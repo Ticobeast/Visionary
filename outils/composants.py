@@ -19,7 +19,7 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août
 COLONNES_VUE = ["chantier_id", "client_id", "client_nom_complet", "telephone", "adresse", "ville", "code_postal",
                 "adresse_maps", "type_libelle", "travaux_detail", "description", "statut", "statut_paiement", "solde",
                 "total_ttc", "paye", "prix_ht", "date_prevue", "ordre_jour", "duree_estimee_h", "attente_depuis",
-                "modalite_paiement", "date_facture", "secteur", "nacelle", "debarrasser_bois", "bois_format", "secteur_tri"]
+                "modalite_paiement", "secteur", "nacelle", "debarrasser_bois", "bois_format", "secteur_tri"]
 
 
 # ---------------------------------------------------------------------------
@@ -66,28 +66,7 @@ def mode_conseille(modalite):
     return modalite if modalite in MODES else "interac"
 
 
-VERROUILLE = '<span class="badge b-termine" title="Chantier terminé : verrouillé en lecture seule">🔒 Terminé</span>'
-
-
-def bouton_encaisser(l, retour):
-    """« Encaisser » en un clic : le montant prévu (le solde) est affiché mais NON modifiable ; on confirme seulement.
-
-    Un montant partiel (acompte) s'enregistre sur la page du chantier. Seuls les chantiers planifiés ou terminés s'encaissent.
-    """
-    if l["statut"] not in ("planifie", "termine") or not l["solde"] or l["solde"] <= 0 or not l["total_ttc"]:
-        return ""
-    mode = mode_conseille(l["modalite_paiement"])
-    options = "".join(f'<option value="{m}"{" selected" if m == mode else ""}>{esc(LIBELLES_MODE[m])}</option>' for m in MODES)
-    texte = f"Encaisser {argent(l['solde'])} ?"
-    return (f'<form class="mini encaisser" method="post" action="/action/encaisser" onsubmit="return confirm({esc(repr(texte))})">'
-            f'<input type="hidden" name="chantier_id" value="{l["chantier_id"]}"><input type="hidden" name="retour" value="{esc(retour)}">'
-            f'<span class="doux">Montant prévu :<br><b class="nw">{argent(l["solde"])}</b></span>'
-            f'<select name="mode" aria-label="Mode de paiement">{options}</select><button type="submit">Encaisser</button></form>')
-
-
-def paiement_cellule(l, retour):
-    """État du paiement (lecture seule) + bouton Encaisser."""
-    return paiement_lecture(l) + bouton_encaisser(l, retour)
+VERROUILLE = '<span class="badge b-termine" title="Chantier terminé : verrouillé en lecture seule">Terminé</span>'
 
 
 def cellule_client(l):
@@ -102,7 +81,7 @@ def cellule_adresse(l):
 
 
 def cellule_travaux(l):
-    duree = f'<span class="total">⏱ {heures(l["duree_estimee_h"])}</span>' if l["duree_estimee_h"] else '<span class="doux">durée à estimer</span>'
+    duree = f'<span class="total">Durée {heures(l["duree_estimee_h"])}</span>' if l["duree_estimee_h"] else '<span class="doux">durée à estimer</span>'
     desc = f'<div class="doux">{esc(l["description"])}</div>' if l["description"] else ""
     options = puces_options(l["nacelle"], l["debarrasser_bois"], l["bois_format"])
     return (f'<a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a><div>{duree}</div>'
@@ -117,37 +96,47 @@ def cellule_montant(l):
     return f'<div class="montant">{argent(l["total_ttc"])}{avant}</div>'
 
 
-def paiement_lecture(l):
-    """État du paiement en lecture seule : statut, reçu et solde (aucun formulaire)."""
-    sp = l["statut_paiement"]
-    out = []
-    if sp not in ("sans_objet", "a_venir"):
-        out.append(badge(sp, LIBELLES_PAIEMENT[sp]))
-    if l["paye"]:
-        out.append(f'<div class="doux">reçu {argent(l["paye"])}'
-                   + (f' · solde <b>{argent(l["solde"])}</b>' if l["solde"] and l["solde"] > 0 else "") + "</div>")
-    if l["modalite_paiement"] and sp not in ("paye", "sans_objet"):
-        out.append(f'<div class="doux">Règlement prévu : {esc(LIBELLES_MODE.get(l["modalite_paiement"], l["modalite_paiement"]))}</div>')
-    return "".join(out) or '<span class="doux">—</span>'
+def bouton_terminer(l, retour):
+    """« Terminer » sur un chantier planifié : ouvre une fenêtre de confirmation (avec « payé ou pas »)."""
+    if l["statut"] == "planifie":
+        return f'<a class="bouton" href="{esc(avec_params(retour, terminer=l["chantier_id"], ok=None, err=None))}">Terminer</a>'
+    if l["statut"] == "termine":
+        return '<span class="doux">Terminé</span>'
+    return ""
 
 
 def fenetre_terminer(conn, chantier_id, chemin, query):
-    """Fenêtre de confirmation affichée après un encaissement sur un chantier « Planifié ».
+    """Fenêtre « Terminer ce chantier » : confirmation, et le client a-t-il payé ou pas.
 
-    Vide si le chantier n'existe plus ou n'est plus « Planifié » (lien périmé).
+    Une fois terminé, le chantier est verrouillé et le client est considéré comme facturé. Vide si le chantier n'existe plus
+    ou n'est plus « Planifié » (lien périmé).
     """
-    r = conn.execute("SELECT statut, client_nom_complet, travaux_detail, type_libelle, duree_estimee_h FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
+    r = conn.execute("SELECT statut, client_nom_complet, travaux_detail, type_libelle, duree_estimee_h, solde, prix_ht, modalite_paiement"
+                     " FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
     if r is None or r[0] != "planifie":
         return ""
+    _, nom, detail, type_, duree, solde, prix, modalite = r
     reste = {k: v for k, v in query.items() if k not in ("terminer", "ok", "err")}
     retour = chemin + ("?" + urlencode(reste) if reste else "")
+    if prix is not None and solde and solde > 0:
+        mode = mode_conseille(modalite)
+        options = "".join(f'<option value="{m}"{" selected" if m == mode else ""}>{esc(LIBELLES_MODE[m])}</option>' for m in MODES)
+        paiement = (f'<p class="question">Le client a-t-il payé ?</p>'
+                    f'<p><label class="coche"><input type="radio" name="paye" value="oui"> Oui, payé en totalité : <b>{esc(argent(solde))}</b></label></p>'
+                    f'<p><label class="coche"><input type="radio" name="paye" value="non" checked> Pas encore payé</label></p>'
+                    f'<div style="margin-bottom:12px"><label for="mode">Mode de paiement (si payé)</label>'
+                    f'<select id="mode" name="mode">{options}</select></div>')
+    elif prix is None:
+        paiement = '<p class="doux">Le prix n\'est pas saisi : ajoute-le sur la page du chantier pour enregistrer un paiement.</p>'
+    else:
+        paiement = '<p class="doux">Ce chantier est déjà payé en totalité.</p>'
     return (f'<div class="modale" role="dialog" aria-modal="true" aria-labelledby="modale-titre"><div class="modale-carte">'
-            f'<h2 id="modale-titre">Paiement enregistré</h2><p><b>{esc(r[1])}</b> — {esc(r[2] or r[3])}</p>'
-            f'<p class="question">Voulez-vous passer ce chantier au statut &quot;Terminé&quot; ?</p>'
-            f'<p class="doux">Une fois terminé, le chantier est verrouillé en lecture seule.</p>'
-            f'<div class="barre"><form method="post" action="/action/terminer"><input type="hidden" name="chantier_id" value="{chantier_id}">'
-            f'<input type="hidden" name="retour" value="{esc(retour)}">'
-            f'<div style="margin-bottom:12px"><label for="duree_reelle_h">Durée réelle (heures) — reprise de la durée estimée</label>'
-            f'<input id="duree_reelle_h" name="duree_reelle_h" value="{r[4] and format(r[4], "g") or ""}" inputmode="decimal"></div>'
-            f'<button type="submit">Oui, passer à Terminé</button></form>'
-            f'<a class="bouton secondaire" href="{esc(retour)}">Non, laisser Planifié</a></div></div></div>')
+            f'<h2 id="modale-titre">Terminer ce chantier</h2><p><b>{esc(nom)}</b> : {esc(detail or type_)}</p>'
+            f'<p class="question">Confirmes-tu que ce chantier est terminé ?</p>'
+            f'<form method="post" action="/action/terminer"><input type="hidden" name="chantier_id" value="{chantier_id}">'
+            f'<input type="hidden" name="retour" value="{esc(retour)}">{paiement}'
+            f'<div style="margin-bottom:12px"><label for="duree_reelle_h">Durée réelle (heures), reprise de la durée estimée</label>'
+            f'<input id="duree_reelle_h" name="duree_reelle_h" value="{duree and format(duree, "g") or ""}" inputmode="decimal"></div>'
+            f'<p class="doux">Une fois terminé, le chantier est verrouillé en lecture seule et le client est considéré comme facturé.</p>'
+            f'<div class="barre"><button type="submit">Oui, il est terminé</button>'
+            f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form></div></div>')

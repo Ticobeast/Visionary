@@ -16,10 +16,10 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
-import importer_saisie  # noqa: E402
+sys.path.insert(0, str(RACINE / "tests"))
+import fixtures  # noqa: E402
 import interface  # noqa: E402
 
-EXEMPLES = RACINE / "modeles" / "saisie_papier_exemples.csv"
 
 
 def fiche(**perso):
@@ -33,7 +33,7 @@ class BaseInterface(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.db = Path(self._tmp.name) / "data" / "t.db"
-        importer_saisie.importer(EXEMPLES, self.db)
+        fixtures.creer_exemples(self.db)
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -75,7 +75,8 @@ class TestPages(BaseInterface):
         self.assertNotIn("Marie Gagnon", actifs)                 # terminé ET payé : archivé automatiquement
         self.assertIn("Marie Gagnon", archives)
         self.assertIn("Archives (1)", page)
-        self.assertIn("à facturer", page)
+        self.assertIn("à recevoir", page)
+        self.assertNotIn("à facturer", page)
         self.assertIn("1 437,19 $", actifs)                      # Lavoie : 1250 + taxes, non facturé
         self.assertNotIn('class="onglet', page)                        # plus d'onglets : une seule section principale
         entete = page[page.index("<header>"):page.index("</header>")]
@@ -83,8 +84,7 @@ class TestPages(BaseInterface):
 
     def test_un_chantier_termine_et_paye_rejoint_les_archives_tout_seul(self):
         self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers")[1]))
-        self.post("/chantier/2/facturer", {"date_facture": "2026-10-02"})
-        self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers")[1]))     # facturé, pas encore payé : reste actif
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 2"), [("a_payer",)])      # terminé = facturé d'office
         self.post("/chantier/2/paiement", {"paiement_date": "2026-10-03", "paiement_montant": "1437,19", "paiement_mode": "cheque"})
         page = self.get("/chantiers")[1]
         self.assertNotIn("Pierre Lavoie", self.partie_active(page))
@@ -95,8 +95,8 @@ class TestPages(BaseInterface):
         self.assertIn("Luc Boucher", self.partie_active(self.get("/chantiers")[1]))
 
     def test_filtres_et_recherche_sans_accent(self):
-        self.assertNotIn("Luc Boucher", self.partie_active(self.get("/chantiers?paiement=non_facture")[1]))
-        self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers?paiement=non_facture")[1]))
+        self.assertNotIn("Luc Boucher", self.partie_active(self.get("/chantiers?paiement=a_payer")[1]))
+        self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers?paiement=a_payer")[1]))
         self.assertIn("Luc Boucher", self.partie_active(self.get("/chantiers?statut=planifie")[1]))
         self.assertNotIn("Pierre Lavoie", self.partie_active(self.get("/chantiers?statut=planifie")[1]))
         self.assertIn("Marie Gagnon", self.partie_archives(self.get("/chantiers?q=erables")[1]))    # « Érables » trouvé sans accent
@@ -140,6 +140,22 @@ class TestPages(BaseInterface):
         self.assertIn("&lt;script&gt;", self.get("/clients")[1])
 
 
+class TestAucunEmoji(BaseInterface):
+    """Aucun emoji (ni symbole pictural) dans l'interface."""
+
+    MOTIF = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u25A0-\u25FF\u23E0-\u23FF\uFE0F\u2190-\u21FF]")
+
+    def test_toutes_les_pages(self):
+        jour = self.sql("SELECT date_prevue FROM chantiers WHERE id = 3")[0][0]
+        pages = [("/", {}), ("/", {"date": jour, "terminer": "3"}), ("/journee", {"date": jour}), ("/journee", {"date": jour, "terminer": "3"}),
+                 ("/chantiers", {}), ("/clients", {}), ("/nouveau", {}), ("/secteurs", {}), ("/client/1", {}), ("/client/1/modifier", {}),
+                 ("/client/1/chantier/nouveau", {}), ("/chantier/1", {}), ("/chantier/2", {}), ("/chantier/3", {}), ("/chantier/3/dupliquer", {})]
+        for chemin, query in pages:
+            page = interface.repondre(self.db, "GET", chemin, query)[2].decode("utf-8")
+            trouves = self.MOTIF.findall(page.split("</style>", 1)[-1])
+            self.assertEqual(trouves, [], f"{chemin} {query}")
+
+
 class TestCreation(BaseInterface):
     def test_creation_complete(self):
         statut, en_tetes, _ = self.post("/nouveau", fiche(
@@ -167,7 +183,7 @@ class TestCreation(BaseInterface):
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
 
     def test_refus_de_la_base_est_affiche(self):
-        _, _, page = self.post("/nouveau", fiche(date_facture="2026-06-14"))   # facture sans prix
+        _, _, page = self.post("/nouveau", fiche(paiement_date="2026-06-14", paiement_montant="50", paiement_mode="interac"))   # paiement sans prix
         self.assertIn("Refusé par la base", page)
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])      # transaction annulée : pas de client orphelin
 
@@ -353,7 +369,7 @@ class TestSimpleParDefaut(BaseInterface):
         self.assertIn("Paramètres avancés", page)
         self.assertNotIn("date_prevue", self.noms(cache))                      # la date des travaux vient de la Journée
         for avance in ("client_entreprise", "client_courriel", "code_postal", "notes_acces", "latitude", "statut", "date_soumission",
-                       "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture", "paiement_montant", "dossier_photos", "fichier_papier"):
+                       "tps", "tvq", "modalite_paiement", "paiement_montant", "dossier_photos", "fichier_papier"):
             self.assertIn(avance, self.noms(cache), avance)
             self.assertNotIn(avance, self.noms(visible), avance)
         self.assertNotIn(" open", page[page.index('<details class="avance"'):][:30])     # replié par défaut
@@ -366,7 +382,7 @@ class TestSimpleParDefaut(BaseInterface):
                          [("soumission", 2.0, 300.0, datetime.date.today().isoformat())])
 
     def test_les_parametres_avances_sont_pris_en_compte(self):
-        self.post("/nouveau", fiche(modalite_paiement="carte", client_courriel="s@example.com", code_postal="j7j1a1", numero_facture=""))
+        self.post("/nouveau", fiche(modalite_paiement="carte", client_courriel="s@example.com", code_postal="j7j1a1"))
         self.assertEqual(self.sql("SELECT modalite_paiement FROM chantiers WHERE id = 4"), [("carte",)])
         self.assertEqual(self.sql("SELECT courriel, code_postal FROM clients WHERE nom = 'Roy'"), [("s@example.com", "J7J 1A1")])
 
@@ -381,7 +397,7 @@ class TestSimpleParDefaut(BaseInterface):
         champs = {c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))}
         # planifié : le statut et la date sont affichés (gérés par la Journée), pas des champs
         self.assertEqual(champs, {"nacelle", "debarrasser_bois", "bois_format", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
-        for avance in ("date_soumission", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
+        for avance in ("date_soumission", "duree_reelle_h", "tps", "tvq", "modalite_paiement",
                        "ref_papier", "fichier_papier", "dossier_photos"):
             self.assertIn(avance, self.noms(cache), avance)
         self.assertIn("Autres chantiers de ce client", cache)
@@ -404,8 +420,7 @@ class TestSimpleParDefaut(BaseInterface):
         page = self.get("/chantier/2")[1]
         visible, _, cache = page.partition('<details class="avance"')
         self.assertIn("verrouillé en lecture seule", visible)
-        self.assertIn("Ajouter le paiement", visible)
-        self.assertIn("Marquer comme facturé", visible)
+        self.assertIn("Ajouter un paiement", visible)
         self.assertNotIn("Fiche papier", visible)
         self.assertIn("Fiche papier", cache)                                       # le détail complet est replié
         self.assertIn("Autres chantiers de ce client", cache)
@@ -433,8 +448,8 @@ class TestTermineVerrouille(BaseInterface):
         self.assertNotIn("Supprimer ce chantier", page)
         self.assertNotIn('name="statut"', page)
         self.assertIn("Dupliquer le chantier", page)
-        self.assertIn("Marquer comme facturé", page)                       # la facturation reste possible
-        self.assertIn("Ajouter le paiement", page)                         # et l'encaissement
+        self.assertNotIn("acturer", page)                                  # plus de système de facture
+        self.assertIn("Ajouter un paiement", page)                         # l'encaissement reste possible
 
     def test_toute_modification_par_le_serveur_est_refusee(self):
         avant = self.sql("SELECT * FROM chantiers WHERE id = 2")
@@ -465,20 +480,19 @@ class TestTermineVerrouille(BaseInterface):
                         "UPDATE chantier_travaux SET precision = 'x' WHERE chantier_id = 2"):
             with self.assertRaises(sqlite3.IntegrityError, msg=requete):
                 c.execute(requete)
-        c.execute("UPDATE chantiers SET numero_facture = '2026-099', date_facture = '2026-10-02' WHERE id = 2")   # facturer : permis
         c.close()
 
 
 class TestPaiementsEtSuppression(BaseInterface):
     def test_ajouter_et_supprimer_un_paiement(self):
-        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 2"), [("non_facture",)])
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 2"), [("a_payer",)])
         statut, en_tetes, _ = self.post("/chantier/2/paiement", {"paiement_date": "2026-10-02", "paiement_montant": "1 437,19",
                                                                   "paiement_mode": "cheque", "paiement_reference": "#0418"})
         self.assertEqual(en_tetes["Location"], "/chantier/2?ok=paiement")
         self.assertEqual(self.sql("SELECT statut_paiement, solde FROM v_chantiers WHERE chantier_id = 2"), [("paye", 0.0)])
         pid = self.sql("SELECT max(id) FROM paiements")[0][0]
         self.post(f"/paiement/{pid}/supprimer", {})
-        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 2"), [("non_facture",)])
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 2"), [("a_payer",)])
 
     def test_paiement_invalide(self):
         for form in ({"paiement_date": "2026-10-02", "paiement_montant": "", "paiement_mode": "interac"},
@@ -504,11 +518,11 @@ class TestPaiementsEtSuppression(BaseInterface):
         self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 2"), [(1,)])
         self.assertEqual(self.sql("SELECT min(solde) FROM v_chantiers"), [(0.0,)])
 
-    def test_encaisser_rapide_ne_depasse_jamais_le_solde(self):
-        # le montant n'est pas modifiable : on encaisse exactement le solde (2 029,45 $), quoi que le navigateur envoie
-        self.post("/action/encaisser", {"chantier_id": "3", "montant": "9999", "mode": "interac", "retour": "/"})
+    def test_terminer_et_payer_encaisse_exactement_le_solde(self):
+        # chantier 3 : planifié, solde 2 029,45 $ ; le montant n'est jamais saisi, quoi que le navigateur envoie
+        self.post("/action/terminer", {"chantier_id": "3", "paye": "oui", "mode": "interac", "montant": "9999", "retour": "/"})
         self.assertEqual(self.sql("SELECT sum(montant) FROM paiements WHERE chantier_id = 3"), [(2529.45,)])
-        self.assertEqual(self.sql("SELECT solde FROM v_chantiers WHERE chantier_id = 3"), [(0.0,)])
+        self.assertEqual(self.sql("SELECT statut, solde, archive FROM v_chantiers WHERE chantier_id = 3"), [("termine", 0.0, 1)])
 
     def test_la_base_refuse_un_solde_negatif(self):
         c = sqlite3.connect(self.db)
@@ -547,8 +561,8 @@ class TestDuplication(BaseInterface):
         self.assertEqual(en_tetes["Location"], "/chantier/4?ok=duplique")
         aujourdhui = datetime.date.today().isoformat()
         self.assertEqual(self.sql("SELECT client_id, statut, date_soumission, date_prevue, ordre_jour, duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq,"
-                                  " modalite_paiement, numero_facture, date_facture, description FROM chantiers WHERE id = 4"),
-                         [(1, "soumission", aujourdhui, None, None, 3.5, None, 520.0, 26.0, 51.87, "interac", None, None, "Taille annuelle")])
+                                  " modalite_paiement, description FROM chantiers WHERE id = 4"),
+                         [(1, "soumission", aujourdhui, None, None, 3.5, None, 520.0, 26.0, 51.87, "interac", "Taille annuelle")])
         self.assertEqual(self.sql("SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = 4"), [("taille_haie", "cèdres côté rue et côté voisin, environ 35 m, hauteur 2 m")])
         self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 4"), [(0,)])
         self.assertEqual(self.sql("SELECT statut, prix_ht FROM chantiers WHERE id = 1"), [("termine", 480.0)])      # l'original n'a pas bougé

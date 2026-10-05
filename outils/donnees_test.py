@@ -7,7 +7,7 @@
 
 Sert à s'entraîner et à tester avant de saisir tes vrais dossiers. Refuse de toucher à la
 vraie base (sylvainculteur.db). Les dates sont calculées par rapport à aujourd'hui : on y
-trouve des chantiers passés (payés, impayés, non facturés), des chantiers planifiés et des
+trouve des chantiers passés (payés, à recevoir), des chantiers planifiés et des
 soumissions. Téléphones en 555-01xx (réservés à la fiction).
 """
 import argparse
@@ -85,15 +85,12 @@ def generer(db, nombre=40, graine=2026):
                          date_prevue=jour(realise),
                          duree_reelle_h=f"{min(duree + rnd.choice([-0.5, 0, 0, 0.5, 1]), 8):g}")
             etat = rnd.random()
-            if etat < 0.70:    # facturé et payé
-                ligne.update(date_facture=jour(realise), numero_facture=f"{realise.year}-{k + 1:03d}")
+            if etat < 0.70:    # payé (donc archivé)
                 tps, tvq = taxes_pour(Decimal(str(prix)))
                 total = float(Decimal(str(prix)) + tps + tvq)      # le même total que la base : jamais de solde négatif
                 ligne.update(paiement_date=jour(realise + datetime.timedelta(days=rnd.randint(0, 20))),
                              paiement_montant=f"{total:.2f}", paiement_mode=rnd.choice(MODES))
-            elif etat < 0.85:  # facturé, pas payé
-                ligne.update(date_facture=jour(realise + datetime.timedelta(days=1)), numero_facture=f"{realise.year}-{k + 1:03d}")
-            # sinon : non facturé
+            # sinon : terminé, pas encore payé (à recevoir)
         elif sort < 0.72:      # à venir : planifié, parfois avec acompte
             prevu = aujourdhui + datetime.timedelta(days=rnd.randint(1, 25))
             ligne.update(statut="planifie", date_soumission=jour(prevu - datetime.timedelta(days=rnd.randint(5, 20))),
@@ -106,8 +103,8 @@ def generer(db, nombre=40, graine=2026):
                          date_soumission=jour(aujourdhui - datetime.timedelta(days=rnd.choice([1, 2, 4, 6, 9, 14, 20, 28, 33, 41, 55]))))
         v, erreurs = lire_ligne(ligne, alias, taxes_auto=True)
         assert not erreurs, (ligne, erreurs)
-        client_id = trouver_ou_creer_client(conn, idx, v, res, lambda m: None)
-        creer_chantier(conn, client_id, v, res, lambda m: None, verifier_doublon=False)
+        client_id = trouver_ou_creer_client(conn, idx, v, res)
+        creer_chantier(conn, client_id, v, res)
     conn.execute("COMMIT")
     conn.close()
     return res

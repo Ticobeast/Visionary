@@ -72,9 +72,9 @@ def _table_chantiers(lignes):
             date_ += f'<div>{badge_attente(jours, priorite(jours))}</div>'
         prevu = f'<div class="doux">prévu le {esc(dp)}</div>' if dp and st == "planifie" else ""
         paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""
-        if stp in ("non_facture", "a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
+        if stp in ("a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
-        duree_aff = f'<div class="doux">⏱ {esc(heures(duree))}</div>' if duree else ""
+        duree_aff = f'<div class="doux">Durée {esc(heures(duree))}</div>' if duree else ""
         corps += (f'<tr><td>{date_}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
                   f'<td>{esc(adresse)}<div class="doux">{esc(secteur or ville)}</div></td>'
                   f'<td>{esc(type_)}{duree_aff}<div>{puces_options(nacelle, bois, format_bois)}</div></td>'
@@ -96,18 +96,16 @@ def page_chantiers(conn, query):
 
     def puce(href, nombre, texte):
         return f'<a class="puce" href="{href}"><b>{nombre}</b><span>{esc(texte)}</span></a>'
-    nf = conn.execute("SELECT count(*), COALESCE(SUM(solde), 0) FROM v_chantiers WHERE statut_paiement = 'non_facture'").fetchone()
     ar = conn.execute("SELECT count(*), COALESCE(SUM(solde), 0) FROM v_chantiers WHERE statut_paiement IN ('a_payer','partiel')").fetchone()
     pl = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'planifie'").fetchone()[0]
     mq = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut_paiement = 'prix_manquant'").fetchone()[0]
-    puces = (puce("/chantiers?paiement=non_facture", nf[0], f"à facturer · {argent(nf[1])}")
-             + puce("/chantiers?paiement=a_recevoir", ar[0], f"à recevoir · {argent(ar[1])}")
+    puces = (puce("/chantiers?paiement=a_recevoir", ar[0], f"à recevoir · {argent(ar[1])}")
              + puce("/chantiers?statut=planifie", pl, "planifiés")
              + (puce("/chantiers?paiement=prix_manquant", mq, "prix manquants") if mq else ""))
 
     opt_statut = '<option value="">Tous les statuts</option>' + "".join(
         f'<option value="{s}"{" selected" if s == statut else ""}>{LIBELLES_STATUT[s]}</option>' for s in STATUTS)
-    paiements = [("a_recevoir", "À recevoir (facturé ou partiel)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
+    paiements = [("a_recevoir", "À recevoir (terminé non payé, ou acompte)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
     opt_paiement = '<option value="">Tous les paiements</option>' + "".join(
         f'<option value="{k}"{" selected" if k == paiement else ""}>{esc(v)}</option>' for k, v in paiements)
     select_sect, _ = select_secteur(lister_secteurs(conn), {"secteur": secteur}, nom="secteur", requis=False, tout="Tous les secteurs")
@@ -128,8 +126,8 @@ def page_chantiers(conn, query):
         archives_html = _table_chantiers(archives) + suite
     else:
         archives_html = '<div class="carte doux">Aucune archive' + (" ne correspond à cette recherche." if total_archives else " pour l'instant.") + "</div>"
-    lien_archives = f' <a class="doux" href="#archives">Archives ({total_archives}) ↓</a>' if total_archives else ""
-    section_archives = (f'<h2 id="archives" style="margin-top:32px">📦 Archives <small class="doux">({total_archives})</small></h2>'
+    lien_archives = f' <a class="doux" href="#archives">Archives ({total_archives})</a>' if total_archives else ""
+    section_archives = (f'<h2 id="archives" style="margin-top:32px">Archives <small class="doux">({total_archives})</small></h2>'
                         '<p class="doux">Chantiers <b>annulés</b>, et chantiers <b>terminés et payés</b> : ils sont déplacés ici automatiquement. '
                         'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent.</p>'
                         + archives_html)
@@ -159,12 +157,12 @@ def page_nouveau(conn, query):
 def creer(conn, form):
     brut, v, erreurs = lire_formulaire(conn, form)
     if not erreurs:
-        res, avertissements = Resultat(), []
+        res = Resultat()
         try:
             with transaction(conn):
                 # un client déjà connu (même adresse) est réutilisé TEL QUEL : sa fiche ne se modifie que depuis la fiche client
-                client_id = trouver_ou_creer_client(conn, Index(conn), v, res, avertissements.append, enrichir=False)
-                chantier_id = creer_chantier(conn, client_id, v, res, avertissements.append, verifier_doublon=False)
+                client_id = trouver_ou_creer_client(conn, Index(conn), v, res)
+                chantier_id = creer_chantier(conn, client_id, v, res)
             ok = "cree_reutilise" if res.clients_reutilises else "cree"
             return redirection(f"/chantier/{chantier_id}?ok={ok}")
         except sqlite3.IntegrityError as e:
@@ -281,6 +279,13 @@ def main(argv=None):
     p.add_argument("--sans-navigateur", action="store_true", help="ne pas ouvrir le navigateur automatiquement")
     a = p.parse_args(argv)
     db = DB_DEFAUT.parent / "test.db" if a.essai else Path(a.db)
+    if a.essai and db.exists() and db.stat().st_size > 0:
+        ancienne = sqlite3.connect(db)
+        version = ancienne.execute("PRAGMA user_version").fetchone()[0]
+        ancienne.close()
+        if version != noyau.VERSION_SCHEMA:        # base d'essai d'une version précédente : de fausses données, on la refait
+            db.unlink()
+            print("Ancienne base d'essai (format périmé) supprimée : elle est recréée.")
     if a.essai and not (db.exists() and db.stat().st_size > 0):
         import donnees_test
         res = donnees_test.generer(db)

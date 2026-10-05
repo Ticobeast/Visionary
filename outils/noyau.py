@@ -1,22 +1,21 @@
 """Noyau partagé : validation d'une fiche et écriture dans la base SQLite.
 
-Utilisé par l'import CSV (importer_saisie.py) et par l'interface de saisie
-(interface.py), pour que les deux appliquent exactement les mêmes règles.
-Bibliothèque standard seulement (Python 3.8+).
+Utilisé par l'interface (interface.py) et par le générateur de données d'essai (donnees_test.py), pour que tout
+passe par les mêmes règles. Bibliothèque standard seulement (Python 3.9+).
 """
 import datetime
 import re
 import sqlite3
 import unicodedata
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 6
+VERSION_SCHEMA = 7
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -38,13 +37,12 @@ COLONNES = [
     "type_travaux", "nacelle", "debarrasser_bois", "bois_format", "statut", "description",
     "date_soumission", "date_prevue",
     "duree_estimee_h", "duree_reelle_h",
-    "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
+    "prix_ht", "tps", "tvq", "modalite_paiement",
     "paiement_date", "paiement_montant", "paiement_mode",
     "notes_acces", "ref_papier", "fichier_papier", "dossier_photos",
     "client_telephone_2", "client_courriel", "client_sms_ok", "client_notes",
     "province", "latitude", "longitude",
 ]
-COLONNES_REQUISES = ("adresse", "ville", "type_travaux", "statut")
 
 # Statuts officiels, dans l'ordre du parcours d'un chantier.
 STATUTS = ("soumission", "en_attente", "a_planifier", "planifie", "termine", "annule")
@@ -52,8 +50,6 @@ LIBELLES_STATUT = {"soumission": "Soumission", "en_attente": "En attente", "a_pl
                    "planifie": "Planifié", "termine": "Terminé", "annule": "Annulé"}
 # Statuts sans date : le chantier n'est pas (encore) placé dans une journée.
 STATUTS_SANS_DATE = ("soumission", "en_attente", "a_planifier")
-# Anciens noms toujours compris (vieilles feuilles CSV) : Accepté -> À planifier, Refusé -> Annulé.
-ALIAS_ANCIENS_STATUTS = {"accepte": "a_planifier", "refuse": "annule"}
 MODES = ("comptant", "cheque", "interac", "carte", "autre")
 LIBELLES_MODE = {"comptant": "Comptant", "cheque": "Chèque", "interac": "Interac", "carte": "Carte", "autre": "Autre"}
 # Bois qui reste sur place (abattage / élagage) : format des morceaux.
@@ -302,7 +298,7 @@ def lire_ligne(brut, alias_types, taxes_auto):
     _lire_client(L, v)
 
     v["travaux"] = L.travaux("type_travaux", alias_types)
-    alias_statuts = {**{cle(c): c for c in STATUTS}, **{cle(l): c for c, l in LIBELLES_STATUT.items()}, **ALIAS_ANCIENS_STATUTS}
+    alias_statuts = {**{cle(c): c for c in STATUTS}, **{cle(l): c for c, l in LIBELLES_STATUT.items()}}
     v["statut"] = L.choix("statut", STATUTS, alias_statuts, obligatoire=True)
     v["nacelle"] = L.booleen("nacelle") or 0
     v["debarrasser_bois"] = L.booleen("debarrasser_bois") or 0
@@ -326,8 +322,6 @@ def lire_ligne(brut, alias_types, taxes_auto):
     if taxes_auto and v["prix_ht"] is not None and v["tps"] is None and v["tvq"] is None:
         v["tps"], v["tvq"] = taxes_pour(v["prix_ht"])
     v["modalite_paiement"] = L.choix("modalite_paiement", MODES, {**{cle(c): c for c in MODES}, **{cle(l): c for c, l in LIBELLES_MODE.items()}})
-    v["numero_facture"] = L.texte("numero_facture")
-    v["date_facture"] = L.jour("date_facture")
 
     v["paiement_date"] = L.jour("paiement_date")
     v["paiement_montant"] = L.montant("paiement_montant")
@@ -372,11 +366,11 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (1, 2, 3, 4, 5):
-            raise SystemExit(f"La base {db_path} utilise un ancien format (v{version}).\n"
-                             f"Convertis-la d'abord (une sauvegarde est faite) :  python outils/migrer.py \"{db_path}\"")
         if version != VERSION_SCHEMA:
-            raise SystemExit(f"Version de schéma inattendue ({version}, attendu : {VERSION_SCHEMA}).")
+            conn.close()
+            raise SystemExit(f"La base {db_path} a été créée par une version précédente du programme (format v{version}, attendu v{VERSION_SCHEMA}).\n"
+                             "Comme il n'y a pas encore de vraies données, supprime simplement ce fichier : il sera recréé au prochain lancement "
+                             "(pour la base d'essai, relance lancer_essai).")
     return conn, existait
 
 
@@ -389,7 +383,7 @@ def alias_types_travaux(conn):
     return alias
 
 
-def sauvegarder(db, etiquette="avant_import"):
+def sauvegarder(db, etiquette="sauvegarde"):
     """Copie cohérente de la base dans data/sauvegardes/. Ne remplace jamais une sauvegarde existante."""
     db = Path(db)
     dossier = db.parent / "sauvegardes"
@@ -462,53 +456,19 @@ class Resultat:
     clients_crees: int = 0
     clients_reutilises: int = 0
     paiements: int = 0
-    doublons: int = 0
-    erreurs: list = field(default_factory=list)        # [(no_ligne, [messages])]
-    avertissements: list = field(default_factory=list)  # [texte]
-    sauvegarde: object = None
 
 
 def _num(d):
     return None if d is None else float(d)
 
 
-def _enrichir(conn, id_, nouvelles, texte_libre, avertir):
-    """Complète les champs vides d'un client existant ; signale les contradictions."""
-    cols = [c for c, val in nouvelles.items() if val is not None]
-    if not cols:
-        return
-    actuel = dict(zip(cols, conn.execute(
-        f"SELECT {', '.join(cols)} FROM clients WHERE id = ?", (id_,)).fetchone()))
-    maj = {}
-    for c in cols:
-        ancien, nouveau = actuel[c], nouvelles[c]
-        if ancien is None:
-            maj[c] = nouveau
-        elif cle(ancien) == cle(nouveau):
-            continue
-        elif c in texte_libre:
-            maj[c] = f"{ancien}\n{nouveau}"
-        else:
-            avertir(f"client #{id_} : {c} déjà « {ancien} », « {nouveau} » ignoré")
-    if maj:
-        conn.execute(
-            f"UPDATE clients SET {', '.join(f'{c} = ?' for c in maj)} WHERE id = ?",
-            (*maj.values(), id_))
+def trouver_ou_creer_client(conn, idx, v, res):
+    """Retourne l'id du client de la fiche v : le client déjà présent à cette adresse, ou un nouveau.
 
-
-def trouver_ou_creer_client(conn, idx, v, res, avertir, enrichir=True):
-    """Retourne l'id du client de la fiche v : le client existant ou un nouveau.
-
-    enrichir=True (import CSV) : les champs vides du client existant sont complétés. enrichir=False (formulaires) :
-    la fiche d'un client existant n'est JAMAIS modifiée (seule la fiche client le permet).
+    La fiche d'un client existant n'est JAMAIS modifiée ici (seule la fiche client le permet).
     """
-    client_id, via = idx.trouver(v)
-    a_coords = v["latitude"] is not None
+    client_id, _ = idx.trouver(v)
     if client_id is None:
-        autre = idx.ailleurs(v)
-        if autre is not None:
-            avertir(f"même téléphone que le client #{autre} mais à une autre adresse : "
-                    "nouvelle fiche client (2e propriété ?)")
         cur = conn.execute(
             "INSERT INTO clients (prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok,"
             " adresse, ville, secteur, province, code_postal, latitude, longitude, geocode_statut, notes_acces, notes)"
@@ -517,33 +477,11 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir, enrichir=True):
              v["client_telephone_2"], v["client_courriel"],
              1 if v["client_sms_ok"] is None else v["client_sms_ok"],
              v["adresse"], v["ville"], v["secteur"], v["province"], v["code_postal"], v["latitude"], v["longitude"],
-             "manuel" if a_coords else "a_faire", v["notes_acces"], v["client_notes"]))
+             "manuel" if v["latitude"] is not None else "a_faire", v["notes_acces"], v["client_notes"]))
         client_id = cur.lastrowid
         res.clients_crees += 1
     else:
         res.clients_reutilises += 1
-        if via == "telephone":
-            nom_actuel = conn.execute(
-                "SELECT prenom, nom, entreprise FROM clients WHERE id = ?", (client_id,)).fetchone()
-            avertir(f"même adresse et même téléphone que le client #{client_id} "
-                    f"({' '.join(x for x in nom_actuel if x)}) : traité comme le même client")
-        if enrichir:
-            _enrichir(conn, client_id, {
-                "prenom": v["client_prenom"], "nom": v["client_nom"], "entreprise": v["client_entreprise"],
-                "telephone": v["client_telephone"], "telephone_2": v["client_telephone_2"],
-                "courriel": v["client_courriel"], "code_postal": v["code_postal"], "secteur": v["secteur"],
-                "notes": v["client_notes"], "notes_acces": v["notes_acces"],
-            }, {"notes", "notes_acces"}, avertir)
-            if v["client_sms_ok"] == 0:  # un refus de textos l'emporte toujours
-                conn.execute("UPDATE clients SET sms_ok = 0 WHERE id = ?", (client_id,))
-            if a_coords:
-                lat, lon = conn.execute("SELECT latitude, longitude FROM clients WHERE id = ?", (client_id,)).fetchone()
-                if lat is None:
-                    conn.execute("UPDATE clients SET latitude = ?, longitude = ?, geocode_statut = 'manuel' WHERE id = ?",
-                                 (v["latitude"], v["longitude"], client_id))
-                elif (lat, lon) != (v["latitude"], v["longitude"]):
-                    avertir(f"client #{client_id} : coordonnées déjà ({lat}, {lon}), "
-                            f"({v['latitude']}, {v['longitude']}) ignorées")
     ligne = conn.execute(
         "SELECT id, prenom, nom, entreprise, telephone, telephone_2, adresse, ville FROM clients WHERE id = ?",
         (client_id,)).fetchone()
@@ -551,37 +489,16 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir, enrichir=True):
     return client_id
 
 
-def _champs_differents(conn, chantier_id, v):
-    """Champs de la ligne qui contredisent un chantier déjà présent (pour avertir, jamais pour écrire)."""
-    colonnes = ["statut", "duree_estimee_h", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture",
-                "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
-    actuel = dict(zip(colonnes, conn.execute(
-        f"SELECT {', '.join(colonnes)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()))
-    nouveau = {c: (_num(v[c]) if isinstance(v[c], Decimal) else v[c]) for c in colonnes}
-    nouveau["tps"] = nouveau["tps"] or 0.0
-    nouveau["tvq"] = nouveau["tvq"] or 0.0
-    diffs = [c for c in colonnes if nouveau[c] != actuel[c] and not (nouveau[c] is None and c != "statut")]
-    precisions = {code: (precision or None) for code, precision in conn.execute(
-        "SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = ?", (chantier_id,))}
-    if precisions != {code: precision for code, precision in v["travaux"]}:
-        diffs.append("précisions des travaux")
-    if v["paiement_montant"] is not None and not conn.execute(
-            "SELECT 1 FROM paiements WHERE chantier_id = ? AND date_paiement = ? AND montant = ? AND mode = ?",
-            (chantier_id, v["paiement_date"], float(v["paiement_montant"]), v["paiement_mode"])).fetchone():
-        diffs.append("paiement")
-    return diffs
-
-
 def _valeurs_chantier(v):
     return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"], v["nacelle"], v["debarrasser_bois"], v["bois_format"],
             _num(v["duree_estimee_h"]), _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0,
-            _num(v["tvq"]) or 0, v["modalite_paiement"], v["numero_facture"], v["date_facture"], v["dossier_photos"],
+            _num(v["tvq"]) or 0, v["modalite_paiement"], v["dossier_photos"],
             v["fichier_papier"], v["ref_papier"])
 
 
 COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue", "nacelle", "debarrasser_bois", "bois_format",
-                     "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture",
-                     "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
+                     "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement",
+                     "dossier_photos", "fichier_papier", "ref_papier"]
 
 
 def _ecrire_travaux(conn, chantier_id, travaux):
@@ -590,24 +507,8 @@ def _ecrire_travaux(conn, chantier_id, travaux):
                      [(chantier_id, code, precision) for code, precision in travaux])
 
 
-def creer_chantier(conn, client_id, v, res, avertir, verifier_doublon=True):
-    """Crée le chantier (et son paiement éventuel). Retourne son id, ou None si déjà présent."""
-    if verifier_doublon:
-        codes = {code for code, _ in v["travaux"]}
-        candidats = conn.execute(
-            "SELECT id FROM chantiers WHERE client_id = ? AND description IS ? AND date_soumission IS ?"
-            " AND date_prevue IS ? AND prix_ht IS ?",
-            (client_id, v["description"], v["date_soumission"], v["date_prevue"], _num(v["prix_ht"]))).fetchall()
-        for (existant,) in candidats:
-            actuels = {r[0] for r in conn.execute("SELECT type_travaux FROM chantier_travaux WHERE chantier_id = ?", (existant,))}
-            if actuels != codes:
-                continue
-            res.doublons += 1
-            differences = _champs_differents(conn, existant, v)
-            if differences:
-                avertir(f"chantier #{existant} déjà présent : {', '.join(differences)} diffère(nt) "
-                        "dans la ligne, qui est ignorée (corriger dans la base, pas par réimportation)")
-            return None
+def creer_chantier(conn, client_id, v, res):
+    """Crée le chantier (et son paiement éventuel). Retourne son id."""
     cur = conn.execute(
         f"INSERT INTO chantiers (client_id, {', '.join(COLONNES_CHANTIER)}) VALUES (?{',?' * len(COLONNES_CHANTIER)})",
         (client_id, *_valeurs_chantier(v)))
@@ -786,27 +687,6 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
     return []
 
 
-def facturer(conn, chantier_id, date_facture=None, numero_facture=None):
-    """Marque un chantier terminé comme facturé (date de la facture = aujourd'hui par défaut)."""
-    r = conn.execute("SELECT statut, prix_ht, date_facture FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
-    if r is None:
-        return [f"chantier #{chantier_id} introuvable"]
-    statut, prix, deja = r
-    if deja:
-        return [f"déjà facturé le {deja}"]
-    if statut != "termine":
-        return ["seul un chantier terminé peut être facturé"]
-    if prix is None:
-        return ["le prix est manquant : complète la fiche du chantier avant de facturer"]
-    L = Ligne({"date_facture": date_facture or ""})
-    d = L.jour("date_facture")
-    if L.erreurs:
-        return L.erreurs
-    conn.execute("UPDATE chantiers SET date_facture = ?, numero_facture = COALESCE(?, numero_facture) WHERE id = ?",
-                 (d or datetime.date.today().isoformat(), (numero_facture or "").strip() or None, chantier_id))
-    return []
-
-
 def argent_texte(x):
     return f"{x:,.2f} $".replace(",", " ").replace(".", ",")
 
@@ -971,7 +851,7 @@ def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=N
     """Crée une nouvelle SOUMISSION d'après un chantier existant (de n'importe quel statut).
 
     Copie : client, types de travaux et précisions, description, durée estimée, prix, modalité de paiement.
-    Réinitialise : dates (demande = aujourd'hui, pas de date de travaux), paiements, facture, durée réelle, fichiers.
+    Réinitialise : dates (demande = aujourd'hui, pas de date de travaux), paiements, durée réelle, fichiers.
     Le prix peut être ajusté ; les taxes sont alors recalculées (avec_taxes=None : reprend le choix de l'original).
     Retourne (id du nouveau chantier ou None, erreurs).
     """
@@ -1020,16 +900,29 @@ def rouvrir_chantier(conn, chantier_id):
     return changer_statut(conn, chantier_id, "a_planifier")
 
 
-def terminer_chantier(conn, chantier_id, duree_reelle=None):
-    """Passe un chantier « Planifié » à « Terminé » (durée réelle reprise de l'estimée si non fournie), puis le verrouille."""
-    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+def terminer_chantier(conn, chantier_id, duree_reelle=None, paye=False, mode=None):
+    """Passe un chantier « Planifié » à « Terminé », puis le verrouille. Le client est alors considéré comme facturé.
+
+    La durée réelle reprend la durée estimée si elle n'est pas fournie. paye=True enregistre en plus l'encaissement du
+    solde complet (aujourd'hui, avec le mode donné ou, à défaut, le mode de règlement prévu ou Interac) : le chantier
+    est alors terminé ET payé, donc archivé. Tout ou rien (à appeler dans une transaction).
+    """
+    r = conn.execute("SELECT statut, modalite_paiement FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
         return [f"chantier #{chantier_id} introuvable"]
     if r[0] == "termine":
         return [VERROU]
     if r[0] != "planifie":
         return ["seul un chantier planifié (placé dans une journée) peut être terminé"]
-    return changer_statut(conn, chantier_id, "termine", duree_reelle=duree_reelle)
+    erreurs = changer_statut(conn, chantier_id, "termine", duree_reelle=duree_reelle)
+    if erreurs or not paye:
+        return erreurs
+    solde = conn.execute("SELECT solde, prix_ht FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
+    if solde[1] is None:
+        return ["le prix du chantier est manquant : saisis-le avant d'indiquer qu'il est payé"]
+    if solde[0] > 0:
+        return encaisser(conn, chantier_id, f"{solde[0]:.2f}", mode or r[1] or "interac")
+    return []
 
 
 # ---------------------------------------------------------------------------

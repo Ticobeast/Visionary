@@ -126,13 +126,13 @@ class TestChantiersListe(BaseTableau):
         page = self.get("/chantiers")[1]
         self.assertIn(">45 j<", page)                                      # Urgent : 45 jours d'attente
         self.assertIn("a-urgente", page)
-        self.assertIn("⏱ 2 h 30", page)
+        self.assertIn("Durée 2 h 30", page)
         self.assertIn('class="montant"', page)
         self.assertIn("400,00 $", page)                                    # Urgent : 400 $, pas de taxes saisies
         self.assertIn("919,80 $", page)                                    # Fait : 800 + TPS + TVQ
 
-    def test_a_facturer_a_recevoir(self):
-        page = self.get("/chantiers", {"paiement": "non_facture"})[1]
+    def test_a_recevoir(self):
+        page = self.get("/chantiers", {"paiement": "a_recevoir"})[1]
         self.assertIn("Fait", page)
         self.assertNotIn("Urgent", page[page.index("<table"):])
 
@@ -148,7 +148,7 @@ class TestActionsRapides(BaseTableau):
     """Le statut n'est jamais choisi à la main : Planifié (ajout à une journée), À planifier (Retirer), Annulé (Annuler), Terminé (Terminer)."""
 
     def test_aucune_action_ne_choisit_un_statut(self):
-        for chemin in ("/action/statut", "/action/facturer"):
+        for chemin in ("/action/statut", "/action/facturer", "/action/encaisser"):
             self.assertTrue(self.post(chemin, {"chantier_id": str(self.ids["Demain"]), "statut": "termine", "retour": "/"})[0].startswith("404"), chemin)
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (self.ids["Demain"],)), [("planifie",)])
 
@@ -188,58 +188,78 @@ class TestActionsRapides(BaseTableau):
         i = self.ids["Demain"]
         self.post("/action/terminer", {"chantier_id": str(i), "retour": "/"})
         self.assertEqual(self.sql("SELECT statut, date_prevue, duree_reelle_h FROM chantiers WHERE id = ?", (i,)), [("termine", dans(1), 3.0)])
-        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)), [("non_facture",)])
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)), [("a_payer",)])      # client facturé d'office
         _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(self.ids["Urgent"]), "retour": "/"})     # pas planifié
         self.assertIn("err=", en_tetes["Location"])
         _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": "9999", "retour": "/"})
         self.assertIn("err=", en_tetes["Location"])
 
-    def test_facturer_depuis_la_page_du_chantier(self):
+    def test_plus_de_systeme_de_facture(self):
         i = self.ids["Fait"]
-        _, en_tetes, _ = self.post(f"/chantier/{i}/facturer", {})
-        self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=facture")
-        self.assertEqual(self.sql("SELECT date_facture FROM chantiers WHERE id = ?", (i,)), [(AUJOURDHUI.isoformat(),)])
-        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)), [("a_payer",)])
-        self.assertIn("déjà facturé", self.post(f"/chantier/{i}/facturer", {})[2])
-        self.assertIn("seul un chantier terminé", self.post(f"/chantier/{self.ids['Normal']}/facturer", {})[2])
+        self.assertTrue(self.post(f"/chantier/{i}/facturer", {})[0].startswith("404"))
+        page = self.get(f"/chantier/{i}")[1]
+        for absent in ("acturation", "acturer", "N° de facture", "date_facture"):
+            self.assertNotIn(absent, page, absent)
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)), [("a_payer",)])    # terminé = facturé d'office
 
-    def test_facturer_sans_prix_refuse(self):
-        i = self.terminer_sans_toucher("SansPrix", prix=None)           # un terminé est verrouillé : on l'insère tel quel
-        self.assertIn("prix", self.post(f"/chantier/{i}/facturer", {})[2])
-        self.assertEqual(self.sql("SELECT date_facture FROM chantiers WHERE id = ?", (i,)), [(None,)])
+    def test_le_bouton_terminer_ouvre_la_fenetre(self):
+        i = self.ids["Demain"]
+        for chemin in ("/", "/journee"):
+            page = self.get(chemin, {"date": dans(1)})[1]
+            self.assertIn(f"terminer={i}", page)
+            self.assertIn(">Terminer</a>", page)
+            self.assertNotIn("Terminer ce chantier", page)                   # la fenêtre n'est ouverte que sur demande
+        fenetre = self.get("/", {"date": dans(1), "terminer": str(i)})[1]
+        self.assertIn("Terminer ce chantier", fenetre)
+        self.assertIn("Confirmes-tu que ce chantier est terminé ?", fenetre)
+        self.assertIn("Le client a-t-il payé ?", fenetre)
+        self.assertIn('name="paye" value="oui"', fenetre)
+        self.assertIn("Pas encore payé", fenetre)
+        self.assertIn("Oui, il est terminé", fenetre)
+        self.assertRegex(fenetre, r'name="duree_reelle_h" value="3"')       # durée réelle préremplie avec l'estimée
 
-    def test_encaisser_le_montant_prevu_seulement(self):
-        i = self.ids["Fait"]                                                 # 800 + 40 + 79,80 = 919,80 $
-        page = self.get("/journee", {"date": il_y_a(40)})[1]
-        self.assertIn("Montant prévu :<br><b class=\"nw\">919,80 $</b>", page)               # le montant est affiché...
-        self.assertNotIn('name="montant"', page)                             # ...mais ne peut pas être saisi ni modifié
-        self.assertIn("confirm(", page)                                      # on confirme simplement
-        _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": str(i), "mode": "cheque", "montant": "1,00", "retour": "/?date=x"})
-        self.assertEqual(en_tetes["Location"], "/?date=x&ok=encaisse")
-        self.assertEqual(self.sql("SELECT montant, mode, date_paiement FROM paiements WHERE chantier_id = ?", (i,)),
-                         [(919.8, "cheque", AUJOURDHUI.isoformat())])         # un montant envoyé par le navigateur est ignoré
-        self.assertEqual(self.sql("SELECT statut_paiement, solde, archive FROM v_chantiers WHERE chantier_id = ?", (i,)), [("paye", 0.0, 1)])
-        _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": str(i), "mode": "cheque", "retour": "/"})   # plus rien à encaisser
-        self.assertIn("err=", en_tetes["Location"])
-        self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(1,)])
+    def test_la_fenetre_propose_le_mode_de_reglement_prevu(self):
+        conn, _ = noyau.ouvrir_base(self.db)
+        conn.execute("UPDATE chantiers SET modalite_paiement = 'cheque' WHERE id = ?", (self.ids["Demain"],))
+        conn.close()
+        fenetre = self.get("/journee", {"date": dans(1), "terminer": str(self.ids["Demain"])})[1]
+        self.assertIn('<option value="cheque" selected>', fenetre)
 
-    def test_encaisser_refus(self):
-        for chantier, mode in ((self.ids["Fait"], "bitcoin"), (self.ids["Fait"], ""), (self.ids["Urgent"], "interac"),      # mode inconnu / à planifier
-                               (self.ids["Devis"], "interac"), (9999, "interac")):
-            _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": str(chantier), "mode": mode, "retour": "/"})
-            self.assertIn("err=", en_tetes["Location"], (chantier, mode))
+    def test_terminer_pas_encore_paye(self):
+        i = self.ids["Demain"]
+        _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(i), "paye": "non", "retour": f"/?date={dans(1)}&terminer={i}"})
+        self.assertEqual(en_tetes["Location"], f"/?date={dans(1)}&ok=termine")
+        self.assertEqual(self.sql("SELECT statut, archive, statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)), [("termine", 0, "a_payer")])
         self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(0,)])
 
-    def test_encaisser_sur_un_planifie_propose_terminer(self):
-        i = self.ids["Demain"]
-        _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": str(i), "mode": "interac", "retour": "/?date=x"})
-        self.assertIn(f"terminer={i}", en_tetes["Location"])
-        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (i,)), [("planifie",)])     # le statut ne change pas tout seul
+    def test_terminer_et_paye_va_aux_archives(self):
+        i = self.ids["Demain"]                                                # 300 $ + taxes = 344,93 $
+        _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(i), "paye": "oui", "mode": "carte", "montant": "1", "retour": "/"})
+        self.assertIn("ok=termine_paye", en_tetes["Location"])
+        self.assertEqual(self.sql("SELECT statut, archive, statut_paiement, solde FROM v_chantiers WHERE chantier_id = ?", (i,)), [("termine", 1, "paye", 0.0)])
+        self.assertEqual(self.sql("SELECT mode, date_paiement FROM paiements WHERE chantier_id = ?", (i,)), [("carte", AUJOURDHUI.isoformat())])
+        chantiers = self.get("/chantiers")[1]
+        self.assertIn("Demain", chantiers[chantiers.index('id="archives"'):])
 
-    def test_le_mode_propose_suit_la_modalite(self):
-        self.terminer_sans_toucher("ParCheque", prix=100, modalite="cheque")           # terminé il y a 20 jours
-        page = self.get("/journee", {"date": il_y_a(20)})[1]
-        self.assertIn('<option value="cheque" selected>', page)
+    def test_terminer_refus(self):
+        for chantier, extra in ((self.ids["Urgent"], {}), (self.ids["Fait"], {}), (9999, {}), (self.ids["Demain"], {"paye": "oui", "mode": "bitcoin"})):
+            _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(chantier), "retour": "/", **extra})
+            self.assertIn("err=", en_tetes["Location"], (chantier, extra))
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (self.ids["Demain"],)), [("planifie",)])    # tout ou rien
+        self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(0,)])
+
+    def test_un_chantier_termine_n_a_plus_de_bouton_terminer(self):
+        page = self.get("/journee", {"date": il_y_a(40)})[1]
+        self.assertNotIn("terminer=", page)
+        self.assertIn("Terminé", page)
+
+    def test_aucun_paiement_ni_statut_sur_le_tableau_de_bord(self):
+        for chemin in ("/", "/journee"):
+            page = self.get(chemin, {"date": dans(1)})[1]
+            self.assertNotIn("Encaisser", page, chemin)
+            self.assertNotIn("Paiement</th>", page, chemin)
+            self.assertNotIn("Statut</th>", page, chemin)
+            self.assertNotIn('class="badge', page, chemin)
 
     def test_le_retour_ne_peut_pas_etre_une_adresse_externe(self):
         for retour in ("https://pirate.example/", "//pirate.example", "pirate", "/\\pirate.example", ""):
@@ -261,7 +281,7 @@ class TestJournee(BaseTableau):
         self.assertTrue(statut.startswith("200"))
         self.assertIn("1 chantier", page)
         self.assertIn("3 h", page)
-        self.assertIn("7 h 30 → 10 h 30", page)                              # début 7 h 30, 3 h de travail
+        self.assertIn("7 h 30 à 10 h 30", page)                              # début 7 h 30, 3 h de travail
         self.assertEqual(self.noms_dans(page)[0], "Demain")
         self.assertIn('action="/action/retirer"', page)
         self.assertIn("Chantiers à placer", page)

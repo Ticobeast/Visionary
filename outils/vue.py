@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from noyau import DB_DEFAUT, LIBELLES_MODE, LIBELLES_STATUT, MODES  # noqa: F401  (réexportés pour les pages)
 
-LIBELLES_PAIEMENT = {"non_facture": "À facturer", "a_payer": "Facturé, à recevoir", "partiel": "Partiel",
+LIBELLES_PAIEMENT = {"a_payer": "À recevoir", "partiel": "Partiel",
                      "paye": "Payé", "a_venir": "À venir", "sans_objet": "—", "prix_manquant": "Prix manquant"}
 MESSAGES = {
     "cree": "Chantier créé.",
@@ -17,11 +17,11 @@ MESSAGES = {
     "statut_change": "Statut mis à jour.",
     "annule": "Chantier annulé : il a disparu de la journée et il est dans les archives.",
     "rouvert": "Chantier rouvert : il redevient « À planifier ».",
-    "termine": "Chantier terminé : il est maintenant verrouillé.",
+    "termine": "Chantier terminé : il est maintenant verrouillé (le client est considéré comme facturé).",
+    "termine_paye": "Chantier terminé et payé : il est verrouillé et déplacé dans les archives.",
     "secteur_ajoute": "Secteur ajouté.",
     "secteur_maj": "Secteur renommé.",
     "secteur_supprime": "Secteur supprimé.",
-    "facture": "Chantier marqué comme facturé.",
     "encaisse": "Paiement enregistré.",
     "planifie_lot": "Chantiers planifiés pour la journée.",
     "retire": "Chantier retiré de la journée : il redevient « À planifier ».",
@@ -57,7 +57,7 @@ table{width:100%;border-collapse:collapse;background:var(--carte);border:1px sol
 th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--trait);vertical-align:top;font-size:15px}
 td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);font-weight:600}tr:last-child td{border-bottom:0}td a{color:var(--accent-fonce);font-weight:600;text-decoration:none}
 .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:13px;border:1px solid var(--trait);white-space:nowrap}
-.b-non_facture,.b-prix_manquant{background:#fff1d6;color:#7a4b00;border-color:#e8c675}.b-a_payer{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte)}
+.b-prix_manquant{background:#fff1d6;color:#7a4b00;border-color:#e8c675}.b-a_payer{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte)}
 .b-partiel{background:#e3eefb;color:#1e4d86;border-color:#9cbbe3}.b-paye,.b-termine{background:var(--ok-fond);color:var(--accent-fonce);border-color:var(--accent)}
 .erreurs{background:var(--alerte-fond);border:1px solid var(--alerte);color:var(--alerte);border-radius:10px;padding:12px 16px;margin-bottom:16px}
 .erreurs ul{margin:6px 0 0 18px;padding:0}.message{background:var(--ok-fond);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-bottom:16px}
@@ -67,7 +67,7 @@ td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);
 .type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
 .base{margin-left:auto;font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
 @media (max-width:600px){.type{grid-template-columns:1fr}}
-main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-statut{min-width:110px}table.tableau td.col-paiement{min-width:150px}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
+main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-actions{min-width:110px}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
 .attente{display:inline-block;border-radius:6px;padding:2px 8px;font-weight:700;font-size:13px;white-space:nowrap;border:1px solid var(--trait)}
 .a-normale{background:var(--ok-fond);color:var(--accent-fonce);border-color:var(--accent)}
 .a-surveiller{background:#fff1d6;color:#7a4b00;border-color:#e8c675}
@@ -90,8 +90,8 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .cal-jour.occupe{border-color:var(--accent);background:var(--ok-fond)}.cal-jour.chargee{border-color:var(--alerte);background:var(--alerte-fond)}
 .cal-jour.selection{outline:3px solid var(--accent-fonce);outline-offset:-1px}.cal-info{font-size:12px;line-height:1.35}.cal-ligne{display:block}
 form.encaisser{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}form.encaisser select{width:auto;max-width:130px}.cal-alerte{font-size:11px;color:var(--alerte);font-weight:700}
-.col-ordre{width:62px;white-space:nowrap}.col-ordre form{display:inline-block;margin:0 2px 0 0}
-button.fleche{padding:2px 8px;font-size:13px;background:transparent;color:var(--accent-fonce);border:1px solid var(--accent)}button.fleche:disabled{opacity:.3;cursor:default}
+.col-ordre{white-space:nowrap}.col-ordre form{display:block;margin:0 0 4px 0}
+button:disabled{opacity:.3;cursor:default}
 .heures{font-size:16px;white-space:nowrap}tr.diner td{background:var(--fond);color:var(--doux);font-size:13px;text-align:center}
 .modale{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modale-carte{background:var(--carte);border-radius:14px;padding:24px;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)}
@@ -107,6 +107,8 @@ details.avance{background:var(--carte);border:1px solid var(--trait);border-radi
 details.avance>summary{margin-bottom:0}details.avance[open]>summary{margin-bottom:14px}
 details.avance .carte{box-shadow:none;border:1px solid var(--trait)}
 .col-travaux{min-width:200px}.nw{white-space:nowrap}
+input[type=radio],input[type=checkbox]{width:auto;margin:0}
+.modale p{margin:6px 0}.modale label.coche{font-size:17px}
 label.coche,span.coche{display:inline-flex;align-items:center;gap:6px;color:var(--texte);font-size:16px;margin:0}.options-travaux .barre{gap:8px 22px}
 .puce-opt{display:inline-block;background:var(--ok-fond);border:1px solid var(--trait);border-radius:999px;padding:1px 9px;font-size:13px;margin:2px 6px 0 0;white-space:nowrap}
 .resume-chantier{display:flex;gap:20px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start}.resume-chantier>div:first-child{flex:1 1 320px}.resume-chantier .montant{margin-left:auto}
@@ -246,8 +248,8 @@ def bloc_options_travaux(valeurs):
     options = "".join(f'<option value="{c}"{" selected" if c == format_bois else ""}>{esc(l)}</option>'
                       for c, l in (("16_pouces", "16 pouces"), ("4_pieds", "4 pieds")))
     return f"""<div class="large options-travaux"><label>Options du travail</label>
-<div class="barre"><label class="coche"><input type="checkbox" name="nacelle" value="1"{" checked" if valeurs.get("nacelle") == "1" else ""}>🏗 Nacelle requise</label>
-<label class="coche"><input type="checkbox" name="debarrasser_bois" id="debarrasser_bois" value="1"{" checked" if valeurs.get("debarrasser_bois") == "1" else ""}>🪵 Débarrasser le bois</label>
+<div class="barre"><label class="coche"><input type="checkbox" name="nacelle" value="1"{" checked" if valeurs.get("nacelle") == "1" else ""}>Nacelle requise</label>
+<label class="coche"><input type="checkbox" name="debarrasser_bois" id="debarrasser_bois" value="1"{" checked" if valeurs.get("debarrasser_bois") == "1" else ""}>Débarrasser le bois</label>
 <span id="bois-format" class="coche">Bois laissé sur place, format :
 <select name="bois_format" aria-label="Format du bois laissé sur place"><option value="">—</option>{options}</select></span></div>
 <p class="doux" style="margin:4px 0 0">Abattage / élagage : si le bois n'est pas débarrassé, précise son format (16 pouces ou 4 pieds).</p>
@@ -259,11 +261,11 @@ def puces_options(nacelle, debarrasser_bois, bois_format):
     """Options de la job, bien visibles : nacelle, sort du bois (vide si rien de particulier)."""
     puces = []
     if nacelle:
-        puces.append("🏗 Nacelle requise")
+        puces.append("Nacelle requise")
     if debarrasser_bois:
-        puces.append("🪵 Bois débarrassé")
+        puces.append("Bois débarrassé")
     elif bois_format:
-        puces.append("🪵 Bois laissé sur place : " + {"16_pouces": "16 pouces", "4_pieds": "4 pieds"}.get(bois_format, bois_format))
+        puces.append("Bois laissé sur place : " + {"16_pouces": "16 pouces", "4_pieds": "4 pieds"}.get(bois_format, bois_format))
     return "".join(f'<span class="puce-opt">{esc(p)}</span>' for p in puces)
 
 
@@ -289,7 +291,7 @@ def client_avance(valeurs):
 <details style="margin-top:12px"><summary>Coordonnées GPS (seulement pour un lot sans numéro civique)</summary><div class="grille">
 {champ("latitude", "Latitude", valeurs, inputmode="decimal", placeholder="45.6480")}
 {champ("longitude", "Longitude (négative au Québec)", valeurs, inputmode="decimal", placeholder="-74.0920")}</div>
-<p class="doux">Google Maps : clic droit sur l'endroit → cliquer sur les coordonnées pour les copier. Laisser vide sinon : le géocodage se fera plus tard.</p></details></div>"""
+<p class="doux">Google Maps : clic droit sur l'endroit, puis cliquer sur les coordonnées pour les copier. Laisser vide sinon : le géocodage se fera plus tard.</p></details></div>"""
 
 
 def avance(contenu, ouvert=False):

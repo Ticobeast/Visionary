@@ -1,10 +1,10 @@
-"""Pages d'un chantier : formulaire de saisie, consultation / modification, paiements, facture, duplication.
+"""Pages d'un chantier : formulaire de saisie, consultation / modification, paiements, duplication.
 
 Règles appliquées ici :
   * le client (nom, adresse, coordonnées) est en LECTURE SEULE sur toutes les pages d'un chantier, avant et après
     l'enregistrement : il ne se modifie que depuis sa fiche (bouton « Modifier le client »). Le serveur relit
     toujours le client dans la base, quoi que le navigateur envoie ;
-  * un chantier « Terminé » est verrouillé : on le consulte, on peut le facturer et encaisser, rien d'autre ;
+  * un chantier « Terminé » est verrouillé : on le consulte et on peut encaisser (le client est considéré comme facturé d'office), rien d'autre ;
   * jamais de solde négatif : un paiement ne peut pas dépasser ce qu'il reste à payer ;
   * la durée estimée est obligatoire ; la durée réelle n'apparaît qu'au moment de la clôture et se préremplit.
 """
@@ -12,7 +12,7 @@ import datetime
 import sqlite3
 
 from noyau import (COLONNES, STATUTS_MANUELS, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
-                   dupliquer_chantier, encaisser, facturer, lire_ligne, lister_secteurs, mettre_a_jour_fiche,
+                   dupliquer_chantier, encaisser, lire_ligne, lister_secteurs, mettre_a_jour_fiche,
                    supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire, valeurs_client)
 from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, MODES, argent, avance, badge, bloc_options_travaux,
                  bloc_types, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps,
@@ -32,7 +32,7 @@ def valeurs_vides():
 def valeurs_chantier(conn, chantier_id):
     """(valeurs du chantier + de son client sous forme de textes, client_id), ou None."""
     cols = ["client_id", "description", "statut", "date_soumission", "date_prevue", "duree_estimee_h", "duree_reelle_h",
-            "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture", "dossier_photos",
+            "prix_ht", "tps", "tvq", "modalite_paiement", "dossier_photos",
             "fichier_papier", "ref_papier", "nacelle", "debarrasser_bois", "bois_format"]
     r = conn.execute(f"SELECT {', '.join(cols)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
@@ -145,10 +145,10 @@ def cartes_chantier(conn, valeurs, creation):
     statut_creation = ""
     if creation:
         statut_creation = liste("statut", "Statut au départ", [(s, LIBELLES_STATUT[s]) for s in STATUTS_MANUELS], valeurs)
-    avance_html = f"""<div class="carte"><h2>Dates, taxes et facture</h2><div class="grille">
+    avance_html = f"""<div class="carte"><h2>Dates et taxes</h2><div class="grille">
 {statut_creation}{champ("date_soumission", "Date de la demande ou de la soumission", valeurs, "date")}{duree_reelle}
 {champ("tps", "TPS ($) — vide : calculée si la case est cochée", valeurs, inputmode="decimal")}{champ("tvq", "TVQ ($)", valeurs, inputmode="decimal")}
-{champ_modalite(valeurs)}{champ("numero_facture", "N° de facture", valeurs)}{champ("date_facture", "Date de la facture / du reçu", valeurs, "date")}</div>
+{champ_modalite(valeurs)}</div>
 <p class="doux">Le statut « Planifié » vient de la page Journée (ajouter le chantier à une journée) ; « Terminé » et « Annulé » se règlent avec les boutons du chantier. À « Terminé », la durée réelle reprend la durée estimée.</p></div>"""
     if creation:
         avance_html += f"""<div class="carte"><h2>Paiement déjà reçu <span class="doux">(facultatif)</span></h2><div class="grille">
@@ -179,7 +179,7 @@ def carte_client_lecture(conn, client_id):
     nom_complet = " ".join(x for x in (prenom, nom) if x) + (f" · {entreprise}" if entreprise and (prenom or nom) else (entreprise or ""))
     adresse_maps = f"{adresse}, {ville}, {prov}" + (f" {cp}" if cp else "") + ", Canada"
     tels = " · ".join(f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12) or "—"
-    return (f'<div class="lecture-seule"><div class="barre"><h2 style="margin:0">🔒 {esc(nom_complet)}</h2>'
+    return (f'<div class="lecture-seule"><div class="barre"><h2 style="margin:0">{esc(nom_complet)}</h2>'
             f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a>'
             f'<a class="bouton secondaire" href="/client/{client_id}">Fiche client</a></div>'
             f'<p style="margin:8px 0 0"><b>Adresse :</b> {lien_maps(adresse_maps, adresse_maps.replace(", Canada", ""))}</p>'
@@ -199,8 +199,7 @@ def _bloc_lecture(conn, chantier_id, v):
               ("Durée réelle", heures(float(v["duree_reelle_h"])) if v.get("duree_reelle_h") else ""),
               ("Prix avant taxes", argent(float(v["prix_ht"])) if v.get("prix_ht") else ""),
               ("TPS", argent(float(v["tps"])) if v.get("tps") else ""), ("TVQ", argent(float(v["tvq"])) if v.get("tvq") else ""),
-              ("Mode de règlement", LIBELLES_MODE.get(v.get("modalite_paiement"), "")), ("N° de facture", v.get("numero_facture")),
-              ("Date de la facture", v.get("date_facture")), ("Fiche papier", v.get("ref_papier")),
+              ("Mode de règlement", LIBELLES_MODE.get(v.get("modalite_paiement"), "")), ("Fiche papier", v.get("ref_papier")),
               ("Scan de la fiche", v.get("fichier_papier")), ("Photos", v.get("dossier_photos"))]
     corps = "".join(f"<dt>{esc(k)}</dt><dd>{esc(val)}</dd>" for k, val in lignes if val)
     return f'<div class="carte"><h2>Détails</h2><dl class="lecture">{corps}</dl></div>'
@@ -220,7 +219,7 @@ def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
     if prix is None:
         ajout = '<p class="doux">Le prix n\'est pas saisi : renseigne-le pour pouvoir enregistrer un paiement.</p>'
     elif solde is not None and solde <= 0:
-        ajout = '<p class="doux">✔ Ce chantier est entièrement payé. Un solde négatif est interdit : aucun autre paiement ne peut être ajouté.</p>'
+        ajout = '<p class="doux">Ce chantier est entièrement payé. Un solde négatif est interdit : aucun autre paiement ne peut être ajouté.</p>'
     else:
         ajout = f"""{err}<form method="post" action="/chantier/{chantier_id}/paiement"><div class="grille">
 {champ("paiement_date", "Date", ev, "date", required=True)}{champ("paiement_montant", f"Montant ($) — au plus {solde:.2f}".replace(".", ","), ev, inputmode="decimal", required=True)}
@@ -247,15 +246,15 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if trouve is None:
         return gabarit("Introuvable", '<h1>Chantier introuvable</h1><p><a href="/chantiers">Retour à la liste</a></p>'), 404
     depuis_base, client_id = trouve
-    (statut, stp, total, paye, solde, prix, tps, tvq, nom, detail, archive, date_facture, date_prevue, duree,
+    (statut, stp, total, paye, solde, prix, tps, tvq, nom, detail, archive, date_prevue, duree,
      nacelle, bois, format_bois) = conn.execute(
-        "SELECT statut, statut_paiement, total_ttc, paye, solde, prix_ht, tps, tvq, client_nom_complet, travaux_detail, archive, date_facture,"
+        "SELECT statut, statut_paiement, total_ttc, paye, solde, prix_ht, tps, tvq, client_nom_complet, travaux_detail, archive,"
         " date_prevue, duree_estimee_h, nacelle, debarrasser_bois, bois_format FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
     termine = statut == "termine"
     badges = (badge(statut, LIBELLES_STATUT[statut]) + (badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else "")
-              + ('<span class="badge">📦 Archivé</span>' if archive else ""))
+              + ('<span class="badge">Archivé</span>' if archive else ""))
     infos = " · ".join(x for x in (f"Prévu le {date_prevue}" if date_prevue and not termine else (f"Fait le {date_prevue}" if date_prevue else ""),
-                                   f"⏱ {heures(duree)}" if duree else "") if x)
+                                   f"Durée {heures(duree)}" if duree else "") if x)
     montants = (f'<div class="montant">{argent(total) if total is not None and total else "prix à saisir"}'
                 + (f'<small>{argent(prix)} + TPS {argent(tps)} + TVQ {argent(tvq)}</small>' if total else "")
                 + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total else "") + "</div>")
@@ -269,27 +268,21 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                 f'<input type="hidden" name="retour" value="/chantier/{chantier_id}"><button type="submit"{f" class={classe}" if classe else ""}>{texte}</button></form>')
     boutons = f'<a class="bouton secondaire" href="/chantier/{chantier_id}/dupliquer">Dupliquer le chantier</a>'
     if statut == "planifie":
-        boutons = bouton("terminer", "✔ Marquer comme terminé") + boutons
+        boutons = f'<a class="bouton" href="/chantier/{chantier_id}?terminer={chantier_id}">Terminer</a>' + boutons
     if statut == "annule":
-        boutons = bouton("rouvrir", "↩ Rouvrir (À planifier)") + boutons
+        boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="barre" style="margin-bottom:16px">{boutons}</div>'
-    bandeau = ('<div class="verrou-termine">🗄 Chantier <b>annulé</b> : il est dans les archives. Il disparaît des journées ; '
+    bandeau = ('<div class="verrou-termine">Chantier <b>annulé</b> : il est dans les archives. Il disparaît des journées ; '
                'tu peux le rouvrir si l\'annulation était une erreur.</div>' if statut == "annule" else "")
     corps = carte_client_lecture(conn, client_id)
     paiements = _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement)
     autres = _autres_chantiers(conn, client_id, chantier_id)
 
     if termine:
-        facturation = ""
-        if not date_facture and prix is not None:
-            facturation = (f'<div class="carte"><h2>Facturation</h2><form method="post" action="/chantier/{chantier_id}/facturer"><div class="grille">'
-                           f'{champ("date_facture", "Date de la facture", {"date_facture": datetime.date.today().isoformat()}, "date")}'
-                           f'{champ("numero_facture", "N° de facture (facultatif)", {})}'
-                           f'<div><label>&nbsp;</label><button type="submit">Marquer comme facturé</button></div></div></form></div>')
-        verrou = ('<div class="verrou-termine"><b>🔒 Chantier terminé : verrouillé en lecture seule.</b> Il ne peut plus être modifié, rouvert '
-                  'ni supprimé. Restent possibles : la facturation, les paiements et la duplication (pour un travail récurrent).'
+        verrou = ('<div class="verrou-termine"><b>Chantier terminé : verrouillé en lecture seule.</b> Le client est considéré comme facturé. Il ne peut plus être modifié, '
+                  'rouvert ni supprimé. Restent possibles : les paiements et la duplication (pour un travail récurrent).'
                   + (' Il est <b>archivé</b> (terminé et payé).' if archive else '') + '</div>')
-        contenu = (f'<h1>Chantier #{chantier_id}</h1>{resume}{verrou}{actions}{corps}{facturation}{paiements}'
+        contenu = (f'<h1>Chantier #{chantier_id}</h1>{resume}{verrou}{actions}{corps}{paiements}'
                    f'{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres)}')
     else:
         essentiel, avance_chantier = cartes_chantier(conn, valeurs if valeurs is not None else depuis_base, creation=False)
@@ -366,17 +359,6 @@ def supprimer_chantier(conn, chantier_id):
     return redirection("/chantiers?ok=supprime")
 
 
-def facturer_chantier(conn, chantier_id, form):
-    try:
-        with transaction(conn):
-            erreurs = facturer(conn, chantier_id, form.get("date_facture") or None, form.get("numero_facture"))
-    except sqlite3.IntegrityError as e:
-        erreurs = [f"Refusé par la base : {e}"]
-    if erreurs:
-        return page_chantier(conn, chantier_id, {}, erreur_globale=" ; ".join(erreurs))
-    return redirection(f"/chantier/{chantier_id}?ok=facture")
-
-
 # ---------------------------------------------------------------------------
 # Duplication : nouvelle soumission d'après un chantier existant (travaux récurrents)
 # ---------------------------------------------------------------------------
@@ -385,7 +367,7 @@ def _form_duplication(conn, chantier_id, valeurs, erreurs=()):
     taxes = " checked" if valeurs.get("avec_taxes") else ""
     return (f'{_erreurs_html(erreurs)}<div class="lecture-seule"><b>Chantier d\'origine :</b> {esc(r[0])} — {esc(r[1])} '
             f'({esc(LIBELLES_STATUT[r[2]])}). Les travaux, la durée, le prix et le mode de règlement sont repris ; les dates repartent '
-            f'd\'aujourd\'hui ({datetime.date.today().isoformat()}) ; les paiements, la facture et la durée réelle ne sont pas copiés.</div>'
+            f'd\'aujourd\'hui ({datetime.date.today().isoformat()}) ; les paiements et la durée réelle ne sont pas copiés.</div>'
             f'<form method="post" action="/chantier/{chantier_id}/dupliquer"><div class="carte"><h2>Nouvelle soumission</h2><div class="grille">'
             f'{champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal")}'
             f'<div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="avec_taxes" value="1"{taxes}>Ajouter TPS 5 % et TVQ 9,975 %</label></div>'
@@ -423,7 +405,6 @@ ROUTES_CHANTIER = [
     ("GET", r"^/chantier/(\d+)$", lambda c, q, f, i: page_chantier(c, int(i), q)),
     ("POST", r"^/chantier/(\d+)$", lambda c, q, f, i: modifier(c, int(i), f)),
     ("POST", r"^/chantier/(\d+)/paiement$", lambda c, q, f, i: ajouter_paiement(c, int(i), f)),
-    ("POST", r"^/chantier/(\d+)/facturer$", lambda c, q, f, i: facturer_chantier(c, int(i), f)),
     ("POST", r"^/chantier/(\d+)/supprimer$", lambda c, q, f, i: supprimer_chantier(c, int(i))),
     ("GET", r"^/chantier/(\d+)/dupliquer$", lambda c, q, f, i: page_dupliquer(c, int(i))),
     ("POST", r"^/chantier/(\d+)/dupliquer$", lambda c, q, f, i: dupliquer(c, int(i), f)),

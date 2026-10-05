@@ -9,17 +9,17 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
-import importer_saisie  # noqa: E402
+sys.path.insert(0, str(RACINE / "tests"))
+import fixtures  # noqa: E402
 import interface  # noqa: E402
 
-EXEMPLES = RACINE / "modeles" / "saisie_papier_exemples.csv"
 
 
 class BaseClients(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.db = Path(self._tmp.name) / "data" / "t.db"
-        importer_saisie.importer(EXEMPLES, self.db)
+        fixtures.creer_exemples(self.db)
 
     def tearDown(self):
         self._tmp.cleanup()

@@ -9,12 +9,10 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
-import importer_saisie  # noqa: E402
 import interface  # noqa: E402
 import noyau  # noqa: E402
 
 AUJOURDHUI = datetime.date.today()
-MODALE = 'Voulez-vous passer ce chantier au statut &quot;Terminé&quot; ?'
 
 
 def dans(jours):
@@ -115,13 +113,6 @@ class TestStatuts(BaseJour):
         self.assertNotIn('name="statut"', planifie)
         self.assertIn("géré automatiquement", planifie)
 
-    def test_anciens_noms_toujours_compris_a_l_import(self):
-        base = {"client_nom": "X", "adresse": "1 A", "ville": "V", "type_travaux": "emondage"}
-        for saisi, attendu in (("Accepté", "a_planifier"), ("accepte", "a_planifier"), ("Refusé", "annule"), ("À planifier", "a_planifier"),
-                               ("En attente", "en_attente"), ("en_attente", "en_attente"), ("Terminé", "termine"), ("Annulé", "annule")):
-            v, erreurs = noyau.lire_ligne({**base, "statut": saisi, "date_prevue": "2026-06-01", "duree_estimee_h": "2"}, {"emondage": "emondage"}, False)
-            self.assertEqual((erreurs, v["statut"]), ([], attendu), saisi)
-
     def test_en_attente_et_a_planifier_n_ont_pas_de_date(self):
         conn, _ = noyau.ouvrir_base(self.db)
         for statut in ("en_attente", "a_planifier", "soumission"):
@@ -146,11 +137,11 @@ class TestStatuts(BaseJour):
 
 
 class TestPageJournee(BaseJour):
-    """La page Journée gère la journée : ordre, statut, encaissement, retrait, ajout. Jamais de durée modifiable."""
+    """La page Journée gère la journée : ordre, terminer, retrait, annulation, ajout. Jamais de statut ni de durée modifiables."""
 
     def test_outils_de_gestion(self):
         page = self.get("/journee", {"date": dans(1)})[1]
-        for attendu in ('action="/action/deplacer"', 'action="/action/encaisser"', 'action="/action/retirer"', 'action="/action/annuler"',
+        for attendu in ('action="/action/deplacer"', "terminer=", 'action="/action/retirer"', 'action="/action/annuler"', ">Monter<", ">Descendre<",
                         "Total de la journée", "durée totale", "Chantiers à placer"):
             self.assertIn(attendu, page, attendu)
         self.assertNotIn('name="statut"', page.split("Chantiers à placer")[0])   # le statut n'est jamais modifiable à la main
@@ -209,13 +200,13 @@ class TestOrdreDeLaJournee(BaseJour):
 
     def test_les_heures_sont_recalculees_quand_l_ordre_change(self):
         page = self.get("/", {"date": dans(1)})[1]
-        self.assertEqual(re.findall(r"(\d+ h \d\d) → (\d+ h \d\d)", page), [("7 h 30", "9 h 30"), ("9 h 30", "13 h 00"), ("13 h 00", "14 h 30")])
+        self.assertEqual(re.findall(r"(\d+ h \d\d) à (\d+ h \d\d)", page), [("7 h 30", "9 h 30"), ("9 h 30", "13 h 00"), ("13 h 00", "14 h 30")])
         self.assertIn("dîner inclus", page)                      # Bravo (3 h) chevauche midi
         self.post("/action/deplacer", {"chantier_id": str(self.ids["Charlie"]), "sens": "haut", "retour": "/"})
         self.post("/action/deplacer", {"chantier_id": str(self.ids["Charlie"]), "sens": "haut", "retour": "/"})
         # Charlie (1 h 30), Alpha (2 h), Bravo (3 h)
         page = self.get("/", {"date": dans(1)})[1]
-        self.assertEqual(re.findall(r"(\d+ h \d\d) → (\d+ h \d\d)", page), [("7 h 30", "9 h 00"), ("9 h 00", "11 h 00"), ("11 h 00", "14 h 30")])
+        self.assertEqual(re.findall(r"(\d+ h \d\d) à (\d+ h \d\d)", page), [("7 h 30", "9 h 00"), ("9 h 00", "11 h 00"), ("11 h 00", "14 h 30")])
         self.assertIn("fin prévue <b>14 h 30</b>", page)
 
     def test_changer_la_duree_recalcule(self):
@@ -226,7 +217,7 @@ class TestOrdreDeLaJournee(BaseJour):
         valeurs.pop("client_id", None)
         self.post(f"/chantier/{self.ids['Alpha']}", {**valeurs, "duree_estimee_h": "1"})
         page = self.get("/", {"date": dans(1)})[1]
-        self.assertEqual(re.findall(r"(\d+ h \d\d) → (\d+ h \d\d)", page)[:2], [("7 h 30", "8 h 30"), ("8 h 30", "11 h 30")])
+        self.assertEqual(re.findall(r"(\d+ h \d\d) à (\d+ h \d\d)", page)[:2], [("7 h 30", "8 h 30"), ("8 h 30", "11 h 30")])
 
     def test_changer_de_jour_replace_a_la_fin_et_sortir_efface_l_ordre(self):
         conn, _ = noyau.ouvrir_base(self.db)
@@ -274,8 +265,8 @@ class TestCalendrier(BaseJour):
         self.assertIsNotNone(lien)
         self.assertIn("occupe", lien.group(1))
         self.assertIn("<b>3 chantiers</b>", lien.group(3))                       # directement dans la case : nombre, temps, montant
-        self.assertIn("⏱ Temps total : 6 h 30", lien.group(3))
-        self.assertIn("💰 Montant total : <span class=\"nw\">900 $</span>", lien.group(3))                # arrondi au dollar : tient dans la case
+        self.assertIn("Temps total : 6 h 30", lien.group(3))
+        self.assertIn("Montant total : <span class=\"nw\">900 $</span>", lien.group(3))                # arrondi au dollar : tient dans la case
 
     def test_cliquer_une_date_affiche_le_deroulement(self):
         page = self.get("/", {"date": dans(1)})[1]
@@ -294,10 +285,9 @@ class TestCalendrier(BaseJour):
                          'name="duree_estimee_h"', 'name="date_prevue"', 'name="statut"', 'name="montant"', 'class="fleche"'):
             self.assertNotIn(interdit, jour, interdit)
         self.assertIn('action="/action/retirer"', jour)                    # retirer une entrée reste possible
-        self.assertIn('action="/action/encaisser"', jour)                  # encaisser aussi : le montant prévu est affiché, non modifiable
-        self.assertIn("Montant prévu :", jour)
-        self.assertIn("Planifié", jour)                                    # le statut est visible
-        self.assertIn("Paiement", jour)                                    # ainsi que les paiements
+        self.assertIn(">Terminer</a>", jour)                               # le bouton Terminer ouvre la fenêtre de confirmation
+        for absent in ("Encaisser", "Paiement", "Statut", "badge", "Planifié"):    # ni statut ni paiement ici
+            self.assertNotIn(absent, jour, absent)
 
     def test_chaque_chantier_montre_son_temps_et_son_montant_et_la_journee_ses_totaux(self):
         conn, _ = noyau.ouvrir_base(self.db)
@@ -305,7 +295,7 @@ class TestCalendrier(BaseJour):
         conn.close()
         page = self.get("/", {"date": dans(1)})[1]
         jour = page[page.index("durée totale"):]
-        for temps in ("⏱ 2 h", "⏱ 3 h", "⏱ 1 h 30"):                       # Alpha, Bravo, Charlie
+        for temps in ("Durée 2 h", "Durée 3 h", "Durée 1 h 30"):                       # Alpha, Bravo, Charlie
             self.assertIn(temps, jour)
         self.assertIn('class="montant">400,00 $', jour)                    # montant du travail, à droite
         self.assertIn("durée totale <span class=\"total\">6 h 30", page)    # somme des temps
@@ -368,60 +358,58 @@ class TestCalendrier(BaseJour):
 
 
 class TestConfirmationTermine(BaseJour):
-    def encaisser(self, nom, montant="100", retour="/?date=X"):
-        return self.post("/action/encaisser", {"chantier_id": str(self.ids[nom]), "montant": montant, "mode": "interac", "retour": retour})
+    """Bouton Terminer d'un chantier de la journée : fenêtre de confirmation, avec « payé ou pas »."""
 
-    def test_un_encaissement_sur_un_chantier_planifie_propose_terminer(self):
-        _, en_tetes, _ = self.encaisser("Alpha", retour=f"/?date={dans(1)}")
-        self.assertIn("ok=encaisse", en_tetes["Location"])
-        self.assertIn(f"terminer={self.ids['Alpha']}", en_tetes["Location"])
-        self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = ?", (self.ids["Alpha"],)), [(1,)])      # le paiement est enregistré
-        page = self.get(en_tetes["Location"].split("?")[0], dict(p.split("=") for p in en_tetes["Location"].split("?")[1].split("&")))[1]
-        self.assertIn(MODALE, page)
-        self.assertIn("Oui, passer à Terminé", page)
-        self.assertIn("Non, laisser Planifié", page)
-        self.assertIn('role="dialog"', page)
-        self.assertIn("Alpha", page[page.index('role="dialog"'):])
+    def ouvrir(self, nom, chemin="/", **query):
+        return self.get(chemin, {"date": dans(1), "terminer": str(self.ids[nom]), **query})[1]
 
-    def test_pas_de_fenetre_pour_les_autres_statuts(self):
-        for nom in ("Delta", "Fox"):
-            conn, _ = noyau.ouvrir_base(self.db)
-            conn.execute("UPDATE chantiers SET statut = ?, date_prevue = ? WHERE id = ?", ("termine" if nom == "Fox" else "a_planifier", dans(-3) if nom == "Fox" else None, self.ids[nom]))
-            conn.close()
-        _, en_tetes, _ = self.encaisser("Fox")
-        self.assertNotIn("terminer=", en_tetes["Location"])
-        conn, _ = noyau.ouvrir_base(self.db)
-        conn.execute("UPDATE chantiers SET statut = 'termine', date_prevue = ? WHERE id = ?", (dans(-1), self.ids["Delta"]))
-        conn.close()
-        _, en_tetes, _ = self.encaisser("Delta")
-        self.assertNotIn("terminer=", en_tetes["Location"])
+    def test_la_fenetre_s_ouvre_depuis_le_bouton(self):
+        page = self.get("/", {"date": dans(1)})[1]
+        self.assertNotIn("Terminer ce chantier", page)
+        self.assertEqual(page.count(">Terminer</a>"), 3)                       # un bouton par chantier planifié (Alpha, Bravo, Charlie)
+        fenetre = self.ouvrir("Alpha")
+        self.assertIn('role="dialog"', fenetre)
+        self.assertIn("Confirmes-tu que ce chantier est terminé ?", fenetre[fenetre.index('role="dialog"'):])
+        self.assertIn("Alpha", fenetre[fenetre.index('role="dialog"'):])
+        self.assertIn("Le client a-t-il payé ?", fenetre)
+        self.assertIn("Oui, payé en totalité : <b>300,00 $</b>", fenetre)
+        self.assertIn("Pas encore payé", fenetre)
 
-    def test_oui_passe_le_chantier_a_termine(self):
-        self.encaisser("Bravo")
-        page = self.get("/", {"date": dans(1), "terminer": str(self.ids["Bravo"])})[1]
-        formulaire = page[page.index('class="modale"'):]
-        self.assertIn('action="/action/terminer"', formulaire)
-        _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(self.ids["Bravo"]), "retour": f"/?date={dans(1)}&terminer={self.ids['Bravo']}"})
-        self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = ?", (self.ids["Bravo"],)), [("termine", dans(1))])
+    def test_oui_termine_pas_encore_paye(self):
+        i = self.ids["Bravo"]
+        _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(i), "paye": "non", "retour": f"/?date={dans(1)}&terminer={i}"})
+        self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = ?", (i,)), [("termine", dans(1))])
+        self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = ?", (i,)), [(0,)])
         self.assertNotIn("terminer=", en_tetes["Location"])                     # la fenêtre ne revient pas
+        self.assertIn("ok=termine", en_tetes["Location"])
 
-    def test_non_laisse_planifie_et_ferme_la_fenetre(self):
-        page = self.get("/", {"date": dans(1), "terminer": str(self.ids["Bravo"]), "ok": "encaisse"})[1]
-        lien = re.search(r'<a class="bouton secondaire" href="([^"]+)">Non, laisser Planifié</a>', page).group(1)
+    def test_oui_termine_et_paye(self):
+        i = self.ids["Bravo"]
+        self.post("/action/terminer", {"chantier_id": str(i), "paye": "oui", "mode": "interac", "retour": "/"})
+        self.assertEqual(self.sql("SELECT statut, archive FROM v_chantiers WHERE chantier_id = ?", (i,)), [("termine", 1)])
+        self.assertEqual(self.sql("SELECT montant FROM paiements WHERE chantier_id = ?", (i,)), [(300.0,)])
+
+    def test_annuler_ferme_la_fenetre_sans_rien_changer(self):
+        page = self.ouvrir("Bravo", ok="termine")
+        lien = re.search(r'<a class="bouton secondaire" href="([^"]+)">Annuler</a></div></form></div></div>', page).group(1)
         self.assertNotIn("terminer", lien)
         self.assertNotIn("ok=", lien)
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (self.ids["Bravo"],)), [("planifie",)])
 
-    def test_lien_perime_ou_invalide_n_affiche_rien(self):
-        for valeur in (str(self.ids["Delta"]), "99999", "abc", ""):
-            self.assertNotIn("Voulez-vous", self.get("/", {"terminer": valeur})[1], valeur)
+    def test_pas_de_fenetre_pour_un_chantier_qui_n_est_pas_planifie(self):
+        for valeur in (str(self.ids["Delta"]), str(self.ids["Fox"]), "99999", "abc", ""):
+            self.assertNotIn("Terminer ce chantier", self.get("/", {"terminer": valeur})[1], valeur)
 
-    def test_aussi_depuis_la_page_du_chantier_et_depuis_la_journee(self):
-        _, en_tetes, _ = self.post(f"/chantier/{self.ids['Alpha']}/paiement", {"paiement_date": AUJOURDHUI.isoformat(), "paiement_montant": "50", "paiement_mode": "cheque"})
-        self.assertIn(f"terminer={self.ids['Alpha']}", en_tetes["Location"])
-        page = self.get(f"/chantier/{self.ids['Alpha']}", {"ok": "paiement", "terminer": str(self.ids["Alpha"])})[1]
-        self.assertIn(MODALE, page)
-        self.assertIn(MODALE, self.get("/journee", {"date": dans(1), "terminer": str(self.ids["Alpha"])})[1])
+    def test_fenetre_aussi_depuis_la_page_du_chantier_et_la_journee(self):
+        i = self.ids["Alpha"]
+        page = self.get(f"/chantier/{i}")[1]
+        self.assertIn(f'href="/chantier/{i}?terminer={i}"', page)
+        self.assertIn("Terminer ce chantier", self.get(f"/chantier/{i}", {"terminer": str(i)})[1])
+        self.assertIn("Terminer ce chantier", self.ouvrir("Alpha", "/journee"))
+        # un paiement ajouté sur la page d'un chantier planifié propose aussi de le terminer
+        _, en_tetes, _ = self.post(f"/chantier/{i}/paiement", {"paiement_date": AUJOURDHUI.isoformat(), "paiement_montant": "50", "paiement_mode": "cheque"})
+        self.assertIn(f"terminer={i}", en_tetes["Location"])
+        self.assertIn("250,00 $", self.get(f"/chantier/{i}", {"terminer": str(i)})[1])             # il reste 250 $ à payer
 
 
 class TestSecurite(BaseJour):

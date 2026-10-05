@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from calendrier import panneau_jour
 from composants import (FILTRES_ATTENTE, JOURNEE_H, TRIS, avec_params, cellule_adresse, cellule_client, cellule_montant,
                         lignes_vue, nom_client, retour_valide)
-from noyau import (annuler_chantier, changer_statut, cle, deplacer, encaisser, jours_attente, planifier_lot, priorite, rouvrir_chantier,
+from noyau import (annuler_chantier, changer_statut, cle, deplacer, jours_attente, planifier_lot, priorite, rouvrir_chantier,
                    terminer_chantier, transaction)
 from vue import badge_attente, esc, gabarit, heures, redirection
 
@@ -44,8 +44,11 @@ def _id(form):
 
 
 def action_terminer(conn, form):
-    """Passe un chantier « Planifié » à « Terminé » (durée réelle reprise de l'estimée si non saisie)."""
-    return _terminer(conn, form, "termine", lambda: terminer_chantier(conn, _id(form), form.get("duree_reelle_h")),
+    """Termine un chantier planifié ; si le client a payé (« paye = oui »), enregistre aussi l'encaissement du solde complet.
+    Le chantier est alors terminé ET payé : il va dans les archives."""
+    paye = form.get("paye") == "oui"
+    return _terminer(conn, form, "termine_paye" if paye else "termine",
+                     lambda: terminer_chantier(conn, _id(form), form.get("duree_reelle_h"), paye=paye, mode=form.get("mode")),
                      extra={"terminer": None})
 
 
@@ -56,23 +59,6 @@ def action_annuler(conn, form):
 
 def action_rouvrir(conn, form):
     return _terminer(conn, form, "rouvert", lambda: rouvrir_chantier(conn, _id(form)), extra={"terminer": None})
-
-
-def action_encaisser(conn, form):
-    """Encaisse le montant PRÉVU (le solde) : le montant n'est pas modifiable depuis le tableau de bord ni la Journée ;
-    seul le mode de paiement se confirme. Si le chantier est « Planifié », propose ensuite de le passer à « Terminé »."""
-    r = conn.execute("SELECT statut, solde FROM v_chantiers WHERE chantier_id = ?", (_id(form),)).fetchone()
-    extra = {"terminer": _id(form)} if r and r[0] == "planifie" else {"terminer": None}
-
-    def travail():
-        if r is None:
-            return [f"chantier #{_id(form)} introuvable"]
-        if r[0] not in ("planifie", "termine"):
-            return ["seul un chantier planifié ou terminé peut être encaissé"]
-        if not r[1] or r[1] <= 0:
-            return ["rien à encaisser : le chantier n'a pas de solde"]
-        return encaisser(conn, _id(form), f"{r[1]:.2f}", form.get("mode"))
-    return _terminer(conn, form, "encaisse", travail, extra=extra)
 
 
 def action_retirer(conn, form):
@@ -107,9 +93,9 @@ def page_journee(conn, query):
 
     retour = "/journee?" + urlencode({k: v for k, v in (("date", jour), ("statut", f_statut), ("attente", f_attente), ("secteur", f_secteur), ("tri", tri)) if v})
     precedent, suivant = (d - datetime.timedelta(days=1)).isoformat(), (d + datetime.timedelta(days=1)).isoformat()
-    navigation = (f'<form class="recherche" method="get" action="/journee"><a class="bouton secondaire" href="/journee?date={precedent}">◀</a>'
+    navigation = (f'<form class="recherche" method="get" action="/journee"><a class="bouton secondaire" href="/journee?date={precedent}">Précédent</a>'
                   f'<input type="date" name="date" value="{jour}" style="max-width:170px" aria-label="Journée"><button type="submit">Afficher</button>'
-                  f'<a class="bouton secondaire" href="/journee?date={suivant}">▶</a>'
+                  f'<a class="bouton secondaire" href="/journee?date={suivant}">Suivant</a>'
                   f'<a class="bouton secondaire" href="/journee?date={demain}">Demain</a>'
                   f'<a class="bouton secondaire" href="/?date={jour}">Voir au calendrier</a></form>')
     deja_h = sum(l["duree_estimee_h"] or 0 for l in toutes if l["statut"] == "planifie" and l["date_prevue"] == jour)
@@ -154,7 +140,7 @@ def page_journee(conn, query):
         prio = priorite(l["jours"])
         autre_jour = f'<div class="doux">prévu le {esc(l["date_prevue"])}</div>' if l["statut"] == "planifie" else ""
         if l["duree_estimee_h"]:
-            duree = f'<span class="total">⏱ {heures(l["duree_estimee_h"])}</span>'
+            duree = f'<span class="total">Durée {heures(l["duree_estimee_h"])}</span>'
             case = (f'<input type="checkbox" name="sel_{l["chantier_id"]}" value="1" aria-label="Choisir {esc(nom_client(l))}">')
         else:
             duree = f'<a href="/chantier/{l["chantier_id"]}">durée à estimer : ouvrir le chantier</a>'
@@ -183,7 +169,7 @@ _SCRIPT_SELECTION = """<script>
 function fr(x,n){return x.toFixed(n).replace('.',',');}
 function maj(){var n=0,t=0,m=0;f.querySelectorAll('tr[data-id]').forEach(function(tr){var c=tr.querySelector('input[type=checkbox]');
 if(c.checked){n++;t+=parseFloat(tr.dataset.h)||0;m+=parseFloat(tr.dataset.m)||0;}});
-document.getElementById('sel').textContent=n+' sélectionné'+(n>1?'s':'')+' · '+fr(t,1)+' h, '+fr(m,2)+' $ → journée : '+fr(base+t,1)+' h sur '+cap+' h, '+fr(baseM+m,2)+' $';}
+document.getElementById('sel').textContent=n+' sélectionné'+(n>1?'s':'')+' · '+fr(t,1)+' h, '+fr(m,2)+' $, journée : '+fr(base+t,1)+' h sur '+cap+' h, '+fr(baseM+m,2)+' $';}
 f.addEventListener('change',maj);maj();})();
 </script>"""
 
@@ -207,7 +193,6 @@ ROUTES_TABLEAU = [
     ("POST", r"^/action/terminer$", lambda c, q, f, *g: action_terminer(c, f)),
     ("POST", r"^/action/annuler$", lambda c, q, f, *g: action_annuler(c, f)),
     ("POST", r"^/action/rouvrir$", lambda c, q, f, *g: action_rouvrir(c, f)),
-    ("POST", r"^/action/encaisser$", lambda c, q, f, *g: action_encaisser(c, f)),
     ("POST", r"^/action/retirer$", lambda c, q, f, *g: action_retirer(c, f)),
     ("POST", r"^/action/deplacer$", lambda c, q, f, *g: action_deplacer(c, f)),
 ]

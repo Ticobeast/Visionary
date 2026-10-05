@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 6;
+PRAGMA user_version = 7;
 
 
 -- -----------------------------------------------------------------------------
@@ -185,8 +185,6 @@ CREATE TABLE chantiers (
     tvq             REAL NOT NULL DEFAULT 0,   -- $ TVQ (0 si non inscrit aux taxes)
     modalite_paiement TEXT,   -- mode de règlement prévu, UN SEUL choix : comptant, cheque, interac, carte, autre
                               -- (imprimé sur la feuille de route pour savoir quoi encaisser sur place)
-    numero_facture  TEXT,
-    date_facture    TEXT,     -- AAAA-MM-JJ : date de la facture / du reçu remis
 
     -- Chemins relatifs au dossier de la base (data/)
     dossier_photos  TEXT,     -- ex. photos/2026/2026-06-14_gagnon
@@ -211,7 +209,6 @@ CREATE TABLE chantiers (
     -- Dates : `date(x, '+0 days') IS x` rejette 2026-02-30, 2026-13-01, 14/06/2026, "2026-06-14 10:00".
     CONSTRAINT ck_chantiers_date_soumission CHECK (date_soumission IS NULL OR date(date_soumission, '+0 days') IS date_soumission),
     CONSTRAINT ck_chantiers_date_prevue     CHECK (date_prevue     IS NULL OR date(date_prevue, '+0 days')     IS date_prevue),
-    CONSTRAINT ck_chantiers_date_facture    CHECK (date_facture    IS NULL OR date(date_facture, '+0 days')    IS date_facture),
 
     CONSTRAINT ck_chantiers_duree_estimee
         CHECK (duree_estimee_h IS NULL OR (typeof(duree_estimee_h) IN ('real','integer')
@@ -227,15 +224,11 @@ CREATE TABLE chantiers (
     CONSTRAINT ck_chantiers_tvq
         CHECK (typeof(tvq) IN ('real','integer') AND tvq >= 0 AND tvq = ROUND(tvq, 2)),
 
-    -- Cohérence statut ⇔ dates / prix
+    -- Cohérence statut / dates / prix
     CONSTRAINT ck_chantiers_planifie_a_une_date
         CHECK (statut <> 'planifie' OR date_prevue IS NOT NULL),
     CONSTRAINT ck_chantiers_termine_a_une_date
         CHECK (statut <> 'termine' OR date_prevue IS NOT NULL),
-    CONSTRAINT ck_chantiers_facture_a_un_prix
-        CHECK (date_facture IS NULL OR prix_ht IS NOT NULL),
-    CONSTRAINT ck_chantiers_numero_facture
-        CHECK (numero_facture IS NULL OR date_facture IS NOT NULL),
 
     -- Chemins relatifs stricts : pas de "/" initial ou final, pas de "\", pas de "..", pas de "C:".
     CONSTRAINT ck_chantiers_dossier_photos
@@ -317,7 +310,7 @@ END;
 
 -- -----------------------------------------------------------------------------
 -- Verrouillage : un chantier « Terminé » est en lecture seule, définitivement. Restent possibles les suites
--- financières (facture, paiements) et l'ordre dans la journée. Il ne peut pas être supprimé.
+-- financières (paiements) et l'ordre dans la journée. Il ne peut pas être supprimé.
 -- (Les types de travaux d'un chantier terminé ne peuvent être ni modifiés ni supprimés.)
 -- -----------------------------------------------------------------------------
 CREATE TRIGGER trg_chantiers_termine_verrouille BEFORE UPDATE ON chantiers
@@ -361,8 +354,7 @@ END;
 --   paye           somme reçue >= total
 --   partiel        une partie reçue (acompte...), solde > 0
 --   sans_objet     soumission / en attente / annulé, ou travail gratuit
---   non_facture    travaux faits, aucune facture émise   ← à facturer
---   a_payer        facture émise, rien reçu              ← à relancer
+--   a_payer        travaux faits (client facturé d'office), rien reçu : à relancer
 --   a_venir        à planifier / planifié, pas encore fait
 -- -----------------------------------------------------------------------------
 CREATE VIEW v_chantiers AS
@@ -403,7 +395,7 @@ base AS (
         c.prix_ht, c.tps, c.tvq,
         ROUND(COALESCE(c.prix_ht, 0) + c.tps + c.tvq, 2) AS total_ttc,
         COALESCE(r.paye, 0) AS paye,
-        c.modalite_paiement, c.numero_facture, c.date_facture,
+        c.modalite_paiement,
 
         c.dossier_photos, c.fichier_papier, c.ref_papier
     FROM chantiers c
@@ -423,8 +415,7 @@ SELECT
         WHEN paye > 0                                       THEN 'partiel'
         WHEN statut IN ('soumission', 'en_attente', 'annule') THEN 'sans_objet'
         WHEN statut = 'termine' AND total_ttc = 0           THEN 'sans_objet'
-        WHEN statut = 'termine' AND date_facture IS NULL    THEN 'non_facture'
-        WHEN date_facture IS NOT NULL                       THEN 'a_payer'
+        WHEN statut = 'termine'                             THEN 'a_payer'
         ELSE 'a_venir'
     END AS statut_paiement
 FROM calcul

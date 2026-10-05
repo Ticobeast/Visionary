@@ -195,7 +195,7 @@ def chantier_creer(conn, client_id, form):
     if not erreurs:
         try:
             with transaction(conn):
-                chantier_id = creer_chantier(conn, client_id, v, Resultat(), lambda m: None, verifier_doublon=False)
+                chantier_id = creer_chantier(conn, client_id, v, Resultat())
             return redirection(f"/chantier/{chantier_id}?ok=client_cree")
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]

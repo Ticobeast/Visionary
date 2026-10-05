@@ -1,5 +1,4 @@
 """Tests des secteurs desservis (liste fermée) et des options de la job (nacelle, bois)."""
-import csv
 import sqlite3
 import sys
 import tempfile
@@ -8,18 +7,18 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
-import importer_saisie  # noqa: E402
+sys.path.insert(0, str(RACINE / "tests"))
+import fixtures  # noqa: E402
 import interface  # noqa: E402
 import noyau  # noqa: E402
 
-EXEMPLES = RACINE / "modeles" / "saisie_papier_exemples.csv"
 
 
 class Base(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.db = Path(self._tmp.name) / "data" / "t.db"
-        importer_saisie.importer(EXEMPLES, self.db)
+        fixtures.creer_exemples(self.db)
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -136,34 +135,6 @@ class TestFiltrerParSecteur(Base):
         self.assertIn('<option value="pointe_du_lac" selected>', page)
 
 
-class TestImportAvecSecteur(Base):
-    def importer(self, lignes):
-        chemin = Path(self._tmp.name) / "s.csv"
-        entete = ["client_nom", "client_prenom", "client_telephone", "adresse", "ville", "client_secteur", "type_travaux", "statut", "duree_estimee_h"]
-        with open(chemin, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(entete)
-            w.writerows(lignes)
-        return importer_saisie.importer(chemin, self.db)
-
-    def test_secteur_par_code_ou_libelle_et_ville_deduite(self):
-        res = self.importer([["Aubry", "Jo", "819-555-0101", "1 Rue Un", "Trois Rivieres", "Cap de la Madeleine", "emondage", "soumission", "2"],
-                             ["Bibeau", "Jo", "819-555-0102", "2 Rue Deux", "", "centre_ville", "emondage", "soumission", "2"]])
-        self.assertEqual(res.erreurs, [])
-        self.assertEqual(self.sql("SELECT nom, secteur, ville FROM clients WHERE nom IN ('Aubry', 'Bibeau') ORDER BY nom"),
-                         [("Aubry", "cap_de_la_madeleine", "Trois-Rivières"), ("Bibeau", "centre_ville", "Trois-Rivières")])
-
-    def test_secteur_inconnu_refuse_et_rien_n_est_importe(self):
-        res = self.importer([["Aubry", "Jo", "819-555-0101", "1 Rue Un", "X", "Atlantide", "emondage", "soumission", "2"]])
-        self.assertTrue(any("client_secteur" in m for _, ms in res.erreurs for m in ms))
-        self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
-
-    def test_secteur_facultatif_a_l_import(self):                       # vieilles feuilles : la ville libre est gardée
-        res = self.importer([["Aubry", "Jo", "819-555-0101", "1 Rue Un", "Ailleurs", "", "emondage", "soumission", "2"]])
-        self.assertEqual(res.erreurs, [])
-        self.assertEqual(self.sql("SELECT secteur, ville FROM clients WHERE nom = 'Aubry'"), [(None, "Ailleurs")])
-
-
 class TestOptionsDuTravail(Base):
     def ligne(self, **perso):
         base = {"client_nom": "X", "adresse": "1 A", "ville": "V", "type_travaux": "abattage", "statut": "soumission", "duree_estimee_h": "2"}
@@ -210,11 +181,11 @@ class TestOptionsDuTravail(Base):
         self.assertIn("Bois débarrassé", page)
         self.assertIn("Bois laissé sur place : 16 pouces", self.get("/chantier/2")[1])             # Lavoie : bois laissé en 16 pouces
         chantiers = self.get("/chantiers")[1]
-        self.assertIn("🏗 Nacelle requise", chantiers)
-        self.assertIn("🪵 Bois laissé sur place : 16 pouces", chantiers)
+        self.assertIn("Nacelle requise", chantiers)
+        self.assertIn("Bois laissé sur place : 16 pouces", chantiers)
         jour = self.sql("SELECT date_prevue FROM chantiers WHERE id = 3")[0][0]
         for chemin in ("/", "/journee"):
-            self.assertIn("🏗 Nacelle requise", self.get(chemin, {"date": jour})[1], chemin)
+            self.assertIn("Nacelle requise", self.get(chemin, {"date": jour})[1], chemin)
 
     def test_duplication_copie_les_options(self):
         conn, _ = noyau.ouvrir_base(self.db)

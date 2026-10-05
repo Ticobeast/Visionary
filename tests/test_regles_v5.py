@@ -110,9 +110,9 @@ class TestTermineVerrouille(Base):
         self.refuse(f"DELETE FROM chantier_travaux WHERE chantier_id = {i}")
         self.refuse(f"UPDATE chantier_travaux SET precision = 'x' WHERE chantier_id = {i}")
 
-    def test_facturer_et_encaisser_restent_possibles(self):
+    def test_encaisser_reste_possible(self):
         i = self.termine()
-        self.assertEqual(noyau.facturer(self.conn, i, "2026-10-02", "2026-001"), [])
+        self.assertEqual(self.conn.execute("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)).fetchone(), ("a_payer",))   # facturé d'office
         self.assertEqual(noyau.encaisser(self.conn, i, "114,98", "interac", "2026-10-03"), [])
         self.assertEqual(self.conn.execute("SELECT statut_paiement, archive FROM v_chantiers WHERE chantier_id = ?", (i,)).fetchone(), ("paye", 1))
 
@@ -184,9 +184,9 @@ class TestDuplication(Base):
         self.conn.execute("PRAGMA foreign_keys = ON")
         nouveau, erreurs = noyau.dupliquer_chantier(self.conn, i, prix_ht="500", avec_taxes=True, duree="4")
         self.assertEqual(erreurs, [])
-        ligne = self.conn.execute("SELECT statut, date_prevue, ordre_jour, duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, date_facture"
+        ligne = self.conn.execute("SELECT statut, date_prevue, ordre_jour, duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq"
                                   " FROM chantiers WHERE id = ?", (nouveau,)).fetchone()
-        self.assertEqual(ligne, ("soumission", None, None, 4.0, None, 500.0, 25.0, 49.88, None))
+        self.assertEqual(ligne, ("soumission", None, None, 4.0, None, 500.0, 25.0, 49.88))
         self.assertEqual(self.conn.execute("SELECT date_soumission FROM chantiers WHERE id = ?", (nouveau,)).fetchone()[0],
                          noyau.datetime.date.today().isoformat())
         self.assertEqual(self.conn.execute("SELECT statut, prix_ht FROM chantiers WHERE id = ?", (i,)).fetchone(), ("termine", 480.0))
@@ -205,18 +205,65 @@ class TestDuplication(Base):
         self.assertEqual(noyau.dupliquer_chantier(self.conn, 999)[1], ["chantier #999 introuvable"])
 
 
+class TestTerminerEtPaye(Base):
+    """« Terminer » : confirmation, et le client a payé ou pas. Terminé = client facturé d'office."""
+
+    def planifie(self, prix=100, tps=5, tvq=9.98, modalite=None):
+        i = self.chantier(statut="planifie", duree=2, prix=prix, tps=tps, tvq=tvq, date="2026-12-01")
+        if modalite:
+            self.conn.execute("UPDATE chantiers SET modalite_paiement = ? WHERE id = ?", (modalite, i))
+        return i
+
+    def etat(self, i):
+        return self.conn.execute("SELECT statut, statut_paiement, solde, archive, duree_reelle_h FROM v_chantiers WHERE chantier_id = ?", (i,)).fetchone()
+
+    def test_termine_pas_encore_paye(self):
+        i = self.planifie()
+        self.assertEqual(noyau.terminer_chantier(self.conn, i), [])
+        self.assertEqual(self.etat(i), ("termine", "a_payer", 114.98, 0, 2.0))          # à recevoir, pas archivé
+        self.assertEqual(self.conn.execute("SELECT count(*) FROM paiements").fetchone(), (0,))
+
+    def test_termine_et_paye_est_archive(self):
+        i = self.planifie(modalite="cheque")
+        self.assertEqual(noyau.terminer_chantier(self.conn, i, paye=True), [])
+        self.assertEqual(self.etat(i), ("termine", "paye", 0.0, 1, 2.0))
+        self.assertEqual(self.conn.execute("SELECT montant, mode FROM paiements").fetchall(), [(114.98, "cheque")])    # mode prévu
+
+    def test_paye_avec_un_mode_choisi_et_un_acompte_deja_recu(self):
+        i = self.planifie()
+        noyau.encaisser(self.conn, i, "14,98", "comptant", "2026-11-30")
+        self.assertEqual(noyau.terminer_chantier(self.conn, i, paye=True, mode="carte"), [])
+        self.assertEqual(self.conn.execute("SELECT montant, mode FROM paiements ORDER BY id").fetchall(), [(14.98, "comptant"), (100.0, "carte")])
+        self.assertEqual(self.etat(i)[:2], ("termine", "paye"))
+
+    def test_duree_reelle_saisie(self):
+        i = self.planifie()
+        noyau.terminer_chantier(self.conn, i, duree_reelle="3,5")
+        self.assertEqual(self.etat(i)[4], 3.5)
+
+    def test_refus_et_tout_ou_rien(self):
+        self.assertTrue(noyau.terminer_chantier(self.conn, self.chantier(statut="a_planifier", prix=100)))      # pas planifié
+        sans_prix = self.planifie(prix=None, tps=0, tvq=0)
+        self.conn.execute("BEGIN")
+        self.assertTrue(noyau.terminer_chantier(self.conn, sans_prix, paye=True))                                  # payé sans prix : refusé
+        self.conn.execute("ROLLBACK")
+        self.assertEqual(self.etat(sans_prix)[0], "planifie")
+        i = self.planifie()
+        self.assertTrue(noyau.terminer_chantier(self.conn, i, paye=True, mode="bitcoin"))
+
+
 class TestOuvertureAncienneBase(unittest.TestCase):
-    def test_v4_refusee_avec_instruction(self):
+    def test_base_d_une_version_precedente_refusee_avec_instruction(self):
         with tempfile.TemporaryDirectory() as t:
             db = Path(t) / "data" / "s.db"
             db.parent.mkdir()
             c = sqlite3.connect(db)
-            c.executescript((RACINE / "tests" / "schema_v4.sql").read_text(encoding="utf-8"))
+            c.execute("CREATE TABLE x (a)")
+            c.execute("PRAGMA user_version = 4")
             c.close()
             with self.assertRaises(SystemExit) as e:
                 noyau.ouvrir_base(db)
-            self.assertIn("migrer.py", str(e.exception))
-            self.assertIn("v4", str(e.exception))
+            self.assertIn("supprime simplement ce fichier", str(e.exception))
 
 
 if __name__ == "__main__":
