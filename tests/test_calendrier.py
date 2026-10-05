@@ -135,10 +135,31 @@ class TestStatuts(BaseJour):
         self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Echo"],)), [("sans_objet",)])
         self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Delta"],)), [("a_venir",)])
 
-    def test_onglet_en_attente_du_suivi(self):
-        page = self.get("/suivi", {"vue": "enattente"})[1]
-        self.assertEqual(re.findall(r'<a href="/client/\d+">([^<]+)</a>', page), ["Echo"])
-        self.assertIn("En attente (1)", page)
+    def test_filtre_en_attente_de_la_journee(self):
+        page = self.get("/journee", {"date": dans(2), "statut": "en_attente"})[1]
+        self.assertEqual(re.findall(r'<a href="/client/\d+">([^<]+)</a>', page[page.index('id="lot"'):]), ["Echo"])
+
+
+class TestPageJournee(BaseJour):
+    """La page Journée gère la journée : ordre, statut, encaissement, retrait, ajout. Jamais de durée modifiable."""
+
+    def test_outils_de_gestion(self):
+        page = self.get("/journee", {"date": dans(1)})[1]
+        for attendu in ('action="/action/deplacer"', 'action="/action/statut"', 'action="/action/encaisser"', 'action="/action/retirer"',
+                        "Total de la journée", "durée totale", "Chantiers à placer"):
+            self.assertIn(attendu, page, attendu)
+        self.assertNotIn('name="duree_estimee_h"', page)                   # le temps d'un travail ne se modifie pas directement
+        self.assertNotIn('name="date_prevue"', page.split("Chantiers à placer")[0].replace('type="hidden" name="date_prevue"', ""))
+
+    def test_changer_le_statut_ne_touche_pas_a_la_duree(self):
+        i = self.ids["Bravo"]                                                  # 3 h
+        self.post("/action/statut", {"chantier_id": str(i), "statut": "termine", "date_prevue": dans(1), "duree_estimee_h": "99", "retour": "/journee"})
+        self.assertEqual(self.sql("SELECT statut, duree_estimee_h, duree_reelle_h FROM chantiers WHERE id = ?", (i,)), [("termine", 3.0, 3.0)])
+
+    def test_navigation_tournee_devenue_journee(self):
+        page = self.get("/journee", {"date": dans(1)})[1]
+        self.assertNotIn("Tournées", page)
+        self.assertIn("<h1>Journée</h1>", page)
 
 
 class TestOrdreDeLaJournee(BaseJour):
@@ -183,7 +204,12 @@ class TestOrdreDeLaJournee(BaseJour):
         self.assertIn("fin prévue <b>14 h 30</b>", page)
 
     def test_changer_la_duree_recalcule(self):
-        self.post("/action/statut", {"chantier_id": str(self.ids["Alpha"]), "statut": "planifie", "date_prevue": dans(1), "duree_estimee_h": "1", "retour": "/"})
+        # la durée se change sur le chantier lui-même (formulaire du chantier), jamais depuis la journée
+        conn, _ = interface.ouvrir_base(self.db)
+        valeurs, _ = interface.valeurs_chantier(conn, self.ids["Alpha"])
+        conn.close()
+        valeurs.pop("client_id", None)
+        self.post(f"/chantier/{self.ids['Alpha']}", {**valeurs, "duree_estimee_h": "1"})
         page = self.get("/", {"date": dans(1)})[1]
         self.assertEqual(re.findall(r"(\d+ h \d\d) → (\d+ h \d\d)", page)[:2], [("7 h 30", "8 h 30"), ("8 h 30", "11 h 30")])
 
@@ -238,10 +264,30 @@ class TestCalendrier(BaseJour):
         self.assertNotIn("Delta", page)                                  # « À planifier » n'est pas dans la journée
         self.assertIn("début <b>7 h 30</b>", page)
         self.assertIn("dîner 12 h 00 - 12 h 30", page)
-        self.assertIn('action="/action/deplacer"', page)
-        self.assertIn('action="/action/statut"', page)
-        self.assertIn('action="/action/encaisser"', page)
-        self.assertIn(f'href="/tournee?date={dans(1)}"', page)
+        self.assertIn(f'href="/journee?date={dans(1)}"', page)           # « Gérer cette journée »
+
+    def test_le_tableau_de_bord_est_en_lecture_seule(self):
+        page = self.get("/", {"date": dans(1)})[1]
+        jour = page[page.index("Total de la journée") - 400:]
+        for interdit in ('action="/action/deplacer"', 'action="/action/statut"', 'action="/action/encaisser"', 'action="/action/facturer"',
+                         'name="duree_estimee_h"', 'name="date_prevue"', 'class="fleche"', "<select"):
+            self.assertNotIn(interdit, jour, interdit)
+        self.assertIn('action="/action/retirer"', jour)                    # retirer une entrée reste possible
+        self.assertIn("Planifié", jour)                                    # le statut est visible
+        self.assertIn("Paiement", jour)                                    # ainsi que les paiements
+
+    def test_chaque_chantier_montre_son_temps_et_son_montant_et_la_journee_ses_totaux(self):
+        conn, _ = noyau.ouvrir_base(self.db)
+        conn.execute("UPDATE chantiers SET prix_ht = 400 WHERE id = ?", (self.ids["Alpha"],))
+        conn.close()
+        page = self.get("/", {"date": dans(1)})[1]
+        jour = page[page.index("durée totale"):]
+        for temps in ("⏱ 2 h", "⏱ 3 h", "⏱ 1 h 30"):                       # Alpha, Bravo, Charlie
+            self.assertIn(temps, jour)
+        self.assertIn('class="montant">400,00 $', jour)                    # montant du travail, à droite
+        self.assertIn("durée totale <span class=\"total\">6 h 30", page)    # somme des temps
+        self.assertIn("1 000,00 $", page)                                  # 400 + 300 + 300 : total de la journée
+        self.assertLess(page.index("th class=\"droite\">Montant"), page.index('class="montant">400,00 $'))
 
     def test_jour_sans_chantier(self):
         self.assertIn("Aucun chantier planifié ce jour-là", self.get("/", {"date": dans(9)})[1])
@@ -294,7 +340,7 @@ class TestCalendrier(BaseJour):
 
     def test_navigation_principale(self):
         page = self.get("/")[1]
-        for lien in ("/", "/tournee", "/chantiers", "/clients", "/nouveau"):
+        for lien in ("/", "/journee", "/chantiers", "/clients", "/nouveau"):
             self.assertIn(f'<a href="{lien}">', page)
 
 
@@ -347,13 +393,12 @@ class TestConfirmationTermine(BaseJour):
         for valeur in (str(self.ids["Delta"]), "99999", "abc", ""):
             self.assertNotIn("Voulez-vous", self.get("/", {"terminer": valeur})[1], valeur)
 
-    def test_aussi_depuis_la_page_du_chantier_et_depuis_les_tournees(self):
+    def test_aussi_depuis_la_page_du_chantier_et_depuis_la_journee(self):
         _, en_tetes, _ = self.post(f"/chantier/{self.ids['Alpha']}/paiement", {"paiement_date": AUJOURDHUI.isoformat(), "paiement_montant": "50", "paiement_mode": "cheque"})
         self.assertIn(f"terminer={self.ids['Alpha']}", en_tetes["Location"])
         page = self.get(f"/chantier/{self.ids['Alpha']}", {"ok": "paiement", "terminer": str(self.ids["Alpha"])})[1]
         self.assertIn(MODALE, page)
-        self.assertIn(MODALE, self.get("/tournee", {"date": dans(1), "terminer": str(self.ids["Alpha"])})[1])
-        self.assertIn(MODALE, self.get("/suivi", {"terminer": str(self.ids["Alpha"])})[1])
+        self.assertIn(MODALE, self.get("/journee", {"date": dans(1), "terminer": str(self.ids["Alpha"])})[1])
 
 
 class TestSecurite(BaseJour):

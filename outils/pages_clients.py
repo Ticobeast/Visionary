@@ -9,8 +9,8 @@ import sqlite3
 
 from noyau import (COLONNES, Resultat, _txt, alias_types_travaux, cle, creer_chantier, lire_client, lire_ligne,
                    mettre_a_jour_client, transaction, travaux_depuis_formulaire, valeurs_client)
-from vue import (LIBELLES_STATUT, badge, bloc_types, carte_adresse, carte_client, champ,
-                 champ_modalite, esc, gabarit, heures, lien_maps, redirection, zone)
+from vue import (LIBELLES_STATUT, avance, badge, bloc_types, champ, champ_modalite, client_avance, client_essentiel, esc,
+                 gabarit, heures, lien_maps, redirection, zone)
 
 
 def _types(conn):
@@ -106,7 +106,7 @@ def _form_client(conn, client_id, valeurs, erreurs=()):
     err = ""
     if erreurs:
         err = ('<div class="erreurs"><strong>À corriger :</strong><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>")
-    return (f'{err}<form method="post" action="/client/{client_id}/modifier">{carte_client(valeurs)}{carte_adresse(valeurs)}'
+    return (f'{err}<form method="post" action="/client/{client_id}/modifier">{client_essentiel(valeurs)}{avance(client_avance(valeurs), ouvert=bool(erreurs))}'
             f'<div class="barre"><button type="submit">Enregistrer</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>')
 
 
@@ -146,17 +146,15 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
               f'{" " + esc(c["code_postal"]) if c["code_postal"] else ""}'
               f'<div class="doux">Nom et adresse verrouillés. <a href="/client/{client_id}/modifier">Modifier la fiche client</a></div></div>')
     return f"""{err}{verrou}<form method="post" action="/client/{client_id}/chantier/nouveau">
-<div class="carte"><h2>Travaux à faire</h2><div class="grille">{bloc_types(_types(conn), valeurs)}</div></div>
-<div class="carte"><h2>Demande, durée, prix et paiement</h2><div class="grille">
-{champ("date_soumission", "Date de la demande de soumission", valeurs, "date")}
+<div class="carte"><h2>Travaux à faire</h2><div class="grille">{bloc_types(_types(conn), valeurs)}
 {champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5", required=True)}
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
 <div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="taxes_auto" value="1"{taxes}>Ajouter TPS 5 % et TVQ 9,975 %</label></div>
-{champ_modalite(valeurs)}</div>
+{zone("description", "Notes (description du chantier, imprimée sur la feuille de route)", valeurs)}</div>
 <p class="doux">La durée estimée est obligatoire (heures décimales : 2,5 = 2 h 30) ; elle sert à calculer les heures de la journée.</p></div>
-<div class="carte"><h2>Notes</h2><div class="grille">{zone("description", "Notes (description du chantier, imprimée sur la feuille de route)", valeurs)}</div></div>
+{avance('<div class="carte"><h2>Demande et règlement</h2><div class="grille">' + champ("date_soumission", "Date de la demande de soumission", valeurs, "date") + champ_modalite(valeurs) + "</div></div>", ouvert=bool(erreurs))}
 <div class="barre"><button type="submit">Créer le chantier</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>
-<p class="doux">Le chantier est créé « À planifier ». La date des travaux et le statut se règlent ensuite depuis le tableau de bord ou les tournées.</p>"""
+<p class="doux">Le chantier est créé « À planifier ». La date des travaux et le statut se règlent ensuite depuis la page Journée ou le chantier.</p>"""
 
 
 def page_chantier_nouveau(conn, client_id):

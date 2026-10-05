@@ -96,6 +96,13 @@ dl.lecture{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:6px 14
 @media (max-width:600px){dl.lecture{grid-template-columns:1fr}}
 .lecture-seule{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}
 details summary{cursor:pointer;color:var(--accent-fonce);font-weight:600;margin-bottom:10px}
+details.avance{background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:12px 16px;margin-bottom:16px}
+details.avance>summary{margin-bottom:0}details.avance[open]>summary{margin-bottom:14px}
+details.avance .carte{box-shadow:none;border:1px solid var(--trait)}
+.col-travaux{min-width:240px}
+.resume-chantier{display:flex;gap:20px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start}.resume-chantier>div:first-child{flex:1 1 320px}.resume-chantier .montant{margin-left:auto}
+.montant{font-size:18px;font-weight:700;text-align:right;white-space:nowrap}.montant small{display:block;font-size:12px;font-weight:400;color:var(--doux)}
+.total-jour .total,.resume-jour .total{font-weight:700}
 @media (max-width:700px){table.liste th:nth-child(n+5),table.liste td:nth-child(n+5){display:none}}
 """
 
@@ -127,7 +134,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False):
     return f"""<!doctype html><html lang="fr-CA"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(titre)} — SylvainCulteur</title>
 <style>{CSS}</style></head><body>
-<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/tournee">Tournées</a><a href="/suivi">Suivi</a><a href="/chantiers">Chantiers</a><a href="/chantiers?vue=archives">Archives</a><a href="/clients">Clients</a><a href="/nouveau">+ Nouveau</a>{etiquette_base()}</header>
+<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/journee">Journée</a><a href="/chantiers">Chantiers</a><a href="/clients">Clients</a><a href="/nouveau">+ Nouveau</a>{etiquette_base()}</header>
 <main{" class=large" if large else ""}>{msg}{contenu}</main></body></html>"""
 
 
@@ -197,23 +204,31 @@ def bloc_types(types, valeurs):
     return f'<div class="large"><label>Types de travaux : coche un ou plusieurs</label>{lignes}</div>'
 
 
-def carte_client(valeurs):
-    sms = " checked" if valeurs.get("client_sms_ok", "1") != "0" else ""
+def client_essentiel(valeurs):
+    """Ce qu'il faut pour retrouver un client : nom, téléphone, adresse des travaux."""
     return f"""<div class="carte"><h2>Client</h2><div class="grille">
 {champ("client_nom", "Nom", valeurs, autocomplete="off")}{champ("client_prenom", "Prénom", valeurs, autocomplete="off")}
-{champ("client_entreprise", "Entreprise / syndicat", valeurs)}{champ("client_telephone", "Téléphone", valeurs, "tel", placeholder="450-555-0142")}
-{champ("client_telephone_2", "Téléphone 2", valeurs, "tel")}{champ("client_courriel", "Courriel", valeurs, "email")}
-<div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="client_sms_ok" value="1"{sms}>Rappels par texto acceptés</label></div>
-{zone("client_notes", "Notes sur le client (préférences, historique)", valeurs)}</div></div>"""
-
-
-def carte_adresse(valeurs):
-    return f"""<div class="carte"><h2>Adresse des travaux</h2><div class="grille">
+{champ("client_telephone", "Téléphone", valeurs, "tel", placeholder="450-555-0142")}
 {champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, required=True, placeholder="123 Rue des Érables")}
-{champ("ville", "Ville", valeurs, required=True)}{champ("code_postal", "Code postal", valeurs, placeholder="J7Z 1A1")}
-{champ("province", "Province", valeurs, placeholder="QC")}
+{champ("ville", "Ville", valeurs, required=True)}</div></div>"""
+
+
+def client_avance(valeurs):
+    """Le reste de la fiche client (rarement utile) : à placer dans « Paramètres avancés »."""
+    sms = " checked" if valeurs.get("client_sms_ok", "1") != "0" else ""
+    return f"""<div class="carte"><h2>Client : autres informations</h2><div class="grille">
+{champ("client_entreprise", "Entreprise / syndicat", valeurs)}{champ("client_telephone_2", "Téléphone 2", valeurs, "tel")}
+{champ("client_courriel", "Courriel", valeurs, "email")}
+<div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="client_sms_ok" value="1"{sms}>Rappels par texto acceptés</label></div>
+{zone("client_notes", "Notes sur le client (préférences, historique)", valeurs)}
+{champ("code_postal", "Code postal", valeurs, placeholder="J7Z 1A1")}{champ("province", "Province", valeurs, placeholder="QC")}
 {zone("notes_acces", "Accès : barrière, chien, où stationner, où est l'arbre", valeurs)}</div>
 <details style="margin-top:12px"><summary>Coordonnées GPS (seulement pour un lot sans numéro civique)</summary><div class="grille">
 {champ("latitude", "Latitude", valeurs, inputmode="decimal", placeholder="45.6480")}
 {champ("longitude", "Longitude (négative au Québec)", valeurs, inputmode="decimal", placeholder="-74.0920")}</div>
 <p class="doux">Google Maps : clic droit sur l'endroit → cliquer sur les coordonnées pour les copier. Laisser vide sinon : le géocodage se fera plus tard.</p></details></div>"""
+
+
+def avance(contenu, ouvert=False):
+    """Section repliée « Paramètres avancés » : les options rarement utilisées. Les champs repliés sont quand même envoyés."""
+    return (f'<details class="avance"{" open" if ouvert else ""}><summary>Paramètres avancés</summary>{contenu}</details>')

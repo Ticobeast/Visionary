@@ -22,24 +22,24 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
-from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, ouvrir_base, sauvegarder, service_nuage,  # noqa: E402
-                   transaction, trouver_ou_creer_client)
+from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, jours_attente, ouvrir_base, priorite,  # noqa: E402
+                   sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
-from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, esc, gabarit,  # noqa: E402,F401
-                 redirection)
+from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, esc, gabarit,  # noqa: E402,F401
+                 heures, redirection)
 
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
-def page_chantiers(conn, query):
-    q = query.get("q", "").strip()
-    statut = query.get("statut", "")
-    paiement = query.get("paiement", "")
-    archives = query.get("vue") == "archives"      # terminé ET payé : sorti de la liste active
+LIMITE_ARCHIVES = 50     # archives affichées d'un coup (les plus récentes) ; la recherche couvre tout
+
+
+def _lignes_chantiers(conn, archive, statut, paiement, q, limite):
     sql = ("SELECT chantier_id, client_nom_complet, entreprise, adresse, ville, telephone, travaux_detail, description,"
-           " statut, statut_paiement, solde, date_prevue, date_soumission, type_libelle FROM v_chantiers WHERE archive = ?")
-    params = [1 if archives else 0]
+           " statut, statut_paiement, solde, date_prevue, date_soumission, type_libelle, duree_estimee_h, total_ttc, attente_depuis"
+           " FROM v_chantiers WHERE archive = ?")
+    params = [1 if archive else 0]
     if statut in STATUTS:
         sql += " AND statut = ?"
         params.append(statut)
@@ -54,8 +54,37 @@ def page_chantiers(conn, query):
     if q:
         mots = cle(q).split()
         lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in r[1:8] if x)) for m in mots)]
-    total = len(lignes)
-    lignes = lignes[:300]
+    return len(lignes), lignes[:limite]
+
+
+def _table_chantiers(lignes):
+    aujourdhui = datetime.date.today()
+    corps = ""
+    for (cid, nom, entreprise, adresse, ville, tel, detail, desc, st, stp, solde, dp, ds, type_, duree, total, attente) in lignes:
+        nom_aff = nom if not entreprise or entreprise == nom else f"{nom} · {entreprise}"
+        date_ = esc(dp or ds or "")
+        if st in ("soumission", "en_attente", "a_planifier") and attente:
+            jours = jours_attente(attente, aujourdhui)
+            date_ += f'<div>{badge_attente(jours, priorite(jours))}</div>'
+        paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""
+        if stp in ("non_facture", "a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
+            paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
+        duree_aff = f'<div class="doux">⏱ {esc(heures(duree))}</div>' if duree else ""
+        corps += (f'<tr><td>{date_}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
+                  f'<td>{esc(adresse)}, {esc(ville)}</td><td>{esc(type_)}{duree_aff}</td><td>{badge(st, LIBELLES_STATUT[st])}</td>'
+                  f'<td>{paiement}</td><td class="montant">{esc(argent(total)) if total else ""}</td></tr>')
+    return ('<table class="liste"><thead><tr><th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
+            f'<th>Paiement</th><th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table>')
+
+
+def page_chantiers(conn, query):
+    """Chantiers actifs ; plus bas, les archives (terminés ET payés : déplacés là automatiquement)."""
+    q = query.get("q", "").strip()
+    statut = query.get("statut", "")
+    paiement = query.get("paiement", "")
+    n_actifs, actifs = _lignes_chantiers(conn, False, statut, paiement, q, 300)
+    n_archives, archives = _lignes_chantiers(conn, True, statut, paiement, q, LIMITE_ARCHIVES)
+    total_archives = conn.execute("SELECT count(*) FROM v_chantiers WHERE archive = 1").fetchone()[0]
 
     def puce(href, nombre, texte):
         return f'<a class="puce" href="{href}"><b>{nombre}</b><span>{esc(texte)}</span></a>'
@@ -73,34 +102,28 @@ def page_chantiers(conn, query):
     paiements = [("a_recevoir", "À recevoir (facturé ou partiel)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
     opt_paiement = '<option value="">Tous les paiements</option>' + "".join(
         f'<option value="{k}"{" selected" if k == paiement else ""}>{esc(v)}</option>' for k, v in paiements)
-    vue_valeur = "archives" if archives else "actifs"
-    recherche = (f'<form class="recherche" method="get" action="/chantiers"><input type="hidden" name="vue" value="{vue_valeur}"><input type="search" name="q" value="{esc(q)}" '
+    recherche = (f'<form class="recherche" method="get" action="/chantiers"><input type="search" name="q" value="{esc(q)}" '
                  f'placeholder="Chercher : nom, téléphone, adresse, ville…"><select name="statut">{opt_statut}</select>'
                  f'<select name="paiement">{opt_paiement}</select><button type="submit">Chercher</button></form>')
 
-    if lignes:
-        corps = ""
-        for (cid, nom, entreprise, adresse, ville, tel, detail, desc, st, stp, solde, dp, ds, type_) in lignes:
-            date_ = dp or ds or ""
-            nom_aff = nom if not entreprise or entreprise == nom else f"{nom} · {entreprise}"
-            solde_aff = argent(solde) if stp in ("non_facture", "a_payer", "partiel") else ""
-            corps += (f'<tr><td>{esc(date_)}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
-                      f'<td>{esc(adresse)}, {esc(ville)}</td><td>{esc(type_)}</td><td>{badge(st, LIBELLES_STATUT[st])}</td>'
-                      f'<td>{badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""}</td><td class="droite">{esc(solde_aff)}</td></tr>')
-        tableau = ('<table class="liste"><thead><tr><th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
-                   f'<th>Paiement</th><th class="droite">Solde</th></tr></thead><tbody>{corps}</tbody></table>')
-        if total > len(lignes):
-            tableau += f'<p class="doux">{len(lignes)} premiers résultats sur {total} : précise la recherche.</p>'
+    if actifs:
+        tableau = _table_chantiers(actifs)
+        if n_actifs > len(actifs):
+            tableau += f'<p class="doux">{len(actifs)} premiers résultats sur {n_actifs} : précise la recherche.</p>'
     else:
-        tableau = '<div class="carte">Aucun chantier ne correspond. <a href="/nouveau">Créer le premier ?</a></div>'
-    nb_archives = conn.execute("SELECT count(*) FROM v_chantiers WHERE archive = 1").fetchone()[0]
-    nb_actifs = conn.execute("SELECT count(*) FROM v_chantiers WHERE archive = 0").fetchone()[0]
-    onglets = (f'<div class="onglets"><a class="onglet{"" if archives else " actif"}" href="/chantiers">Actifs ({nb_actifs})</a>'
-               f'<a class="onglet{" actif" if archives else ""}" href="/chantiers?vue=archives">📦 Archives ({nb_archives})</a></div>')
-    note = ('<p class="doux">Archives : chantiers <b>terminés et payés</b> (déplacés ici automatiquement). Ils sont verrouillés en lecture seule ; '
-            '« Dupliquer » crée une nouvelle soumission pour un travail récurrent.</p>' if archives else "")
-    titre = "Archives" if archives else "Chantiers"
-    return gabarit(titre, f'<h1>{titre}</h1>{onglets}{note}{"" if archives else f"<div class=puces>{puces}</div>"}{recherche}{tableau}', query.get("ok"))
+        tableau = '<div class="carte">Aucun chantier actif ne correspond. <a href="/nouveau">Créer le premier ?</a></div>'
+
+    if n_archives:
+        suite = (f'<p class="doux">{len(archives)} plus récent{"s" if len(archives) > 1 else ""} sur {n_archives} : '
+                 'utilise la recherche pour retrouver un ancien chantier.</p>' if n_archives > len(archives) else "")
+        archives_html = _table_chantiers(archives) + suite
+    else:
+        archives_html = '<div class="carte doux">Aucune archive' + (" ne correspond à cette recherche." if total_archives else " pour l'instant.") + "</div>"
+    lien_archives = f' <a class="doux" href="#archives">Archives ({total_archives}) ↓</a>' if total_archives else ""
+    section_archives = (f'<h2 id="archives" style="margin-top:32px">📦 Archives <small class="doux">({total_archives})</small></h2>'
+                        '<p class="doux">Chantiers <b>terminés et payés</b>, déplacés ici automatiquement. Ils sont verrouillés en lecture seule ; '
+                        '« Dupliquer » crée une nouvelle soumission pour un travail récurrent.</p>' + archives_html)
+    return gabarit("Chantiers", f'<h1>Chantiers{lien_archives}</h1><div class="puces">{puces}</div>{recherche}{tableau}{section_archives}', query.get("ok"))
 
 
 def page_nouveau(conn, query):

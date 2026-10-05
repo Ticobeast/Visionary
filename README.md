@@ -12,7 +12,7 @@ sans retranscription.
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
 - **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**
-  des journées planifiées (heures de passage calculées, ordre modifiable), un **suivi** par délai d'attente, les **tournées**, les fiches clients, la saisie avec validation immédiate. Elle écoute
+  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), les fiches clients, la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 - Un **import CSV** reste disponible pour saisir en rafale dans un tableur (de préférence LibreOffice Calc).
 
@@ -36,9 +36,9 @@ de règlement parmi cinq ; durée estimée obligatoire ; un chantier terminé **
 ```
 schema/schema.sql                       schéma SQLite prêt à exécuter (tables, règles, vue v_chantiers)
 outils/interface.py                     serveur local + saisie complète (nouveau client, modification d'un chantier)
-outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée (heures, ordre)
-outils/tableau.py                       suivi par statut et délai d'attente, actions rapides, tournées
-outils/composants.py                    cellules et formulaires rapides partagés, fenêtre « Terminé ? »
+outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)
+outils/tableau.py                       page Journée (créer / gérer une journée) et actions rapides (statut, ordre, encaissement)
+outils/composants.py                    cellules (client, adresse, travaux, montant, paiement) et formulaires rapides partagés, fenêtre « Terminé ? »
 outils/pages_clients.py                 liste des clients, fiche client, formulaire simplifié de nouveau chantier
 outils/pages_chantier.py                page d'un chantier (client en lecture seule, verrou « Terminé », paiements, duplication)
 outils/vue.py                           composants d'affichage partagés
@@ -50,7 +50,7 @@ modeles/saisie_papier_*.csv             feuille de saisie CSV : vide + 3 exemple
 lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
 lancer_essai.bat / .command / .py       double-clic (ou bouton « Exécuter » de VS Code) : base d'ESSAI (fausses données)
 lancer_interface.py                     idem, sur la VRAIE base
-docs/tableau_de_bord.md                 guide : calendrier, journée, suivi, tournées, fiche client
+docs/tableau_de_bord.md                 guide : tableau de bord, journée, chantiers et archives, fiche client
 docs/dictionnaire_donnees.md            toutes les colonnes : type, format, règle, exemple
 docs/transition_papier.md               méthode pour numériser les dossiers papier
 docs/plan_de_tests.md                   plan de mise en route et de tests, phase par phase

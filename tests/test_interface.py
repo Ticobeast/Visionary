@@ -57,41 +57,64 @@ class BaseInterface(unittest.TestCase):
 
 
 class TestPages(BaseInterface):
-    def test_liste_actifs_et_archives(self):
+    @staticmethod
+    def partie_active(page):
+        return page[:page.index('id="archives"')]
+
+    @staticmethod
+    def partie_archives(page):
+        return page[page.index('id="archives"'):]
+
+    def test_une_seule_page_chantiers_avec_les_archives_plus_bas(self):
         statut, page = self.get("/chantiers")
         self.assertTrue(statut.startswith("200"))
+        actifs, archives = self.partie_active(page), self.partie_archives(page)
         for nom in ("Pierre Lavoie", "Luc Boucher"):
-            self.assertIn(nom, page)
-        self.assertNotIn("Marie Gagnon", page)                  # terminé ET payé : archivé automatiquement
-        self.assertIn("Actifs (2)", page)
+            self.assertIn(nom, actifs)
+            self.assertNotIn(nom, archives)
+        self.assertNotIn("Marie Gagnon", actifs)                 # terminé ET payé : archivé automatiquement
+        self.assertIn("Marie Gagnon", archives)
         self.assertIn("Archives (1)", page)
         self.assertIn("à facturer", page)
-        self.assertIn("1 437,19 $", page)                       # Lavoie : 1250 + taxes, non facturé
-        archives = self.get("/chantiers?vue=archives")[1]
-        self.assertIn("Marie Gagnon", archives)
-        self.assertNotIn("Pierre Lavoie", archives)
-        self.assertNotIn("Luc Boucher", archives)
+        self.assertIn("1 437,19 $", actifs)                      # Lavoie : 1250 + taxes, non facturé
+        self.assertNotIn('class="onglet', page)                        # plus d'onglets : une seule section principale
+        entete = page[page.index("<header>"):page.index("</header>")]
+        self.assertNotIn("Archives", entete)                     # et pas d'entrée « Archives » dans le menu
 
     def test_un_chantier_termine_et_paye_rejoint_les_archives_tout_seul(self):
-        self.assertIn("Pierre Lavoie", self.get("/chantiers")[1])
+        self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers")[1]))
         self.post("/chantier/2/facturer", {"date_facture": "2026-10-02"})
-        self.assertIn("Pierre Lavoie", self.get("/chantiers")[1])               # facturé, pas encore payé : reste actif
+        self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers")[1]))     # facturé, pas encore payé : reste actif
         self.post("/chantier/2/paiement", {"paiement_date": "2026-10-03", "paiement_montant": "1437,19", "paiement_mode": "cheque"})
-        self.assertNotIn("Pierre Lavoie", self.get("/chantiers")[1])
-        self.assertIn("Pierre Lavoie", self.get("/chantiers?vue=archives")[1])
+        page = self.get("/chantiers")[1]
+        self.assertNotIn("Pierre Lavoie", self.partie_active(page))
+        self.assertIn("Pierre Lavoie", self.partie_archives(page))
         self.assertIn("Archivé", self.get("/chantier/2")[1])
         # un chantier payé mais pas terminé n'est PAS archivé
         self.post("/chantier/3/paiement", {"paiement_date": "2026-10-03", "paiement_montant": "2029,45", "paiement_mode": "cheque"})
-        self.assertIn("Luc Boucher", self.get("/chantiers")[1])
+        self.assertIn("Luc Boucher", self.partie_active(self.get("/chantiers")[1]))
 
     def test_filtres_et_recherche_sans_accent(self):
-        self.assertNotIn("Luc Boucher", self.get("/chantiers?paiement=non_facture")[1])
-        self.assertIn("Pierre Lavoie", self.get("/chantiers?paiement=non_facture")[1])
-        self.assertIn("Luc Boucher", self.get("/chantiers?statut=planifie")[1])
-        self.assertNotIn("Pierre Lavoie", self.get("/chantiers?statut=planifie")[1])
-        self.assertIn("Marie Gagnon", self.get("/chantiers?vue=archives&q=erables")[1])    # « Érables » trouvé sans accent
-        self.assertIn("Marie Gagnon", self.get("/chantiers?vue=archives&q=450-555-0142")[1])
-        self.assertNotIn("Pierre Lavoie", self.get("/chantiers?q=boucher")[1])
+        self.assertNotIn("Luc Boucher", self.partie_active(self.get("/chantiers?paiement=non_facture")[1]))
+        self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers?paiement=non_facture")[1]))
+        self.assertIn("Luc Boucher", self.partie_active(self.get("/chantiers?statut=planifie")[1]))
+        self.assertNotIn("Pierre Lavoie", self.partie_active(self.get("/chantiers?statut=planifie")[1]))
+        self.assertIn("Marie Gagnon", self.partie_archives(self.get("/chantiers?q=erables")[1]))    # « Érables » trouvé sans accent
+        self.assertIn("Marie Gagnon", self.partie_archives(self.get("/chantiers?q=450-555-0142")[1]))
+        self.assertNotIn("Pierre Lavoie", self.get("/chantiers?q=boucher")[1])                    # la recherche couvre actifs ET archives
+
+    def test_les_archives_sont_limitees_mais_toujours_retrouvables(self):
+        conn, _ = interface.ouvrir_base(self.db)
+        modele = conn.execute("SELECT client_id FROM chantiers WHERE id = 1").fetchone()[0]
+        for i in range(60):
+            cur = conn.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, duree_reelle_h, prix_ht) VALUES (?, 'termine', ?, 2, 2, 0)",
+                               (modele, f"2020-01-{i % 28 + 1:02d}"))
+            conn.execute("INSERT INTO chantier_travaux VALUES (?, 'emondage', ?)", (cur.lastrowid, f"zzz{i}"))
+        conn.close()
+        archives = self.partie_archives(self.get("/chantiers")[1])
+        self.assertEqual(archives.count('<a href="/chantier/'), interface.LIMITE_ARCHIVES)
+        self.assertIn("utilise la recherche", archives)
+        self.assertIn("zzz59", self.get("/chantiers?q=zzz59")[1])
 
     def test_pages_de_detail_et_introuvable(self):
         statut, page = self.get("/chantier/1")
@@ -276,6 +299,97 @@ class TestModification(BaseInterface):
         self.assertIn("modalite_paiement", page)
         _, en_tetes, _ = self.post("/nouveau", fiche(modalite_paiement="carte"))
         self.assertIn("ok=cree", en_tetes["Location"])
+
+
+class TestSimpleParDefaut(BaseInterface):
+    """Simple par défaut : l'essentiel en clair, le reste dans « Paramètres avancés » (repliés, mais envoyés avec le formulaire)."""
+
+    @staticmethod
+    def noms(html):
+        return set(re.findall(r'<(?:input|select|textarea)[^>]*\bname="([^"]+)"', html))
+
+    def separer(self, page, debut):
+        """(partie visible, partie « Paramètres avancés ») du premier formulaire commençant par `debut`."""
+        formulaire = page[page.index(debut):]
+        formulaire = formulaire[:formulaire.index("</form>")]
+        visible, _, reste = formulaire.partition('<details class="avance"')
+        return visible, reste
+
+    def test_nouveau_client_et_chantier(self):
+        page = self.get("/nouveau")[1]
+        visible, cache = self.separer(page, '<form method="post" action="/nouveau">')
+        champs = {c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))}
+        self.assertEqual(champs, {"client_nom", "client_prenom", "client_telephone", "adresse", "ville", "duree_estimee_h", "prix_ht",
+                                  "taxes_auto", "description"})
+        self.assertIn("Paramètres avancés", page)
+        for avance in ("client_entreprise", "client_courriel", "code_postal", "notes_acces", "latitude", "statut", "date_soumission", "date_prevue",
+                       "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture", "paiement_montant", "dossier_photos", "fichier_papier"):
+            self.assertIn(avance, self.noms(cache), avance)
+            self.assertNotIn(avance, self.noms(visible), avance)
+        self.assertNotIn(" open", page[page.index('<details class="avance"'):][:30])     # replié par défaut
+
+    def test_creation_avec_l_essentiel_seulement(self):
+        _, en_tetes, _ = self.post("/nouveau", {"client_nom": "Simon", "client_telephone": "450-555-0188", "adresse": "5 Rue Courte", "ville": "Mirabel",
+                                                "type_elagage": "1", "duree_estimee_h": "2", "prix_ht": "300"})
+        self.assertIn("ok=cree", en_tetes["Location"])
+        self.assertEqual(self.sql("SELECT statut, duree_estimee_h, prix_ht, date_soumission FROM chantiers WHERE id = 4"),
+                         [("soumission", 2.0, 300.0, datetime.date.today().isoformat())])
+
+    def test_les_parametres_avances_sont_pris_en_compte(self):
+        self.post("/nouveau", fiche(modalite_paiement="carte", client_courriel="s@example.com", code_postal="j7j1a1", numero_facture=""))
+        self.assertEqual(self.sql("SELECT modalite_paiement FROM chantiers WHERE id = 4"), [("carte",)])
+        self.assertEqual(self.sql("SELECT courriel, code_postal FROM clients WHERE nom = 'Roy'"), [("s@example.com", "J7J 1A1")])
+
+    def test_une_erreur_dans_les_avances_les_ouvre(self):
+        _, _, page = self.post("/nouveau", fiche(date_prevue="14/06/2026"))
+        self.assertIn('<details class="avance" open>', page)
+        self.assertIn("AAAA-MM-JJ", page)
+
+    def test_page_d_un_chantier(self):
+        page = self.get("/chantier/3")[1]
+        visible, cache = self.separer(page, '<form method="post" action="/chantier/3">')
+        champs = {c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))}
+        self.assertEqual(champs, {"statut", "date_prevue", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
+        for avance in ("date_soumission", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
+                       "ref_papier", "fichier_papier", "dossier_photos"):
+            self.assertIn(avance, self.noms(cache), avance)
+        self.assertIn("Autres chantiers de ce client", cache)
+        self.assertIn("Supprimer ce chantier", cache)
+        self.assertNotIn("Supprimer ce chantier", visible)
+
+    def test_le_bouton_supprimer_n_est_jamais_le_bouton_par_defaut_du_formulaire(self):
+        """La touche Entrée soumet le premier bouton du formulaire : ce doit être « Enregistrer », jamais « Supprimer »."""
+        page = self.get("/chantier/3")[1]
+        formulaire = page[page.index('<form method="post" action="/chantier/3">'):]
+        formulaire = formulaire[:formulaire.index("</form>")]
+        boutons = re.findall(r'<button([^>]*)>([^<]*)</button>', formulaire)
+        self.assertEqual(boutons[0][1], "Enregistrer les modifications")
+        suppression = [attrs for attrs, texte in boutons if texte == "Supprimer ce chantier"]
+        self.assertEqual(len(suppression), 1)
+        self.assertIn('form="supprimer-chantier"', suppression[0])                 # rattaché à son propre formulaire
+        self.assertIn('<form id="supprimer-chantier" method="post" action="/chantier/3/supprimer"></form>', page)
+
+    def test_chantier_termine_details_dans_les_parametres_avances(self):
+        page = self.get("/chantier/2")[1]
+        visible, _, cache = page.partition('<details class="avance"')
+        self.assertIn("verrouillé en lecture seule", visible)
+        self.assertIn("Ajouter le paiement", visible)
+        self.assertIn("Marquer comme facturé", visible)
+        self.assertNotIn("Fiche papier", visible)
+        self.assertIn("Fiche papier", cache)                                       # le détail complet est replié
+        self.assertIn("Autres chantiers de ce client", cache)
+        self.assertIn('class="montant">1 437,19 $', visible)                       # mais le montant est bien en vue
+
+    def test_formulaire_client_simplifie_et_fiche_client(self):
+        page = self.get("/client/3/chantier/nouveau")[1]
+        visible, cache = self.separer(page, '<form method="post" action="/client/3/chantier/nouveau">')
+        self.assertEqual({c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))},
+                         {"duree_estimee_h", "prix_ht", "taxes_auto", "description"})
+        self.assertEqual(self.noms(cache), {"date_soumission", "modalite_paiement"})
+        page = self.get("/client/3/modifier")[1]
+        visible, cache = self.separer(page, '<form method="post" action="/client/3/modifier">')
+        self.assertEqual(self.noms(visible), {"client_nom", "client_prenom", "client_telephone", "adresse", "ville"})
+        self.assertIn("client_courriel", self.noms(cache))
 
 
 class TestTermineVerrouille(BaseInterface):

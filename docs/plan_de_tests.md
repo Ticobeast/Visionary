@@ -44,9 +44,9 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 
 | # | Scénario | Résultat attendu |
 |---|---|---|
-| 1 | Menu **Suivi** → onglet « À facturer » | seuls les chantiers faits et non facturés s'affichent, avec leur solde |
+| 1 | **Chantiers** → raccourci « à facturer » | seuls les chantiers faits et non facturés s'affichent, avec leur montant ; les anciens chantiers (terminés et payés) sont plus bas, sous « Archives » |
 | 2 | Chercher un client par nom **sans accent** (ex. « cote » pour Côté), puis par téléphone | le bon client apparaît |
-| 3 | **Nouveau chantier**, client neuf : nom, adresse, ville, au moins un type coché, **durée estimée**, statut « Soumission » (la date de la demande est déjà celle d'aujourd'hui) | « Chantier créé » ; le chantier apparaît dans la liste |
+| 3 | **+ Nouveau**, client neuf : nom, adresse, ville, au moins un type coché, **durée estimée** (« Paramètres avancés » reste replié : statut « Soumission » et date de la demande = aujourd'hui par défaut) | « Chantier créé » ; le chantier apparaît dans la liste |
 | 4 | **Client qui revient** : « Nouveau chantier » → chercher son nom → cliquer sa fiche → choisir un type | adresse et téléphone déjà remplis ; **aucun nouveau client** créé |
 | 5 | Passer le chantier de 3 à « Planifié » **sans** date | l'enregistrement est refusé, avec un message clair |
 | 6 | Mettre une date + une durée estimée (ex. `2,5`) ; essayer de la laisser vide | `2,5` est compris comme 2 h 30 ; durée vide = refusé (« obligatoire ») |
@@ -58,18 +58,18 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 11 | Modifier l'adresse d'un client, puis supprimer un paiement et un chantier de test | tout se passe sans erreur |
 | 12 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
 | 13 | **Tableau de bord** (accueil) | **seulement** un calendrier du mois (pas de tuiles) : les jours planifiés montrent « 3 chantiers · 6 h 30 » ; les jours trop chargés (> 8 h) sont en rouge |
-| 14 | Cliquer sur une **date** du calendrier | le **déroulement de la journée** s'affiche dessous : durée totale, **puis le total en $ de la journée** (taxes incluses), chantiers dans l'ordre, avec heures de début → fin (le premier à 7 h 30) |
+| 14 | Cliquer sur une **date** du calendrier | le déroulement de la journée s'affiche dessous, **en lecture seule** : durée totale, **puis le total en $** (taxes incluses), chantiers dans l'ordre avec heures, temps de chacun, statut, paiements et **montant à droite** ; ni flèches, ni liste de statut, ni durée modifiable ; seulement « Retirer » et « Gérer cette journée » |
 | 15 | Repérer le **dîner** : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
-| 16 | Cliquer **▼** sur le 1er chantier, puis **▲** sur le 3e | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités la flèche est grisée |
-| 17 | Changer la **durée** d'un chantier de la journée (ex. `1`) + OK | les heures de début et de fin des suivants se décalent |
-| 18 | Changer le **statut** d'un chantier depuis la journée (« Terminé », puis « À planifier ») | « Terminé » reste dans la journée ; « À planifier » le fait disparaître du calendrier |
+| 16 | Page **Journée** : cliquer **▼** sur le 1er chantier, puis **▲** sur le 3e | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités la flèche est grisée |
+| 17 | Sur la page **Journée**, chercher où modifier la **durée** d'un chantier ; l'ouvrir (lien du chantier), changer « Durée estimée » (ex. `1`), enregistrer | aucun champ de durée dans la Journée ni sur le tableau de bord ; sur le chantier, les heures des suivants se décalent |
+| 18 | Changer le **statut** d'un chantier depuis la page **Journée** (« Terminé », puis « À planifier » sur un autre) | « Terminé » reste dans la journée (verrouillé) ; « À planifier » le fait disparaître du calendrier |
 | 19 | **Encaisser** sur un chantier « Planifié » | le paiement est enregistré, puis une fenêtre demande : *Voulez-vous passer ce chantier au statut "Terminé" ?* — « Oui » le passe à Terminé, « Non » le laisse Planifié |
 | 20 | Même encaissement sur un chantier « Terminé » ou « À planifier » | **aucune** fenêtre |
-| 21 | Page **Suivi** : onglets À planifier / En attente / Soumissions / À facturer / À recevoir | chantiers regroupés par délai (rouge > 30 j, jaune 7 à 30 j, vert < 7 j) ; filtres délai / secteur / tri |
+| 21 | **Chantiers** : regarder la liste active | délai d'attente en pastille (rouge > 30 j, jaune 7 à 30 j, vert < 7 j) sur les chantiers à planifier ; temps de chaque chantier ; **montant à droite** ; filtres statut / paiement |
 | 22 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
-| 23 | **Facturer** (onglet « À facturer »), puis **Encaisser** un acompte et le solde (« À recevoir ») | « Facturé », « Partiel », « Payé » sans ouvrir de fiche |
+| 23 | **Facturer** (page du chantier terminé), puis **Encaisser** un acompte et le solde | « Facturé », « Partiel », « Payé » ; à « Payé », le chantier descend dans les **Archives** |
 | 24 | **Clients** → un client → **+ Nouveau chantier** | nom et adresse **verrouillés** ; travaux, date de la demande (aujourd'hui), durée estimée obligatoire, prix, mode de règlement (un seul choix), notes ; le chantier arrive « À planifier » |
-| 25 | **Tournées** : choisir demain, filtrer par secteur, cocher 3 chantiers, ajuster une durée, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché ; le total d'heures se met à jour en cochant |
+| 25 | **Journée** : choisir demain, filtrer par secteur, cocher 3 chantiers, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché ; le total d'heures **et de dollars** se met à jour en cochant ; un chantier sans durée ne peut pas être coché |
 | 26 | Dans la journée : **Retirer** un chantier | il redevient « À planifier » (sans date) |
 | 27 | **Clients** (liste) | seulement 3 colonnes : Nom, Téléphone, Adresse ; la fiche d'un client n'affiche aucun montant |
 | 28 | Ouvrir un chantier existant : chercher un champ pour changer le nom ou l'adresse du client | il n'y en a pas : le client est en lecture seule (🔒) ; le bouton **Modifier le client** mène à sa fiche ; même chose après « Enregistrer » |
@@ -79,6 +79,8 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 32 | Ouvrir ce chantier terminé | page en **lecture seule** (🔒) ; ni formulaire, ni « Supprimer » ; il reste « Facturer », « Encaisser », « Dupliquer » |
 | 33 | Facturer puis encaisser **tout** le solde du chantier terminé | il quitte *Chantiers* et apparaît dans **Archives** tout seul |
 | 34 | **Dupliquer le chantier** sur un chantier terminé : changer le prix, valider | nouvelle **soumission** du même client : mêmes travaux, date de demande = aujourd'hui, aucun paiement ni facture ; l'original est intact |
+| 35 | Menu du haut | seulement : Tableau de bord, Journée, Chantiers, Clients, + Nouveau (ni Suivi, ni Tournées, ni Archives) ; les archives sont en bas de la page Chantiers |
+| 36 | Ouvrir un chantier existant | résumé + valeur à droite, client en lecture seule, paiements ; le reste (dates, taxes, facture, fichiers, suppression) est dans « Paramètres avancés » (replié) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

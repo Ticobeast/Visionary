@@ -854,7 +854,7 @@ def planifier_lot(conn, ids, date_prevue, durees=None):
         h = Lh.duree("duree_estimee_h")
         L.erreurs.extend(f"chantier #{i} : {e}" for e in Lh.erreurs)
         if h is None and not r[1] and not Lh.erreurs:
-            L.erreurs.append(f"chantier #{i} : la durée estimée est obligatoire (en heures, ex. 2,5)")
+            L.erreurs.append(f"chantier #{i} : la durée estimée est obligatoire (ouvre le chantier pour la saisir)")
         a_ecrire.append((i, h))
     if L.erreurs:
         return L.erreurs

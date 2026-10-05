@@ -140,7 +140,7 @@ Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiem
 
 ### Archives — calculées, jamais saisies
 
-`v_chantiers.archive = 1` quand le chantier est **Terminé ET payé** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Le chantier passe tout seul des « Actifs » aux « Archives » (menu *Archives*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent.
+`v_chantiers.archive = 1` quand le chantier est **Terminé ET payé** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Le chantier passe tout seul des « Actifs » aux « Archives » (section en bas de la page *Chantiers*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent.
 
 ### Dupliquer un chantier
 

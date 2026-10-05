@@ -101,80 +101,64 @@ class TestAttente(unittest.TestCase):
         self.assertEqual(noyau.jours_attente(None), 0)
 
 
-class TestTableauDeBord(BaseTableau):
-    def test_groupes_par_delai_d_attente(self):
-        statut, page = self.get("/suivi")
-        self.assertTrue(statut.startswith("200"))
-        positions = [page.index(t) for t in ("Urgent : plus de 30 jours", "À surveiller : 7 à 30 jours", "Normal : moins de 7 jours")]
-        self.assertEqual(positions, sorted(positions))
-        # ordre : urgents (45 j, 31 j) puis surveiller (15 j, 7 j) puis normal (3 j)
-        self.assertEqual(self.noms_dans(page), ["Urgent", "Limite31", "Surveiller", "Limite7", "Normal"])
-        self.assertIn(">45 j<", page)
+class TestSuiviSupprime(BaseTableau):
+    """Le Suivi n'existe plus (la Journée et Chantiers couvrent ses informations) ; les anciens liens ne cassent pas."""
+
+    def test_anciens_liens_redirigent(self):
+        statut, en_tetes, _ = interface.repondre(self.db, "GET", "/suivi", {"vue": "afacturer"})
+        self.assertEqual((statut[:3], dict(en_tetes)["Location"]), ("303", "/chantiers"))
+        statut, en_tetes, _ = interface.repondre(self.db, "GET", "/tournee", {"date": dans(2)})
+        self.assertEqual((statut[:3], dict(en_tetes)["Location"]), ("303", f"/journee?date={dans(2)}"))
+
+    def test_navigation_sans_suivi_ni_tournee_ni_archives(self):
+        page = self.get("/")[1]
+        entete = page[page.index("<header>"):page.index("</header>")]
+        self.assertEqual(re.findall(r'<a href="([^"]+)">([^<]+)</a>', entete),
+                         [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/clients", "Clients"), ("/nouveau", "+ Nouveau")])
+
+
+class TestChantiersListe(BaseTableau):
+    """Ce que le Suivi montrait se retrouve dans Chantiers : délai d'attente, durée, montant, à facturer / à recevoir."""
+
+    def test_attente_duree_et_montant(self):
+        page = self.get("/chantiers")[1]
+        self.assertIn(">45 j<", page)                                      # Urgent : 45 jours d'attente
         self.assertIn("a-urgente", page)
-        self.assertIn("ligne-urgente", page)
-        self.assertIn("a-normale", page)
-
-    def test_onglets_avec_compteurs(self):
-        page = self.get("/suivi")[1]
-        self.assertIn("À planifier (5 · <b>2 urgents</b>)", page)
-        self.assertIn("Soumissions (1)", page)
-        self.assertIn("Planifiés (1)", page)
-        self.assertIn("À facturer (1)", page)
-
-    def test_filtres_attente_secteur_tri(self):
-        self.assertEqual(self.noms_dans(self.get("/suivi", {"attente": "urgente"})[1]), ["Urgent", "Limite31"])
-        self.assertEqual(self.noms_dans(self.get("/suivi", {"attente": "normale"})[1]), ["Normal"])
-        self.assertEqual(sorted(self.noms_dans(self.get("/suivi", {"secteur": "Mirabel"})[1])), ["Limite31", "Limite7", "Surveiller"])
-        # tri par secteur : groupes par ville, puis par code postal (J7C avant J7J ; J7J 1A1 < 2B2 < 3C3)
-        page = self.get("/suivi", {"tri": "secteur"})[1]
-        self.assertEqual(self.noms_dans(page), ["Urgent", "Normal", "Surveiller", "Limite7", "Limite31"])
-        self.assertIn("Secteur : Blainville", page)
-        self.assertLess(page.index("Secteur : Blainville"), page.index("Secteur : Mirabel"))
-        # tri par durée : la plus longue d'abord
-        self.assertEqual(self.noms_dans(self.get("/suivi", {"tri": "duree"})[1])[0], "Urgent")
-        self.assertEqual(self.noms_dans(self.get("/suivi", {"q": "surveiller"})[1]), ["Surveiller"])
-
-    def test_duree_et_adresse_cliquable(self):
-        page = self.get("/suivi")[1]
-        self.assertIn("⏱ 2 h 30", page)                                    # Urgent : 2,5 h
-        self.assertIn("durée à estimer", page)                              # Normal : pas de durée
-        self.assertIn('href="https://www.google.com/maps/search/?api=1&amp;query=1%20Rue%20Urgent%2C%20Blainville%2C%20QC%20J7C%201A1%2C%20Canada"', page)
-        self.assertIn('target="_blank"', page)
-        self.assertIn("Règlement prévu : Chèque", page)
-
-    def test_planifies_groupes_par_jour(self):
-        page = self.get("/suivi", {"vue": "planifies"})[1]
-        self.assertIn(dans(1), page)
-        self.assertIn("1 chantier", page)
-        self.assertIn("3 h", page)
-        self.assertIn(f'href="/tournee?date={dans(1)}"', page)
+        self.assertIn("⏱ 2 h 30", page)
+        self.assertIn('class="montant"', page)
+        self.assertIn("400,00 $", page)                                    # Urgent : 400 $, pas de taxes saisies
+        self.assertIn("919,80 $", page)                                    # Fait : 800 + TPS + TVQ
 
     def test_a_facturer_a_recevoir(self):
-        page = self.get("/suivi", {"vue": "afacturer"})[1]
-        self.assertEqual(self.noms_dans(page), ["Fait"])
-        self.assertIn('action="/action/facturer"', page)
-        self.assertIn(">40 j<", page)                                       # attente depuis les travaux
-        self.assertIn("À facturer", page)
+        page = self.get("/chantiers", {"paiement": "non_facture"})[1]
+        self.assertIn("Fait", page)
+        self.assertNotIn("Urgent", page[page.index("<table"):])
 
     def test_html_est_echappe(self):
         conn, _ = noyau.ouvrir_base(self.db)
         conn.execute("UPDATE clients SET nom = '<script>alert(1)</script>' WHERE id = 1")
         conn.close()
-        self.assertNotIn("<script>alert", self.get("/suivi")[1])
-        self.assertNotIn("<script>alert", self.get("/tournee")[1])
+        for chemin in ("/chantiers", "/journee", "/"):
+            self.assertNotIn("<script>alert", self.get(chemin)[1], chemin)
 
 
 class TestActionsRapides(BaseTableau):
     def test_changer_statut_vers_planifie_exige_une_date(self):
         i = self.ids["Normal"]
-        _, en_tetes, _ = self.post("/action/statut", {"chantier_id": str(i), "statut": "planifie", "retour": "/suivi?vue=aplanifier"})
+        _, en_tetes, _ = self.post("/action/statut", {"chantier_id": str(i), "statut": "planifie", "retour": "/journee?statut=a_planifier"})
         self.assertIn("err=", en_tetes["Location"])
         self.assertIn("date", en_tetes["Location"])
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (i,)), [("a_planifier",)])
-        _, en_tetes, _ = self.post("/action/statut", {"chantier_id": str(i), "statut": "planifie", "date_prevue": dans(3),
-                                                      "duree_estimee_h": "2,5", "retour": "/suivi?vue=aplanifier&tri=secteur"})
-        self.assertEqual(en_tetes["Location"], "/suivi?vue=aplanifier&tri=secteur&ok=statut_change")   # on revient au même endroit
-        self.assertEqual(self.sql("SELECT statut, date_prevue, duree_estimee_h FROM chantiers WHERE id = ?", (i,)), [("planifie", dans(3), 2.5)])
+        # « Normal » n'a pas de durée estimée : refusé, et la durée envoyée par le formulaire est ignorée (elle se règle sur le chantier)
+        _, en_tetes, _ = self.post("/action/statut", {"chantier_id": str(i), "statut": "planifie", "date_prevue": dans(3), "duree_estimee_h": "2,5",
+                                                      "retour": "/journee?statut=a_planifier&tri=secteur"})
+        self.assertIn("err=", en_tetes["Location"])
+        self.assertEqual(self.sql("SELECT statut, duree_estimee_h FROM chantiers WHERE id = ?", (i,)), [("a_planifier", None)])
+        j = self.ids["Urgent"]
+        _, en_tetes, _ = self.post("/action/statut", {"chantier_id": str(j), "statut": "planifie", "date_prevue": dans(3),
+                                                      "retour": "/journee?statut=a_planifier&tri=secteur"})
+        self.assertEqual(en_tetes["Location"], "/journee?statut=a_planifier&tri=secteur&ok=statut_change")   # on revient au même endroit
+        self.assertEqual(self.sql("SELECT statut, date_prevue, duree_estimee_h FROM chantiers WHERE id = ?", (j,)), [("planifie", dans(3), 2.5)])
 
     def test_remettre_a_planifier_efface_la_date(self):
         i = self.ids["Demain"]
@@ -195,8 +179,8 @@ class TestActionsRapides(BaseTableau):
 
     def test_facturer(self):
         i = self.ids["Fait"]
-        _, en_tetes, _ = self.post("/action/facturer", {"chantier_id": str(i), "retour": "/suivi?vue=afacturer"})
-        self.assertEqual(en_tetes["Location"], "/suivi?vue=afacturer&ok=facture")
+        _, en_tetes, _ = self.post("/action/facturer", {"chantier_id": str(i), "retour": "/chantiers?paiement=non_facture"})
+        self.assertEqual(en_tetes["Location"], "/chantiers?paiement=non_facture&ok=facture")
         self.assertEqual(self.sql("SELECT date_facture FROM chantiers WHERE id = ?", (i,)), [(AUJOURDHUI.isoformat(),)])
         self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)), [("a_payer",)])
         _, en_tetes, _ = self.post("/action/facturer", {"chantier_id": str(i), "retour": "/"})          # déjà facturé
@@ -212,12 +196,12 @@ class TestActionsRapides(BaseTableau):
 
     def test_encaisser_partiel_puis_solde(self):
         i = self.ids["Fait"]                                                 # 800 + 40 + 79,80 = 919,80 $
-        page = self.get("/suivi", {"vue": "afacturer"})[1]
+        page = self.get("/journee", {"date": il_y_a(40)})[1]
         self.assertIn('value="919.80"', page)                                # le formulaire propose le solde complet
         self.post("/action/encaisser", {"chantier_id": str(i), "montant": "400", "mode": "cheque", "retour": "/"})
         self.assertEqual(self.sql("SELECT statut_paiement, solde FROM v_chantiers WHERE chantier_id = ?", (i,)), [("partiel", 519.8)])
-        _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": str(i), "montant": "519,80", "mode": "interac", "retour": "/suivi?vue=arecevoir"})
-        self.assertEqual(en_tetes["Location"], "/suivi?vue=arecevoir&ok=encaisse")
+        _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": str(i), "montant": "519,80", "mode": "interac", "retour": "/journee?date=x"})
+        self.assertEqual(en_tetes["Location"], "/journee?date=x&ok=encaisse")
         self.assertEqual(self.sql("SELECT statut_paiement, solde FROM v_chantiers WHERE chantier_id = ?", (i,)), [("paye", 0.0)])
         self.assertEqual(self.sql("SELECT date_paiement, mode FROM paiements WHERE chantier_id = ? ORDER BY id", (i,)),
                          [(AUJOURDHUI.isoformat(), "cheque"), (AUJOURDHUI.isoformat(), "interac")])
@@ -231,8 +215,8 @@ class TestActionsRapides(BaseTableau):
         self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(0,)])
 
     def test_le_mode_propose_suit_la_modalite(self):
-        self.terminer_sans_toucher("ParCheque", prix=100, modalite="cheque")
-        page = self.get("/suivi", {"vue": "afacturer"})[1]
+        self.terminer_sans_toucher("ParCheque", prix=100, modalite="cheque")           # terminé il y a 20 jours
+        page = self.get("/journee", {"date": il_y_a(20)})[1]
         self.assertIn('<option value="cheque" selected>', page)
 
     def test_le_retour_ne_peut_pas_etre_une_adresse_externe(self):
@@ -243,15 +227,15 @@ class TestActionsRapides(BaseTableau):
         self.assertTrue(en_tetes["Location"].startswith("/?"))
 
     def test_message_et_erreur_affiches(self):
-        self.assertIn("Statut mis à jour", self.get("/suivi", {"ok": "statut_change"})[1])
-        page = self.get("/suivi", {"err": "<b>boom</b>"})[1]
+        self.assertIn("Statut mis à jour", self.get("/journee", {"ok": "statut_change"})[1])
+        page = self.get("/journee", {"err": "<b>boom</b>"})[1]
         self.assertIn("Action refusée", page)
         self.assertNotIn("<b>boom</b>", page)
 
 
-class TestTournees(BaseTableau):
+class TestJournee(BaseTableau):
     def test_page_de_la_journee(self):
-        statut, page = self.get("/tournee", {"date": dans(1)})
+        statut, page = self.get("/journee", {"date": dans(1)})
         self.assertTrue(statut.startswith("200"))
         self.assertIn("1 chantier", page)
         self.assertIn("3 h", page)
@@ -261,55 +245,64 @@ class TestTournees(BaseTableau):
         self.assertIn("Chantiers à placer", page)
 
     def test_candidats_filtres_et_tries(self):
-        page = self.get("/tournee", {"date": dans(2), "secteur": "Mirabel", "attente": "surveiller", "tri": "attente"})[1]
+        page = self.get("/journee", {"date": dans(2), "secteur": "Mirabel", "attente": "surveiller", "tri": "attente"})[1]
         candidats = page[page.index('id="lot"'):]
         self.assertEqual(self.noms_dans(candidats), ["Surveiller", "Limite7"])
-        tous = self.get("/tournee", {"date": dans(2), "tri": "secteur"})[1]
+        tous = self.get("/journee", {"date": dans(2), "tri": "secteur"})[1]
         self.assertIn("Secteur : Blainville", tous)
         self.assertLess(tous.index("Secteur : Blainville"), tous.index("Secteur : Mirabel"))
-        self.assertIn('name="duree_', tous)
+        self.assertNotIn('name="duree_', tous)                              # la durée ne se modifie pas ici : c'est celle du chantier
+        self.assertIn("durée à estimer : ouvrir le chantier", tous)         # « Normal » n'a pas de durée : impossible à cocher
+        self.assertIn('class="montant"', tous)
         self.assertIn('name="sel_', tous)
-        soumissions = self.get("/tournee", {"date": dans(2), "statut": "soumission"})[1]
+        soumissions = self.get("/journee", {"date": dans(2), "statut": "soumission"})[1]
         self.assertEqual(self.noms_dans(soumissions[soumissions.index('id="lot"'):]), ["Devis"])
 
     def test_planifier_plusieurs_chantiers_en_un_clic(self):
-        a, b = self.ids["Urgent"], self.ids["Normal"]
-        _, en_tetes, _ = self.post("/tournee/planifier", {"date": dans(2), f"sel_{a}": "1", f"sel_{b}": "1",
-                                                          f"duree_{a}": "2,5", f"duree_{b}": "1,5", "retour": f"/tournee?date={dans(2)}"})
-        self.assertEqual(en_tetes["Location"], f"/tournee?date={dans(2)}&ok=planifie_lot")
+        a, b = self.ids["Urgent"], self.ids["Surveiller"]                     # 2,5 h et 1 h
+        _, en_tetes, _ = self.post("/journee/planifier", {"date": dans(2), f"sel_{a}": "1", f"sel_{b}": "1", "retour": f"/journee?date={dans(2)}"})
+        self.assertEqual(en_tetes["Location"], f"/journee?date={dans(2)}&ok=planifie_lot")
         self.assertEqual(self.sql("SELECT statut, date_prevue, duree_estimee_h FROM chantiers WHERE id IN (?, ?) ORDER BY id", (a, b)),
-                         [("planifie", dans(2), 2.5), ("planifie", dans(2), 1.5)])
-        page = self.get("/tournee", {"date": dans(2)})[1]
+                         [("planifie", dans(2), 2.5), ("planifie", dans(2), 1.0)])
+        page = self.get("/journee", {"date": dans(2)})[1]
         self.assertIn("2 chantiers", page)
-        self.assertIn("4 h", page)                                           # 2,5 + 1,5
+        self.assertIn("3 h 30", page)                                          # durée totale
+        self.assertIn("Total de la journée", page)
+        self.assertIn("650,00 $", page)                                        # 400 $ + 250 $
+
+    def test_la_duree_ne_se_saisit_pas_ici(self):
+        n = self.ids["Normal"]                                                 # sans durée estimée
+        _, en_tetes, _ = self.post("/journee/planifier", {"date": dans(2), f"sel_{n}": "1", f"duree_{n}": "2", "retour": "/journee"})
+        self.assertIn("err=", en_tetes["Location"])                            # une durée envoyée quand même est ignorée
+        self.assertEqual(self.sql("SELECT statut, duree_estimee_h FROM chantiers WHERE id = ?", (n,)), [("a_planifier", None)])
 
     def test_journee_trop_chargee(self):
         conn, _ = noyau.ouvrir_base(self.db)
         conn.execute("UPDATE chantiers SET duree_estimee_h = 9 WHERE id = ?", (self.ids["Demain"],))
         conn.close()
-        self.assertIn("journée chargée", self.get("/tournee", {"date": dans(1)})[1])
+        self.assertIn("journée chargée", self.get("/journee", {"date": dans(1)})[1])
 
     def test_planification_tout_ou_rien(self):
         a, fait = self.ids["Urgent"], self.ids["Fait"]
-        _, en_tetes, _ = self.post("/tournee/planifier", {"date": dans(2), f"sel_{a}": "1", f"sel_{fait}": "1", "retour": "/tournee"})
+        _, en_tetes, _ = self.post("/journee/planifier", {"date": dans(2), f"sel_{a}": "1", f"sel_{fait}": "1", "retour": "/journee"})
         self.assertIn("err=", en_tetes["Location"])
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (a,)), [("a_planifier",)])      # rien n'a bougé
         for form in ({"date": dans(2)}, {"date": "", f"sel_{a}": "1"}, {"date": "2026-13-45", f"sel_{a}": "1"},
-                     {"date": dans(2), f"sel_{a}": "1", f"duree_{a}": "30"}):
-            _, en_tetes, _ = self.post("/tournee/planifier", {"retour": "/tournee", **form})
+                     {"date": dans(2), f"sel_{self.ids['Normal']}": "1"}):
+            _, en_tetes, _ = self.post("/journee/planifier", {"retour": "/journee", **form})
             self.assertIn("err=", en_tetes["Location"], form)
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (a,)), [("a_planifier",)])
 
     def test_deplacer_un_chantier_planifie_et_le_retirer(self):
         d = self.ids["Demain"]
-        self.post("/tournee/planifier", {"date": dans(4), f"sel_{d}": "1", "retour": "/tournee"})
+        self.post("/journee/planifier", {"date": dans(4), f"sel_{d}": "1", "retour": "/journee"})
         self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = ?", (d,)), [("planifie", dans(4))])
-        _, en_tetes, _ = self.post("/action/retirer", {"chantier_id": str(d), "retour": f"/tournee?date={dans(4)}"})
-        self.assertEqual(en_tetes["Location"], f"/tournee?date={dans(4)}&ok=retire")
+        _, en_tetes, _ = self.post("/action/retirer", {"chantier_id": str(d), "retour": f"/journee?date={dans(4)}"})
+        self.assertEqual(en_tetes["Location"], f"/journee?date={dans(4)}&ok=retire")
         self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = ?", (d,)), [("a_planifier", None)])
 
     def test_date_invalide_retombe_sur_demain(self):
-        self.assertIn(dans(1), self.get("/tournee", {"date": "pas une date"})[1])
+        self.assertIn(dans(1), self.get("/journee", {"date": "pas une date"})[1])
 
 
 if __name__ == "__main__":

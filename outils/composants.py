@@ -1,4 +1,4 @@
-"""Composants partagés par le calendrier, le suivi et les tournées : lecture des chantiers, cellules de tableau,
+"""Composants partagés par le tableau de bord (calendrier) et la page Journée : lecture des chantiers, cellules de tableau,
 formulaires rapides (statut, facturation, encaissement) et fenêtre de confirmation « Terminé »."""
 import datetime
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -8,22 +8,11 @@ from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, argent, badg
 
 JOURNEE_H = 8.0   # repère d'une journée de travail (heures), pour voir ce qu'il reste de place
 
-VUES = [
-    ("aplanifier", "À planifier"),
-    ("enattente", "En attente"),
-    ("soumissions", "Soumissions"),
-    ("planifies", "Planifiés"),
-    ("afacturer", "À facturer"),
-    ("arecevoir", "À recevoir"),
-]
 TRIS = [("attente", "Délai d'attente (le plus long d'abord)"), ("secteur", "Secteur (ville, code postal)"),
         ("duree", "Durée (la plus longue d'abord)")]
 FILTRES_ATTENTE = [("", "Tous les délais"), ("urgente", f"Urgents (plus de {SEUIL_URGENT} j)"),
                    ("surveiller", f"À surveiller ({SEUIL_SURVEILLER} à {SEUIL_URGENT} j)"),
                    ("normale", f"Normaux (moins de {SEUIL_SURVEILLER} j)")]
-TITRES_PRIORITE = {"urgente": f"Urgent : plus de {SEUIL_URGENT} jours d'attente",
-                   "surveiller": f"À surveiller : {SEUIL_SURVEILLER} à {SEUIL_URGENT} jours",
-                   "normale": f"Normal : moins de {SEUIL_SURVEILLER} jours"}
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
 
@@ -48,22 +37,6 @@ def lignes_vue(conn, condition="1=1", params=()):
         l["secteur_tri"] = (cle(l["ville"]), (l["code_postal"] or "").replace(" ", ""))
         lignes.append(l)
     return lignes, aujourdhui
-
-
-def reference_attente(l, vue):
-    """Date à partir de laquelle on compte l'attente, selon l'onglet."""
-    if vue in ("afacturer",):
-        return l["date_prevue"] or l["attente_depuis"]
-    if vue == "arecevoir":
-        return l["date_facture"] or l["date_prevue"] or l["attente_depuis"]
-    return l["attente_depuis"]
-
-
-def dans_vue(l, vue):
-    st, sp = l["statut"], l["statut_paiement"]
-    return {"aplanifier": st == "a_planifier", "enattente": st == "en_attente", "soumissions": st == "soumission",
-            "planifies": st == "planifie", "afacturer": sp in ("non_facture", "prix_manquant"),
-            "arecevoir": sp in ("a_payer", "partiel")}[vue]
 
 
 def nom_client(l):
@@ -93,21 +66,6 @@ def mode_conseille(modalite):
 
 
 VERROUILLE = '<span class="badge b-termine" title="Chantier terminé : verrouillé en lecture seule">🔒 Terminé</span>'
-
-
-def form_statut(l, retour, avec_date=True):
-    if l["statut"] == "termine":              # un chantier terminé ne change plus de statut
-        return VERROUILLE
-    options = "".join(f'<option value="{s}"{" selected" if s == l["statut"] else ""}>{esc(LIBELLES_STATUT[s])}</option>' for s in STATUTS)
-    duree = f"{l['duree_estimee_h']:g}" if l["duree_estimee_h"] else ""
-    date = ""
-    if avec_date:
-        date = (f'<input type="date" name="date_prevue" value="{esc(l["date_prevue"])}" title="Date des travaux (obligatoire pour Planifié / Terminé)">'
-                f'<input class="court" name="duree_estimee_h" value="{esc(duree)}" inputmode="decimal" placeholder="h" '
-                f'title="Durée estimée en heures (2,5 = 2 h 30)">')
-    return (f'<form class="mini" method="post" action="/action/statut"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
-            f'<input type="hidden" name="retour" value="{esc(retour)}"><select name="statut" aria-label="Statut">{options}</select>{date}'
-            f'<button type="submit" class="secondaire">OK</button></form>')
 
 
 def actions_paiement(l, retour):
@@ -156,17 +114,35 @@ def cellule_travaux(l):
 
 
 def form_statut_jour(l, retour):
-    """Statut + durée estimée d'un chantier, dans la vue d'une journée (la date reste celle de la journée)."""
+    """Statut d'un chantier, dans la page Journée (la date et la durée ne se changent pas ici : elles sont celles du chantier)."""
     if l["statut"] == "termine":
         return VERROUILLE
     options = "".join(f'<option value="{s}"{" selected" if s == l["statut"] else ""}>{esc(LIBELLES_STATUT[s])}</option>' for s in STATUTS)
-    duree = f"{l['duree_estimee_h']:g}" if l["duree_estimee_h"] else ""
     return (f'<form class="mini" method="post" action="/action/statut"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
             f'<input type="hidden" name="retour" value="{esc(retour)}"><input type="hidden" name="date_prevue" value="{esc(l["date_prevue"])}">'
-            f'<select name="statut" aria-label="Statut">{options}</select>'
-            f'<input class="court" name="duree_estimee_h" value="{esc(duree)}" inputmode="decimal" placeholder="h" '
-            f'title="Durée estimée en heures (2,5 = 2 h 30) : les heures de passage sont recalculées">'
-            f'<button type="submit" class="secondaire">OK</button></form>')
+            f'<select name="statut" aria-label="Statut">{options}</select><button type="submit" class="secondaire">OK</button></form>')
+
+
+def cellule_montant(l):
+    """Valeur du travail, bien visible à droite : total taxes incluses (le prix avant taxes en dessous)."""
+    if l["total_ttc"] is None or not l["total_ttc"]:
+        return '<div class="montant"><small>prix à saisir</small></div>'
+    avant = f'<small>{argent(l["prix_ht"])} avant taxes</small>' if l["prix_ht"] is not None and abs(l["total_ttc"] - l["prix_ht"]) > 0.004 else ""
+    return f'<div class="montant">{argent(l["total_ttc"])}{avant}</div>'
+
+
+def paiement_lecture(l):
+    """État du paiement en lecture seule : statut, reçu et solde (aucun formulaire)."""
+    sp = l["statut_paiement"]
+    out = []
+    if sp not in ("sans_objet", "a_venir"):
+        out.append(badge(sp, LIBELLES_PAIEMENT[sp]))
+    if l["paye"]:
+        out.append(f'<div class="doux">reçu {argent(l["paye"])}'
+                   + (f' · solde <b>{argent(l["solde"])}</b>' if l["solde"] and l["solde"] > 0 else "") + "</div>")
+    if l["modalite_paiement"] and sp not in ("paye", "sans_objet"):
+        out.append(f'<div class="doux">Règlement prévu : {esc(LIBELLES_MODE.get(l["modalite_paiement"], l["modalite_paiement"]))}</div>')
+    return "".join(out) or '<span class="doux">—</span>'
 
 
 def fenetre_terminer(conn, chantier_id, chemin, query):
