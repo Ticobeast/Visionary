@@ -15,6 +15,13 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
+SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
+
+
+def service_nuage(chemin):
+    """Nom du service de synchronisation (OneDrive, Dropbox...) si le chemin est dans un dossier synchronisé."""
+    partie = str(Path(chemin).resolve()).lower()
+    return next((n for n in SERVICES_NUAGE if n in partie), None)
 
 # Taux utilisés seulement avec --taxes-auto (pour les lignes sans tps/tvq).
 # Les montants importés sont ensuite stockés tels quels : un changement de taux

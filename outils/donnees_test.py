@@ -119,7 +119,7 @@ def main(argv=None):
         db.unlink()
     res = generer(db, a.nombre)
     print(f"Base d'essai créée : {db}\n{res.chantiers} chantiers, {res.clients_crees} clients, {res.paiements} paiements (fictifs).")
-    print(f"L'essayer :  python3 outils/interface.py --db {db}")
+    print("L'essayer :  python outils/interface.py --essai        (ou double-clic sur lancer_essai.bat / lancer_essai.py)")
 
 
 if __name__ == "__main__":

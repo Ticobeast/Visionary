@@ -38,7 +38,8 @@ outils/donnees_test.py                  crée une base d'ESSAI avec de fausses d
 outils/migrer.py                        convertit une base de l'ancien format (v1) sans rien perdre
 modeles/saisie_papier_*.csv             feuille de saisie CSV : vide + 3 exemples fictifs
 lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
-lancer_essai.bat / .command             double-clic : ouvre l'interface sur la base d'ESSAI (fausses données)
+lancer_essai.bat / .command / .py       double-clic (ou bouton « Exécuter » de VS Code) : base d'ESSAI (fausses données)
+lancer_interface.py                     idem, sur la VRAIE base
 docs/dictionnaire_donnees.md            toutes les colonnes : type, format, règle, exemple
 docs/transition_papier.md               méthode pour numériser les dossiers papier
 docs/plan_de_tests.md                   plan de mise en route et de tests, phase par phase
@@ -55,6 +56,9 @@ python3 outils/interface.py                            # la VRAIE base (créée 
 python3 outils/migrer.py data/sylvainculteur.db        # seulement si une base créée avant la mise à jour refuse de s'ouvrir
 ```
 
+**Bouton « Exécuter » de VS Code** : ouvre `lancer_essai.py` (essai) ou `lancer_interface.py` (vraie base) ; ne lance pas
+`interface.py` directement, il ouvrirait toujours la vraie base. Les chemins contenant des espaces doivent être entre guillemets.
+
 Le coin supérieur droit de l'interface indique toujours la base ouverte : **« BASE D’ESSAI »** en orange pour
 les fausses données, « Base : sylvainculteur.db » pour la vraie.
 
@@ -65,6 +69,10 @@ Les chemins de photos et de scans sont **relatifs au dossier `data/`** : si tu d
 autre ordinateur), tout reste valide.
 
 ## Confidentialité
+
+**Ne place pas le projet dans un dossier synchronisé (OneDrive, Dropbox, iCloud, Google Drive)** : les données de tes
+clients seraient copiées sur des serveurs externes, et SQLite peut y avoir des problèmes. Mets le dossier du projet
+ailleurs, par exemple `C:\SylvainCulteur`. L'interface affiche un avertissement au démarrage si elle détecte ce cas.
 
 `data/` et tous les fichiers `*.db` sont dans le `.gitignore` : les vraies données de tes clients ne doivent
 jamais être envoyées sur GitHub. Le dépôt ne contient que des exemples fictifs (téléphones en `555-01xx`,

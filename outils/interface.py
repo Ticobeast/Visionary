@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
 from noyau import (COLONNES, DB_DEFAUT, MODES, STATUTS, Index, Ligne, Resultat, alias_types_travaux,  # noqa: E402
                    cle, creer_chantier, lire_ligne, mettre_a_jour_client, mettre_a_jour_fiche, ouvrir_base,
-                   sauvegarder, trouver_ou_creer_client)
+                   sauvegarder, service_nuage, trouver_ou_creer_client)
 
 LIBELLES_STATUT = {"soumission": "Soumission", "refuse": "Refusé", "accepte": "Accepté",
                    "planifie": "Planifié", "termine": "Terminé", "annule": "Annulé"}
@@ -607,7 +607,15 @@ def main(argv=None):
     except OSError:
         sys.exit(f"Le port {a.port} est déjà utilisé (l'interface est peut-être déjà ouverte ?). Essaie : --port {a.port + 1}")
     url = f"http://localhost:{a.port}/"
-    print(f"Base : {db}\nInterface : {url}\nArrêter : Ctrl+C")
+    mode = "BASE D'ESSAI (fausses données)" if db.name != DB_DEFAUT.name else "BASE RÉELLE"
+    print(f"{mode} : {db}\nInterface : {url}\nArrêter : Ctrl+C")
+    if db.name == DB_DEFAUT.name:
+        print("Pour t'entraîner sur de fausses données, lance plutôt :  python outils/interface.py --essai")
+    nuage = service_nuage(db)
+    if nuage:
+        print(f"\nATTENTION : ce dossier semble synchronisé par {nuage}. Les données de tes clients seraient copiées sur\n"
+              "des serveurs externes (contraire à l'objectif « 100 % local »), et SQLite peut avoir des problèmes dans un\n"
+              "dossier synchronisé. Déplace tout le dossier du projet hors de ce service (ex. C:\\SylvainCulteur).\n")
     if not a.sans_navigateur:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:

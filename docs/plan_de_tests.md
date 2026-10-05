@@ -18,8 +18,8 @@ coûte 10 minutes, pas après 150 fiches.
 
 1. **Python 3** : https://www.python.org/downloads/ (Windows : cocher « Add python.exe to PATH »).
    Vérifier dans un terminal : `python --version` (Windows) ou `python3 --version` (Mac) → « Python 3.… ».
-2. **Le projet** : sur GitHub, bouton vert **Code → Download ZIP**, puis décompresser dans
-   `Documents/SylvainCulteur`. (Pas besoin de Git.)
+2. **Le projet** : sur GitHub, bouton vert **Code → Download ZIP**, puis décompresser dans un dossier **hors OneDrive**
+   (par exemple `C:\SylvainCulteur`). (Pas besoin de Git.)
 3. **Vérifier l'installation** : dans un terminal ouvert dans ce dossier,
    `python3 -m unittest discover -s tests` → doit finir par **`OK`**.
 4. *(Facultatif)* Installer **DB Browser for SQLite** (https://sqlitebrowser.org/) pour regarder dans la base.
@@ -145,5 +145,6 @@ Quand c'est validé, on enchaîne sur l'étape 2 (géocodage, itinéraire, feuil
 | « La base est occupée » | DB Browser a la base ouverte en écriture | fermer DB Browser (ou « Écrire les modifications ») |
 | Les accents s'affichent mal dans un CSV | encodage du tableur | enregistrer en UTF-8 ; l'import lit aussi le Windows-1252 |
 | Une date est refusée | format | l'interface utilise un sélecteur de date ; dans un CSV, `AAAA-MM-JJ` seulement |
-| L'interface est vide alors que tu as créé la base d'essai | tu as ouvert la vraie base | lancer avec `--essai` (ou `--db data/test.db`) ; l'étiquette en haut à droite indique la base ouverte |
+| L'interface ouvre toujours `sylvainculteur.db` et jamais la base d'essai | `interface.py` lancé sans option (bouton « Exécuter » de VS Code compris) | ouvrir et exécuter **`lancer_essai.py`** (ou `lancer_essai.bat`, ou `python outils/interface.py --essai`) ; l'étiquette en haut à droite indique la base ouverte |
+| Avertissement « dossier synchronisé par OneDrive » | le projet est dans OneDrive / Dropbox… | déplacer **tout le dossier du projet** hors du service (ex. `C:\SylvainCulteur`) : tes données clients ne doivent pas partir dans le nuage |
 | « La base utilise l'ancien format (v1) » | base créée avant la mise à jour | `python outils/migrer.py data/sylvainculteur.db` : convertit sans rien perdre (sauvegarde faite avant) |
