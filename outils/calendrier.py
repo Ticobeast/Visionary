@@ -39,9 +39,8 @@ def panneau_jour(conn, jour, retour, gestion=False):
 
     Ni statut ni paiement ici : le statut est automatique (jamais choisi à la main) et le paiement se règle dans la
     fenêtre « Terminer » ou sur la page du chantier.
-    gestion=False (tableau de bord) : ni durée, ni ordre ne se modifient ; on peut Terminer ou Retirer un chantier.
-    gestion=True (page Journée) : en plus, on réorganise (Monter / Descendre) et on peut Annuler (le chantier disparaît
-    de la journée et est archivé).
+    gestion=False (tableau de bord) : lecture seule ; seul le bouton Terminer, en bas de chaque chantier.
+    gestion=True (page Journée) : boutons Terminer et Retirer, et une flèche vers le haut / vers le bas pour l'ordre.
     """
     d = datetime.date.fromisoformat(jour)
     ids = ids_de_la_journee(conn, jour)
@@ -71,7 +70,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
               + (f' <b>Attention : {sans_duree} chantier{"s" if sans_duree > 1 else ""} sans durée estimée : les heures sont approximatives.</b>' if sans_duree else "")
               + "</p>")
 
-    colonnes = 7 if gestion else 6
+    colonnes = 7 if gestion else 5
     corps = ""
     for rang, (l, h) in enumerate(zip(chantiers, horaire)):
         if h["diner_avant"]:
@@ -81,30 +80,30 @@ def panneau_jour(conn, jour, retour, gestion=False):
             horaire_html += '<div class="doux">dîner inclus</div>'
         if h["duree_inconnue"]:
             horaire_html += '<div class="doux">durée à estimer</div>'
+        base = (f'<td>{horaire_html}</td><td>{cellule_client(l)}</td><td>{cellule_adresse(l)}</td>'
+                f'<td class="col-travaux">{cellule_travaux(l)}</td>')
+        if not gestion:
+            # tableau de bord : le chantier, puis en bas son bouton Terminer (rien d'autre)
+            corps += (f'<tr class="sans-bas">{base}<td>{cellule_montant(l)}</td></tr>'
+                      f'<tr class="ligne-actions"><td colspan="{colonnes}">{bouton_terminer(l, retour)}</td></tr>')
+            continue
         actions = bouton_terminer(l, retour)
         if l["statut"] == "planifie":
             actions += (f'<form class="mini" method="post" action="/action/retirer"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
                         f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire" '
                         f'title="Remettre dans « À planifier »">Retirer</button></form>')
-            if gestion:
-                actions += (f'<form class="mini" method="post" action="/action/annuler" onsubmit="return confirm(\'Annuler ce chantier ? Il disparaît de la journée '
-                            f'et va dans les archives.\')"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
-                            f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="danger" '
-                            f'title="Annuler le chantier (archivé)">Annuler</button></form>')
-        ordre = ""
-        if gestion:
-            monter = (f'<form class="mini" method="post" action="/action/deplacer"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
-                      f'<input type="hidden" name="retour" value="{esc(retour)}"><input type="hidden" name="sens" value="%s">'
-                      f'<button type="submit" class="secondaire" %s>%s</button></form>')
-            fleches = (monter % ("haut", "disabled" if rang == 0 else "", "Monter")
-                       + monter % ("bas", "disabled" if rang == len(chantiers) - 1 else "", "Descendre"))
-            ordre = f'<td class="col-ordre">{fleches}<div class="doux">n° {rang + 1}</div></td>'
-        corps += (f'<tr>{ordre}<td>{horaire_html}</td>'
-                  f'<td>{cellule_client(l)}</td><td>{cellule_adresse(l)}</td><td class="col-travaux">{cellule_travaux(l)}</td>'
+        fleche = (f'<form class="mini" method="post" action="/action/deplacer"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
+                  f'<input type="hidden" name="retour" value="{esc(retour)}"><input type="hidden" name="sens" value="%s">'
+                  f'<button type="submit" class="secondaire fleche" title="%s" aria-label="%s" %s>%s</button></form>')
+        fleches = (fleche % ("haut", "Monter", "Monter", "disabled" if rang == 0 else "", "&#9650;")
+                   + fleche % ("bas", "Descendre", "Descendre", "disabled" if rang == len(chantiers) - 1 else "", "&#9660;"))
+        corps += (f'<tr><td class="col-ordre"><div class="fleches">{fleches}</div><div class="doux">n° {rang + 1}</div></td>{base}'
                   f'<td class="col-actions">{actions}</td><td>{cellule_montant(l)}</td></tr>')
-    entete_ordre = "<th>Ordre</th>" if gestion else ""
-    table = (f'<div class="liste-defile"><table class="tableau"><thead><tr>{entete_ordre}<th>Heures</th><th>Client</th><th>Adresse</th>'
-             f'<th>Travaux · durée</th><th></th><th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table></div>')
+    if gestion:
+        entetes = '<th>Ordre</th><th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th></th><th class="droite">Montant</th>'
+    else:
+        entetes = '<th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th class="droite">Montant</th>'
+    table = (f'<div class="liste-defile"><table class="tableau"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
     pied = "" if gestion else f'<div class="barre" style="margin-top:12px">{lien_gerer}</div>'
     return f'<div class="carte"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 

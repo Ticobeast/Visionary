@@ -44,15 +44,15 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 |---|---|---|
 | 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, Clients, + Nouveau ; **aucun emoji** nulle part |
 | 2 | **Tableau de bord** | un calendrier du mois ; **dans chaque case** d'un jour planifié : « N chantiers », « Temps total : X h », « Montant total : XXX $ » ; les jours de plus de 8 h sont en rouge |
-| 3 | Cliquer sur une **date** du calendrier | la journée s'affiche dessous : durée totale, montant total, chantiers dans l'ordre avec heures, temps, options (nacelle, bois) et **montant à droite** ; **aucun statut ni paiement** ; boutons **Terminer** et **Retirer** |
+| 3 | Cliquer sur une **date** du calendrier | la journée s'affiche dessous : durée totale, montant total, chantiers dans l'ordre avec heures, temps, options (nacelle, bois) et **montant à droite** ; **aucun statut ni paiement** ; un seul bouton **Terminer**, en bas de chaque chantier |
 | 4 | Dîner : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
 | 5 | **Terminer** un chantier planifié, répondre « Pas encore payé » | fenêtre « Terminer ce chantier » ; après « Oui, il est terminé » : le chantier est verrouillé, **à recevoir** (dans Chantiers, pas dans les archives) |
 | 6 | **Terminer** un autre chantier, répondre « Oui, payé en totalité » | le paiement du solde est enregistré avec le mode choisi ; le chantier va **dans les archives** |
 | 7 | Fenêtre « Terminer » : cliquer « Annuler » | rien ne change |
-| 8 | Page **Journée** : chercher où changer le statut ou la durée d'un chantier | il n'y en a **pas** ; boutons Monter, Descendre, Terminer, Retirer, Annuler |
-| 9 | Journée : **Monter** / **Descendre** | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités le bouton est grisé |
+| 8 | Page **Journée** : chercher où changer le statut ou la durée d'un chantier | il n'y en a **pas** ; une flèche vers le haut et une vers le bas (sans texte), boutons Terminer et Retirer ; pas d'Annuler |
+| 9 | Journée : flèche vers le haut / vers le bas | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités le bouton est grisé |
 | 10 | Journée : **Retirer** un chantier | il redevient « À planifier » (sans date) et disparaît de la journée |
-| 11 | Journée : **Annuler** un chantier (confirmation) | il disparaît de la journée et apparaît dans les **archives** (bas de la page Chantiers) |
+| 11 | Page d'un chantier planifié, « Paramètres avancés », « Annuler le chantier » (confirmation) | il disparaît de la journée et apparaît dans les **archives** (bas de la page Chantiers) |
 | 12 | Journée : choisir demain, filtrer par secteur, cocher 3 chantiers, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché, et deviennent planifiés ; le total d'heures et de dollars se met à jour en cochant ; un chantier sans durée ne peut pas être coché |
 | 13 | **Chantiers** | une seule page : chantiers actifs en haut (date de la **demande**, délai d'attente en pastille, temps, options, **montant à droite**), « Archives » plus bas ; filtres statut / paiement / secteur |
 | 14 | **+ Nouveau**, client neuf : nom, adresse, secteur (liste), un type, durée, prix | « Chantier créé » ; « Paramètres avancés » reste replié ; la date de la demande est celle d'aujourd'hui |
@@ -68,6 +68,8 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 24 | Se tromper exprès : téléphone `123`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 25 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
 | 26 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
+| 27 | **Clients** : ouvrir la fiche d'un client créé pour rien, « Supprimer le client » (confirmation) | le client et ses chantiers non terminés disparaissent ; la fiche d'un client avec un chantier terminé ou des paiements refuse (« Impossible ») |
+| 28 | **Chantiers** : regarder une ligne et la page d'un chantier | pas de pastille « Nacelle requise » ni « Bois ... » (elles restent dans le tableau de bord et la Journée) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -82,7 +84,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 26 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 28 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

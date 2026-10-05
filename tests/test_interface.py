@@ -140,6 +140,62 @@ class TestPages(BaseInterface):
         self.assertIn("&lt;script&gt;", self.get("/clients")[1])
 
 
+class TestSuppressionDeClient(BaseInterface):
+    """Effacer un client créé par erreur (avec ses chantiers non terminés et sans paiement)."""
+
+    def creer(self, **perso):
+        _, en_tetes, _ = self.post("/nouveau", fiche(**perso))
+        return int(en_tetes["Location"].split("/chantier/")[1].split("?")[0])
+
+    def test_bouton_et_suppression_d_un_client_avec_son_chantier(self):
+        chantier = self.creer()
+        client = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (chantier,))[0][0]
+        page = self.get(f"/client/{client}")[1]
+        self.assertIn(f'action="/client/{client}/supprimer"', page)
+        self.assertIn("Ses 1 chantier seront supprimés avec lui", page)
+        self.assertIn("confirm(", page)                                          # confirmation avant d'effacer
+        statut, en_tetes, _ = self.post(f"/client/{client}/supprimer", {})
+        self.assertEqual(en_tetes["Location"], "/clients?ok=client_supprime")
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE id = ?", (chantier,)), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantier_travaux WHERE chantier_id = ?", (chantier,)), [(0,)])
+        self.assertIn("Client supprimé", self.get("/clients?ok=client_supprime")[1])
+        self.assertTrue(self.get(f"/client/{client}")[0].startswith("404"))
+
+    def test_client_sans_chantier(self):
+        client = self.creer()
+        self.post(f"/chantier/{self.sql('SELECT max(id) FROM chantiers')[0][0]}/supprimer", {})        # supprime le chantier (et le client orphelin)
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(0,)])
+
+    def test_client_avec_chantier_termine_ou_paiements_est_conserve(self):
+        for client in (1, 2, 3):                                                  # exemples : 1 et 2 terminés ; 3 planifié avec acompte
+            page = self.get(f"/client/{client}")[1]
+            self.assertNotIn(f'action="/client/{client}/supprimer"', page)
+            self.assertIn("Impossible", page)
+            _, en_tetes, _ = self.post(f"/client/{client}/supprimer", {})
+            self.assertIn("err=", en_tetes["Location"])
+            self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(1,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
+
+    def test_un_chantier_annule_sans_paiement_ne_retient_pas_le_client(self):
+        chantier = self.creer()
+        client = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (chantier,))[0][0]
+        self.post("/action/annuler", {"chantier_id": str(chantier), "retour": "/"})
+        self.post(f"/client/{client}/supprimer", {})
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(0,)])
+
+    def test_les_autres_clients_ne_sont_pas_touches(self):
+        avant = self.sql("SELECT count(*) FROM clients")[0][0]
+        self.creer()
+        client = self.sql("SELECT max(id) FROM clients")[0][0]
+        self.post(f"/client/{client}/supprimer", {})
+        self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(avant,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
+
+    def test_client_inconnu(self):
+        self.assertTrue(self.post("/client/999/supprimer", {})[0].startswith("404"))
+
+
 class TestAucunEmoji(BaseInterface):
     """Aucun emoji (ni symbole pictural) dans l'interface."""
 
@@ -152,7 +208,7 @@ class TestAucunEmoji(BaseInterface):
                  ("/client/1/chantier/nouveau", {}), ("/chantier/1", {}), ("/chantier/2", {}), ("/chantier/3", {}), ("/chantier/3/dupliquer", {})]
         for chemin, query in pages:
             page = interface.repondre(self.db, "GET", chemin, query)[2].decode("utf-8")
-            trouves = self.MOTIF.findall(page.split("</style>", 1)[-1])
+            trouves = [c for c in self.MOTIF.findall(page.split("</style>", 1)[-1]) if c not in ("\u25b2", "\u25bc")]   # sauf les flèches de l'ordre
             self.assertEqual(trouves, [], f"{chemin} {query}")
 
 

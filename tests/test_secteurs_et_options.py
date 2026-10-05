@@ -175,16 +175,17 @@ class TestOptionsDuTravail(Base):
                 c.execute(requete)
         c.close()
 
-    def test_visibles_dans_les_listes_et_les_journees(self):
+    def test_pastilles_seulement_dans_les_journees(self):
+        # dans Chantiers (liste et page d'un chantier), pas de pastilles : on minimise l'écran (les cases restent dans le formulaire)
         page = self.get("/chantier/3")[1]                              # Boucher : nacelle, bois débarrassé
-        self.assertIn("Nacelle requise", page)
-        self.assertIn("Bois débarrassé", page)
-        self.assertIn("Bois laissé sur place : 16 pouces", self.get("/chantier/2")[1])             # Lavoie : bois laissé en 16 pouces
+        self.assertNotIn("Nacelle requise</span>", page)
+        self.assertNotIn("Bois débarrassé</span>", page)
+        self.assertIn('name="nacelle" value="1" checked', page)
+        self.assertNotIn("Bois laissé sur place : 16 pouces</span>", self.get("/chantier/2")[1])
         chantiers = self.get("/chantiers")[1]
-        self.assertIn("Nacelle requise", chantiers)
-        self.assertIn("Bois laissé sur place : 16 pouces", chantiers)
+        self.assertNotIn("puce-opt", chantiers[chantiers.index("<table"):])
         jour = self.sql("SELECT date_prevue FROM chantiers WHERE id = 3")[0][0]
-        for chemin in ("/", "/journee"):
+        for chemin in ("/", "/journee"):                                # en revanche la journée les montre : elles servent à préparer la job
             self.assertIn("Nacelle requise", self.get(chemin, {"date": jour})[1], chemin)
 
     def test_duplication_copie_les_options(self):

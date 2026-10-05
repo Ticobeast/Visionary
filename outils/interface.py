@@ -27,7 +27,7 @@ from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, jou
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
 from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, esc, gabarit,  # noqa: E402,F401
-                 heures, puces_options, redirection, select_secteur)
+                 heures, redirection, select_secteur)
 
 # ---------------------------------------------------------------------------
 # Pages
@@ -38,7 +38,7 @@ LIMITE_ARCHIVES = 50     # archives affichées d'un coup (les plus récentes) ; 
 def _lignes_chantiers(conn, archive, statut, paiement, secteur, q, limite):
     sql = ("SELECT chantier_id, client_nom_complet, entreprise, adresse, ville, telephone, travaux_detail, description,"
            " statut, statut_paiement, solde, date_prevue, attente_depuis, type_libelle, duree_estimee_h, total_ttc,"
-           " secteur, nacelle, debarrasser_bois, bois_format"
+           " secteur"
            " FROM v_chantiers WHERE archive = ?")
     params = [1 if archive else 0]
     if statut in STATUTS:
@@ -64,7 +64,7 @@ def _table_chantiers(lignes):
     aujourdhui = datetime.date.today()
     corps = ""
     for (cid, nom, entreprise, adresse, ville, tel, detail, desc, st, stp, solde, dp, attente, type_, duree, total,
-         secteur, nacelle, bois, format_bois) in lignes:
+         secteur) in lignes:
         nom_aff = nom if not entreprise or entreprise == nom else f"{nom} · {entreprise}"
         date_ = esc(attente or "")                                      # la date de la demande, pas la date planifiée
         if st in ("soumission", "en_attente", "a_planifier") and attente:
@@ -77,7 +77,7 @@ def _table_chantiers(lignes):
         duree_aff = f'<div class="doux">Durée {esc(heures(duree))}</div>' if duree else ""
         corps += (f'<tr><td>{date_}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
                   f'<td>{esc(adresse)}<div class="doux">{esc(secteur or ville)}</div></td>'
-                  f'<td>{esc(type_)}{duree_aff}<div>{puces_options(nacelle, bois, format_bois)}</div></td>'
+                  f'<td>{esc(type_)}{duree_aff}</td>'
                   f'<td>{badge(st, LIBELLES_STATUT[st])}{prevu}</td>'
                   f'<td>{paiement}</td><td class="montant">{esc(argent(total)) if total else ""}</td></tr>')
     return ('<table class="liste"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'

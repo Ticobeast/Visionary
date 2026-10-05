@@ -16,7 +16,7 @@ from noyau import (COLONNES, STATUTS_MANUELS, TYPES_AVEC_BOIS, VERROU, _txt, ali
                    supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire, valeurs_client)
 from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, MODES, argent, avance, badge, bloc_options_travaux,
                  bloc_types, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps,
-                 puces_options, redirection, zone)
+                 redirection, zone)
 
 
 def types_triees(conn):
@@ -246,10 +246,9 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if trouve is None:
         return gabarit("Introuvable", '<h1>Chantier introuvable</h1><p><a href="/chantiers">Retour à la liste</a></p>'), 404
     depuis_base, client_id = trouve
-    (statut, stp, total, paye, solde, prix, tps, tvq, nom, detail, archive, date_prevue, duree,
-     nacelle, bois, format_bois) = conn.execute(
+    (statut, stp, total, paye, solde, prix, tps, tvq, nom, detail, archive, date_prevue, duree) = conn.execute(
         "SELECT statut, statut_paiement, total_ttc, paye, solde, prix_ht, tps, tvq, client_nom_complet, travaux_detail, archive,"
-        " date_prevue, duree_estimee_h, nacelle, debarrasser_bois, bois_format FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
+        " date_prevue, duree_estimee_h FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
     termine = statut == "termine"
     badges = (badge(statut, LIBELLES_STATUT[statut]) + (badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else "")
               + ('<span class="badge">Archivé</span>' if archive else ""))
@@ -260,7 +259,6 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                 + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total else "") + "</div>")
     resume = (f'<div class="carte resume-chantier"><div><div class="barre"><h2 style="margin:0">{esc(nom)}</h2>{badges}</div>'
               f'<p style="margin:10px 0 0"><b>Travaux :</b> {esc(detail)}</p>'
-              f'{f"<div>{puces_options(nacelle, bois, format_bois)}</div>" if (nacelle or bois or format_bois) else ""}'
               f'{f"<p class=doux style=margin-bottom:0>{esc(infos)}</p>" if infos else ""}</div>{montants}</div>')
     def bouton(action, texte, classe="", confirmation=""):
         confirmer = f' onsubmit="return confirm(\'{confirmation}\')"' if confirmation else ""

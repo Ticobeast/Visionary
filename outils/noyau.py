@@ -1014,3 +1014,34 @@ def supprimer_chantier(conn, chantier_id):
     if not conn.execute("SELECT 1 FROM chantiers WHERE client_id = ?", (r[0],)).fetchone():
         conn.execute("DELETE FROM clients WHERE id = ?", (r[0],))
     return []
+
+
+def obstacles_suppression_client(conn, client_id):
+    """Raisons pour lesquelles un client ne peut pas être supprimé (liste vide : il peut l'être).
+
+    Un chantier terminé est gardé pour toujours (historique), et un chantier qui a des paiements aussi.
+    """
+    obstacles = []
+    n = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ? AND statut = 'termine'", (client_id,)).fetchone()[0]
+    if n:
+        obstacles.append(f"{n} chantier{'s' if n > 1 else ''} terminé{'s' if n > 1 else ''} (l'historique est conservé)")
+    n = conn.execute("SELECT count(DISTINCT p.chantier_id) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id"
+                     " WHERE c.client_id = ? AND c.statut <> 'termine'", (client_id,)).fetchone()[0]
+    if n:
+        obstacles.append(f"{n} chantier{'s' if n > 1 else ''} avec des paiements")
+    return obstacles
+
+
+def supprimer_client(conn, client_id):
+    """Supprime un client créé par erreur, avec ses chantiers non terminés et sans paiement (soumissions, annulés...).
+
+    Refusé si le client a un chantier terminé ou un chantier avec des paiements. À appeler dans une transaction.
+    """
+    if conn.execute("SELECT 1 FROM clients WHERE id = ?", (client_id,)).fetchone() is None:
+        return [f"client #{client_id} introuvable"]
+    obstacles = obstacles_suppression_client(conn, client_id)
+    if obstacles:
+        return ["Ce client ne peut pas être supprimé : il a " + " et ".join(obstacles) + "."]
+    conn.execute("DELETE FROM chantiers WHERE client_id = ?", (client_id,))      # leurs types de travaux partent avec eux
+    conn.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    return []

@@ -32,7 +32,7 @@ L'interface ne contient **aucun emoji**.
 | **Annuler** le chantier | **Annulé** : il disparaît de la journée et va **automatiquement dans les archives** |
 | **Terminer** le chantier (bouton, puis confirmation) | **Terminé** (verrouillé) |
 
-Seuls les statuts d'**avant** la planification se choisissent, sur la page du chantier : *Soumission, En attente, À planifier*.
+L'annulation d'un chantier se fait sur sa page (« Paramètres avancés », « Annuler le chantier »). Seuls les statuts d'**avant** la planification se choisissent, sur la page du chantier : *Soumission, En attente, À planifier*.
 Un chantier annulé par erreur se **rouvre** (bouton sur sa page) : il redevient « À planifier ».
 
 ## Pas de système de facture
@@ -50,8 +50,8 @@ Un **calendrier du mois**. Dans **chaque case** d'un jour planifié : le **nombr
 - les **chantiers dans l'ordre de passage**, avec leurs **heures de début à fin** et le **temps de chacun** ;
 - la **durée totale** et, juste dessous, le **montant total** de la journée (taxes incluses) ;
 - à **droite de chaque chantier, sa valeur** (total taxes incluses, prix avant taxes en petit) ;
-- les **options** de la job (« Nacelle requise », « Bois débarrassé » ou « Bois laissé sur place : 16 pouces ») ;
-- deux boutons : **Terminer** et **Retirer** (le chantier redevient « À planifier »).
+- les **options** de la job (« Nacelle requise », « Bois débarrassé » ou « Bois laissé sur place : 16 pouces »), seulement dans le tableau de bord et la Journée, où elles servent à préparer la job ;
+- un seul bouton, **Terminer**, placé **en bas** de chaque chantier (pas de bouton Retirer ici : cela se fait dans la page *Journée*).
 
 Il n'y a **ni statut, ni paiement** sur cet écran : seulement le montant du chantier. Rien ne se modifie (ni durée, ni ordre). Le bouton
 **Gérer cette journée** ouvre la page *Journée* sur la même date.
@@ -91,10 +91,9 @@ en plus :
 
 | Action | Ce qu'elle fait |
 |---|---|
-| **Monter / Descendre** | déplace un chantier dans l'ordre de passage ; toutes les heures sont recalculées aussitôt |
+| **Flèche vers le haut / vers le bas** | déplace un chantier dans l'ordre de passage (une flèche seulement, sans texte) ; toutes les heures sont recalculées aussitôt |
 | **Terminer** | ouvre la fenêtre de confirmation (payé ou pas) |
 | **Retirer** | remet le chantier dans « À planifier » |
-| **Annuler** | annule le chantier (confirmation) : il disparaît de la journée et est archivé |
 
 **Le temps et le prix d'un travail ne se modifient jamais ici** : ce sont ceux du chantier (page du chantier, « Durée estimée »).
 
@@ -110,7 +109,7 @@ Menu **Chantiers** : une seule page.
 
 - **En haut : les chantiers actifs**, classés par **date de la demande / soumission** (c'est la date principale ; la date planifiée n'est
   qu'une mention « prévu le … »), avec le **délai d'attente** des soumissions / en attente / à planifier (pastille verte moins de 7 jours,
-  jaune 7 à 30, rouge plus de 30), le temps, le statut, le paiement, les options et le **montant à droite**. Des raccourcis : à recevoir, planifiés,
+  jaune 7 à 30, rouge plus de 30), le temps, le statut, le paiement et le **montant à droite** (écran minimal : ni nacelle ni bois affichés ici). Des raccourcis : à recevoir, planifiés,
   prix manquants ; une recherche (nom sans accent, téléphone, adresse, secteur) et des filtres statut / paiement / **secteur**.
 - **Plus bas : « Archives »** : les chantiers **annulés** et les chantiers **terminés et payés**. Ils y vont **automatiquement**, sans rien cliquer.
   Les 50 plus récents s'affichent ; la recherche couvre tout. Un lien « Archives (N) » en haut de page y descend.
@@ -134,7 +133,7 @@ Un chantier ne se planifie pas à la création : on l'ajoute ensuite à une jour
 
 **Après la création**, on arrive sur la **page du chantier**, pensée pour une consultation rapide :
 
-1. le résumé : client, statut, travaux, options, date et durée, et **la valeur à droite** (total, reçu, solde) ;
+1. le résumé : client, statut, travaux, date et durée (sans les pastilles nacelle / bois : les cases sont dans le formulaire), et **la valeur à droite** (total, reçu, solde) ;
 2. le client en **lecture seule** ;
 3. les **paiements** (liste ; « + Ajouter un paiement » à un clic) ;
 4. les champs essentiels à modifier : travaux, options, durée estimée, prix, description ; le **statut** (à choisir seulement avant la planification)
@@ -151,6 +150,8 @@ Un chantier **Terminé** n'a pas de formulaire : résumé, client et paiements e
 d'un client montre ses coordonnées et l'historique de ses chantiers (date, travaux, statut, sans montants). **+ Nouveau chantier** ouvre un
 formulaire réduit à l'essentiel : travaux avec précisions, options, **durée estimée (obligatoire)**, prix, notes ; la **date de la demande**
 (aujourd'hui) et le **mode de règlement** sont dans « Paramètres avancés ». Le chantier est créé « À planifier ».
+
+**Supprimer un client** : au bas de sa fiche, bouton « Supprimer le client » (avec confirmation), pour un client créé par erreur. Ses chantiers non terminés et sans paiement sont supprimés avec lui. Un client qui a un chantier **terminé** ou un chantier **avec paiements** est conservé (historique) : la fiche l'explique.
 
 **Le client n'est modifiable qu'à un seul endroit : sa fiche** (bouton *Modifier le client*, même principe : l'essentiel d'abord, le reste dans
 « Paramètres avancés »). Partout ailleurs son nom, son adresse et ses coordonnées sont **affichés en lecture seule** : le serveur relit

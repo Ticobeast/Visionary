@@ -141,9 +141,12 @@ class TestPageJournee(BaseJour):
 
     def test_outils_de_gestion(self):
         page = self.get("/journee", {"date": dans(1)})[1]
-        for attendu in ('action="/action/deplacer"', "terminer=", 'action="/action/retirer"', 'action="/action/annuler"', ">Monter<", ">Descendre<",
+        for attendu in ('action="/action/deplacer"', "terminer=", 'action="/action/retirer"', 'aria-label="Monter"', 'aria-label="Descendre"', "&#9650;", "&#9660;",
                         "Total de la journée", "durée totale", "Chantiers à placer"):
             self.assertIn(attendu, page, attendu)
+        self.assertNotIn(">Monter<", page)                                 # une flèche seulement, pas de mot
+        self.assertNotIn(">Descendre<", page)
+        self.assertNotIn("/action/annuler", page)                          # pas d'Annuler dans la Journée (il reste sur la page du chantier)
         self.assertNotIn('name="statut"', page.split("Chantiers à placer")[0])   # le statut n'est jamais modifiable à la main
         self.assertNotIn('action="/action/statut"', page)
         self.assertNotIn('name="duree_estimee_h"', page)                   # le temps d'un travail ne se modifie pas directement
@@ -284,8 +287,10 @@ class TestCalendrier(BaseJour):
         for interdit in ('action="/action/deplacer"', 'action="/action/statut"', 'action="/action/annuler"', 'action="/action/facturer"',
                          'name="duree_estimee_h"', 'name="date_prevue"', 'name="statut"', 'name="montant"', 'class="fleche"'):
             self.assertNotIn(interdit, jour, interdit)
-        self.assertIn('action="/action/retirer"', jour)                    # retirer une entrée reste possible
-        self.assertIn(">Terminer</a>", jour)                               # le bouton Terminer ouvre la fenêtre de confirmation
+        self.assertNotIn("/action/retirer", jour)                          # pas de bouton Retirer sur le tableau de bord
+        self.assertEqual(jour.count(">Terminer</a>"), 3)                   # seulement Terminer, un par chantier (Alpha, Bravo, Charlie)
+        for ligne in re.findall(r'<tr class="ligne-actions">(.*?)</tr>', jour):      # placé EN BAS de chaque chantier
+            self.assertIn(">Terminer</a>", ligne)
         for absent in ("Encaisser", "Paiement", "Statut", "badge", "Planifié"):    # ni statut ni paiement ici
             self.assertNotIn(absent, jour, absent)
 

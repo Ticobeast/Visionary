@@ -6,8 +6,9 @@ essentiels sont demandés : travaux à faire, prix, modalité de paiement, notes
 """
 import datetime
 import sqlite3
+from urllib.parse import urlencode
 
-from noyau import (COLONNES, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
+from noyau import (COLONNES, obstacles_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (LIBELLES_STATUT, avance, badge, bloc_options_travaux, bloc_types, champ, champ_modalite, client_avance,
@@ -74,7 +75,7 @@ def page_clients(conn, query):
     select_sect, _ = select_secteur(lister_secteurs(conn), {"secteur": secteur}, nom="secteur", requis=False, tout="Tous les secteurs")
     recherche = (f'<form class="recherche" method="get" action="/clients"><input type="search" name="q" value="{esc(q)}" '
                  f'placeholder="Chercher : nom, téléphone, adresse…">{select_sect}<button type="submit">Chercher</button></form>')
-    return gabarit("Clients", f'<h1>Clients</h1>{recherche}{tableau}<p class="doux"><a href="/secteurs">Gérer les secteurs desservis</a></p>')
+    return gabarit("Clients", f'<h1>Clients</h1>{recherche}{tableau}<p class="doux"><a href="/secteurs">Gérer les secteurs desservis</a></p>', query.get("ok"))
 
 
 def page_client(conn, client_id, query):
@@ -104,7 +105,19 @@ def page_client(conn, client_id, query):
              + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
     actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/chantier/nouveau">+ Nouveau chantier</a>'
                f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a></div>')
-    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Chantiers</h2>{historique}', query.get("ok"))
+    obstacles = obstacles_suppression_client(conn, client_id)
+    if obstacles:
+        suppression = ('<div class="carte"><h2>Supprimer ce client</h2><p class="doux">Impossible : ce client a '
+                       + esc(" et ".join(obstacles)) + ". Il est conservé.</p></div>")
+    else:
+        n = len(chantiers)
+        avec = f" et ses {n} chantier{'s' if n > 1 else ''}" if n else ""
+        confirmation = f"Supprimer définitivement ce client{avec} ? Cette action est irréversible."
+        reste = f" Ses {n} chantier{'s' if n > 1 else ''} seront supprimés avec lui." if n else ""
+        suppression = (f'<div class="carte"><h2>Supprimer ce client</h2><p class="doux">Pour un client créé par erreur.{reste}</p>'
+                       f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
+                       '<button class="danger" type="submit">Supprimer le client</button></form></div>')
+    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Chantiers</h2>{historique}{suppression}', query.get("ok"), query.get("err"))
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +251,19 @@ def _secteur_action(conn, travail, ok):
     return redirection(f"/secteurs?ok={ok}") if not erreurs else page_secteurs(conn, {}, erreurs)
 
 
+def client_supprimer(conn, client_id):
+    if _client(conn, client_id) is None:
+        return _introuvable()
+    try:
+        with transaction(conn):
+            erreurs = supprimer_client_noyau(conn, client_id)
+    except sqlite3.IntegrityError as e:
+        erreurs = [f"Refusé par la base : {e}"]
+    if erreurs:
+        return redirection(f"/client/{client_id}?" + urlencode({"err": " ".join(erreurs)[:300]}))
+    return redirection("/clients?ok=client_supprime")
+
+
 ROUTES_CLIENTS = [
     ("GET", r"^/secteurs$", lambda c, q, f, *g: page_secteurs(c, q)),
     ("POST", r"^/secteurs/ajouter$", lambda c, q, f, *g: _secteur_action(c, lambda: ajouter_secteur(c, f.get("libelle"), f.get("ville"))[1], "secteur_ajoute")),
@@ -247,6 +273,7 @@ ROUTES_CLIENTS = [
     ("GET", r"^/client/(\d+)$", lambda c, q, f, i: page_client(c, int(i), q)),
     ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: page_client_modifier(c, int(i))),
     ("POST", r"^/client/(\d+)/modifier$", lambda c, q, f, i: client_modifier(c, int(i), f)),
+    ("POST", r"^/client/(\d+)/supprimer$", lambda c, q, f, i: client_supprimer(c, int(i))),
     ("GET", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: page_chantier_nouveau(c, int(i))),
     ("POST", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: chantier_creer(c, int(i), f)),
 ]

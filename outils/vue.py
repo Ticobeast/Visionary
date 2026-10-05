@@ -27,6 +27,7 @@ MESSAGES = {
     "retire": "Chantier retiré de la journée : il redevient « À planifier ».",
     "deplace": "Ordre de passage mis à jour : les heures sont recalculées.",
     "client_maj": "Fiche client enregistrée.",
+    "client_supprime": "Client supprimé.",
     "client_cree": "Chantier créé pour ce client.",
     "duplique": "Nouvelle soumission créée d'après le chantier précédent : ajuste le prix si besoin.",
 }
@@ -90,7 +91,8 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .cal-jour.occupe{border-color:var(--accent);background:var(--ok-fond)}.cal-jour.chargee{border-color:var(--alerte);background:var(--alerte-fond)}
 .cal-jour.selection{outline:3px solid var(--accent-fonce);outline-offset:-1px}.cal-info{font-size:12px;line-height:1.35}.cal-ligne{display:block}
 form.encaisser{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}form.encaisser select{width:auto;max-width:130px}.cal-alerte{font-size:11px;color:var(--alerte);font-weight:700}
-.col-ordre{white-space:nowrap}.col-ordre form{display:block;margin:0 0 4px 0}
+.col-ordre{white-space:nowrap}.col-ordre .fleches{display:flex;gap:4px;margin-bottom:4px}.col-ordre form{margin:0}button.fleche{padding:3px 9px;font-size:13px;line-height:1}
+tr.sans-bas td{border-bottom:none}tr.ligne-actions td{text-align:right;padding-top:0}
 button:disabled{opacity:.3;cursor:default}
 .heures{font-size:16px;white-space:nowrap}tr.diner td{background:var(--fond);color:var(--doux);font-size:13px;text-align:center}
 .modale{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
