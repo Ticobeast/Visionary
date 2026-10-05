@@ -57,6 +57,14 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 10 | Se tromper exprès : téléphone `123`, code postal `ZZZ`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 11 | Modifier l'adresse d'un client, puis supprimer un paiement et un chantier de test | tout se passe sans erreur |
 | 12 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
+| 13 | **Tableau de bord**, onglet « À planifier » | chantiers regroupés « Urgent (> 30 j) », « À surveiller », « Normal (< 7 j) », avec pastilles rouge / jaune / verte |
+| 14 | Filtrer par **délai** (« Urgents »), par **secteur**, puis trier par secteur | seuls les chantiers voulus ; avec le tri secteur, regroupés par ville |
+| 15 | Cliquer sur une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
+| 16 | Dans une ligne « À planifier » : statut « Planifié » + une date + `2,5` + OK | le chantier quitte l'onglet et apparaît dans « Planifiés » (2 h 30) |
+| 17 | Onglet « À facturer » : **Facturer** ; puis dans « À recevoir » : **Encaisser** un acompte, puis le solde | passe à « Facturé », « Partiel », puis « Payé » sans ouvrir de fiche |
+| 18 | **Clients** → un client → **+ Nouveau chantier** | nom et adresse **affichés mais non modifiables** ; seulement travaux, prix, modalité de paiement, notes ; le chantier arrive « À planifier » |
+| 19 | **Tournées** : choisir demain, filtrer par secteur, cocher 3 chantiers, ajuster une durée, « Ajouter à la journée » | le total d'heures se met à jour en cochant ; la journée affiche les 3 chantiers et ce qu'il reste de place sur 8 h |
+| 20 | Dans la journée : **Retirer** un chantier | il redevient « À planifier » (sans date) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -147,4 +155,4 @@ Quand c'est validé, on enchaîne sur l'étape 2 (géocodage, itinéraire, feuil
 | Une date est refusée | format | l'interface utilise un sélecteur de date ; dans un CSV, `AAAA-MM-JJ` seulement |
 | L'interface ouvre toujours `sylvainculteur.db` et jamais la base d'essai | `interface.py` lancé sans option (bouton « Exécuter » de VS Code compris) | ouvrir et exécuter **`lancer_essai.py`** (ou `lancer_essai.bat`, ou `python outils/interface.py --essai`) ; l'étiquette en haut à droite indique la base ouverte |
 | Avertissement « dossier synchronisé par OneDrive » | le projet est dans OneDrive / Dropbox… | déplacer **tout le dossier du projet** hors du service (ex. `C:\SylvainCulteur`) : tes données clients ne doivent pas partir dans le nuage |
-| « La base utilise l'ancien format (v1) » | base créée avant la mise à jour | `python outils/migrer.py data/sylvainculteur.db` : convertit sans rien perdre (sauvegarde faite avant) |
+| « La base utilise un ancien format (v1 ou v2) » | base créée avant une mise à jour | `python outils/migrer.py data/sylvainculteur.db` : convertit sans rien perdre (sauvegarde faite avant) |

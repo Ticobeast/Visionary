@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v2)
+# Dictionnaire de données (schéma v3)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -71,7 +71,7 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `client_id` | entier | oui | → `clients.id` ; un client ne peut pas être supprimé s'il a des chantiers | `1` |
 | `description` | texte | non | **la** description du chantier (une seule), imprimée sur la feuille de route ; le détail par type est dans `chantier_travaux` | `Résidus ramassés. Prévenir le gardien la veille.` |
 | `statut` | texte | oui, défaut `soumission` | voir ci-dessous | `planifie` |
-| `date_soumission` | date | non | quand l'estimé a été donné | `2026-05-28` |
+| `date_soumission` | date | non | date de la **demande ou de la soumission** : sert à calculer le délai d'attente (à défaut, la date de création de la fiche) | `2026-05-28` |
 | `date_prevue` | date | **si `planifie` ou `termine`** | **la** date des travaux : prévue d'abord, puis réalisée. Si le chantier change de jour, on la met simplement à jour. C'est elle que le script d'itinéraire filtre | `2026-10-14` |
 | `heure_prevue` | heure | non | seulement pour un rendez-vous fixe | `08:00` |
 | `duree_estimee_h` | réel | non | pour l'itinéraire et la feuille de route | `3.0` |
@@ -79,6 +79,7 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `prix_ht` | réel | non | avant taxes ; estimé tant que non facturé, puis final | `480.00` |
 | `tps` | réel | oui, défaut `0` | montant de TPS (laisser `0` si non inscrit aux taxes) | `24.00` |
 | `tvq` | réel | oui, défaut `0` | montant de TVQ (idem) | `47.88` |
+| `modalite_paiement` | texte | non | comment le client paiera (texte libre) ; imprimée sur la feuille de route pour savoir quoi encaisser sur place | `Interac à la fin des travaux` |
 | `numero_facture` | texte | non | le numéro de ta facture papier ; exige `date_facture` | `2026-031` |
 | `date_facture` | date | non | date de la facture ou du reçu remis ; exige `prix_ht` | `2026-06-14` |
 | `dossier_photos` | chemin | non | **un dossier par chantier** ; les photos qu'il contient seront lues par le script (miniatures) | `photos/2026/2026-06-14_gagnon` |
@@ -97,7 +98,7 @@ même jour). Chaque type coché a sa **précision** libre (« érable argenté c
 | `type_travaux` | texte | oui | un `code` de `types_travaux` : `emondage`, `elagage`, `taille_haie`, `abattage`, `essouchement`, `autre` ; un type par chantier au maximum | `elagage` |
 | `precision` | texte | non | ce qu'il y a à faire pour ce type | `érable argenté côté garage` |
 
-Au moins un type est exigé par l'interface et par l'import. Dans `v_chantiers` : `types_codes`
+Au moins un type est exigé par l'interface et par l'import. Dans `v_chantiers` : `attente_depuis` (date à partir de laquelle le client attend), `modalite_paiement`, `types_codes`
 (`elagage+taille_haie`), `type_libelle` (`Élagage + Taille de haie`) et `travaux_detail`
 (`Élagage : érable argenté côté garage ; Taille de haie : cèdres, 35 m`).
 
@@ -189,7 +190,7 @@ une fiche = un chantier) ; l'import range chaque colonne dans la bonne table :
 | Colonnes de la feuille | Destination |
 |---|---|
 | `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes`, `adresse`, `ville`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `clients` |
-| `type_travaux`, `statut`, `description`, `date_*`, `heure_prevue`, `duree_*`, `prix_ht`, `tps`, `tvq`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
+| `type_travaux`, `statut`, `description`, `date_*`, `heure_prevue`, `duree_*`, `prix_ht`, `tps`, `tvq`, `modalite_paiement`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
 | `paiement_date`, `paiement_montant`, `paiement_mode` | `paiements` (un paiement par ligne ; les acomptes supplémentaires se saisissent dans l'interface) |
 
 L'import est plus souple que la base, puis écrit toujours le format strict :

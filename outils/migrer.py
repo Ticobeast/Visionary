@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Convertit une base de l'ancien format (v1) vers le format actuel (v2).
+"""Convertit une base d'un ancien format (v1 ou v2) vers le format actuel (v3).
 
     python outils/migrer.py data/sylvainculteur.db
 
-Changements v1 -> v2 :
+Changements v2 -> v3 :
+  * nouvelle colonne chantiers.modalite_paiement (comment le client paiera) ;
+  * la vue v_chantiers gagne attente_depuis et modalite_paiement.
+
+Changements v1 -> v2 (appliqués en même temps si la base est en v1) :
   * un chantier peut avoir plusieurs types de travaux, chacun avec sa précision
     (table chantier_travaux) : l'ancien type devient un type sans précision ;
   * une seule date des travaux : date_prevue reprend date_realisee quand elle existe ;
@@ -26,6 +30,34 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 TABLES = ("clients", "chantiers", "paiements")
+VERSION_SCHEMA = 3
+
+
+def _migrer_v2(db_path):
+    """v2 -> v3 sur place : ajout d'une colonne et nouvelle vue (aucune ligne n'est recopiée)."""
+    sauvegardes = db_path.parent / "sauvegardes"
+    sauvegardes.mkdir(exist_ok=True)
+    copie = sauvegardes / f"{datetime.datetime.now():%Y-%m-%d_%H%M%S}_avant_migration_v2.db"
+    shutil.copy2(db_path, copie)
+    schema = SCHEMA.read_text(encoding="utf-8")
+    vue = schema[schema.index("CREATE VIEW v_chantiers AS"):]
+    conn = sqlite3.connect(db_path, isolation_level=None)
+    try:
+        conn.execute("BEGIN")
+        conn.execute("ALTER TABLE chantiers ADD COLUMN modalite_paiement TEXT")
+        conn.execute("DROP VIEW v_chantiers")
+        conn.execute(vue.rstrip().rstrip(";"))
+        conn.execute(f"PRAGMA user_version = {VERSION_SCHEMA}")
+        conn.execute("COMMIT")
+    except sqlite3.OperationalError as e:
+        conn.execute("ROLLBACK")
+        raise SystemExit(f"Migration impossible ({e}). Rien n'a été modifié (base de départ intacte).")
+    compte = {t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in TABLES}
+    if conn.execute("SELECT count(*) FROM v_chantiers").fetchone()[0] != compte["chantiers"] \
+            or conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+        raise SystemExit(f"Vérification échouée après migration. Ta copie intacte : {copie}")
+    conn.close()
+    return {"sauvegarde": copie, **compte}
 
 
 def migrer(db_path):
@@ -36,8 +68,10 @@ def migrer(db_path):
     version = ancien.execute("PRAGMA user_version").fetchone()[0]
     tables = {r[0] for r in ancien.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     ancien.close()
-    if version == 2:
+    if version == VERSION_SCHEMA:
         return None  # déjà à jour
+    if version == 2:
+        return _migrer_v2(db_path)
     if version != 1 or "sites" in tables:
         raise SystemExit("Format de base non pris en charge (version %s%s). Garde ce fichier et demande de l'aide."
                          % (version, ", avec une table sites" if "sites" in tables else ""))
@@ -81,7 +115,7 @@ def migrer(db_path):
 
         sauvegardes = db_path.parent / "sauvegardes"
         sauvegardes.mkdir(exist_ok=True)
-        copie = sauvegardes / f"{datetime.datetime.now():%Y-%m-%d_%H%M%S}_avant_migration_v1.db"
+        copie = sauvegardes / f"{datetime.datetime.now():%Y-%m-%d_%H%M%S}_avant_migration_v{version}.db"
         shutil.copy2(db_path, copie)
         try:
             os.replace(nouveau_chemin, db_path)
@@ -94,7 +128,7 @@ def migrer(db_path):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="Convertit une base v1 vers le format actuel (v2).")
+    p = argparse.ArgumentParser(description="Convertit une base v1 ou v2 vers le format actuel (v3).")
     p.add_argument("db", help="fichier de base à convertir (ex. data/sylvainculteur.db)")
     a = p.parse_args(argv)
     r = migrer(a.db)

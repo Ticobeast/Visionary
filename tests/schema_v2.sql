@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 3;
+PRAGMA user_version = 2;
 
 
 -- -----------------------------------------------------------------------------
@@ -139,8 +139,6 @@ CREATE TABLE chantiers (
     prix_ht         REAL,     -- $ CAD avant taxes (estimé tant que non facturé, puis final)
     tps             REAL NOT NULL DEFAULT 0,   -- $ TPS (0 si non inscrit aux taxes)
     tvq             REAL NOT NULL DEFAULT 0,   -- $ TVQ (0 si non inscrit aux taxes)
-    modalite_paiement TEXT,   -- comment le client paiera (« Interac à la fin », « 50 % d'acompte »...) ;
-                              -- imprimée sur la feuille de route pour savoir quoi encaisser sur place
     numero_facture  TEXT,
     date_facture    TEXT,     -- AAAA-MM-JJ : date de la facture / du reçu remis
 
@@ -270,8 +268,6 @@ base AS (
             WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS travaux_detail,
         c.description,
         c.date_soumission, c.date_prevue, c.heure_prevue,
-        -- Depuis quand le client attend : date de la demande/soumission, à défaut date de création de la fiche
-        COALESCE(c.date_soumission, date(c.cree_le)) AS attente_depuis,
         c.duree_estimee_h, c.duree_reelle_h,
 
         cl.id AS client_id, cl.prenom, cl.nom, cl.entreprise,
@@ -285,7 +281,7 @@ base AS (
         c.prix_ht, c.tps, c.tvq,
         ROUND(COALESCE(c.prix_ht, 0) + c.tps + c.tvq, 2) AS total_ttc,
         COALESCE(r.paye, 0) AS paye,
-        c.modalite_paiement, c.numero_facture, c.date_facture,
+        c.numero_facture, c.date_facture,
 
         c.dossier_photos, c.fichier_papier, c.ref_papier
     FROM chantiers c

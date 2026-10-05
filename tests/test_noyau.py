@@ -70,7 +70,7 @@ class TestSchema(unittest.TestCase):
             self.c.execute(sql, args)
 
     def test_version_et_integrite(self):
-        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 3)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):

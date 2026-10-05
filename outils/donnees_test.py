@@ -72,7 +72,8 @@ def generer(db, nombre=40, graine=2026):
         ligne = {**c, "type_travaux": travaux, "description": rnd.choice(["", "", "Résidus ramassés.", "Appeler avant de venir."]),
                  "duree_estimee_h": f"{min(duree, 8):g}", "prix_ht": f"{prix:.2f}", "ref_papier": f"Classeur A, fiche {k + 1}"}
         sort = rnd.random()
-        if sort < 0.70:        # passé : terminé
+        ligne["modalite_paiement"] = rnd.choice(["", "Interac à la fin des travaux", "Chèque à la fin des travaux", "Comptant à la fin des travaux"])
+        if sort < 0.55:        # passé : terminé
             realise = aujourdhui - datetime.timedelta(days=rnd.randint(8, 540))
             ligne.update(statut="termine", date_soumission=jour(realise - datetime.timedelta(days=rnd.randint(3, 20))),
                          date_prevue=jour(realise),
@@ -86,15 +87,16 @@ def generer(db, nombre=40, graine=2026):
             elif etat < 0.85:  # facturé, pas payé
                 ligne.update(date_facture=jour(realise + datetime.timedelta(days=1)), numero_facture=f"{realise.year}-{k + 1:03d}")
             # sinon : non facturé
-        elif sort < 0.85:      # à venir : planifié, parfois avec acompte
+        elif sort < 0.72:      # à venir : planifié, parfois avec acompte
             prevu = aujourdhui + datetime.timedelta(days=rnd.randint(1, 25))
             ligne.update(statut="planifie", date_soumission=jour(prevu - datetime.timedelta(days=rnd.randint(5, 20))),
                          date_prevue=jour(prevu), heure_prevue=rnd.choice(["", "08:00", "09:30", "13:00"]))
             if rnd.random() < 0.3:
                 ligne.update(paiement_date=jour(aujourdhui), paiement_montant="100.00", paiement_mode="interac")
         else:                  # soumissions, acceptés, refusés, annulés
-            ligne.update(statut=rnd.choice(["soumission", "soumission", "accepte", "refuse", "annule"]),
-                         date_soumission=jour(aujourdhui - datetime.timedelta(days=rnd.randint(1, 30))))
+            # surtout des chantiers acceptés qui attendent d'être planifiés, avec des délais d'attente variés
+            ligne.update(statut=rnd.choice(["accepte"] * 5 + ["soumission"] * 2 + ["refuse", "annule"]),
+                         date_soumission=jour(aujourdhui - datetime.timedelta(days=rnd.choice([1, 2, 4, 6, 9, 14, 20, 28, 33, 41, 55]))))
         v, erreurs = lire_ligne(ligne, alias, taxes_auto=True)
         assert not erreurs, (ligne, erreurs)
         client_id = trouver_ou_creer_client(conn, idx, v, res, lambda m: None)

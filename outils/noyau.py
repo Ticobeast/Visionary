@@ -8,6 +8,7 @@ import datetime
 import re
 import sqlite3
 import unicodedata
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
@@ -15,6 +16,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
+VERSION_SCHEMA = 3
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -36,7 +38,7 @@ COLONNES = [
     "type_travaux", "statut", "description",
     "date_soumission", "date_prevue", "heure_prevue",
     "duree_estimee_h", "duree_reelle_h",
-    "prix_ht", "tps", "tvq", "numero_facture", "date_facture",
+    "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
     "paiement_date", "paiement_montant", "paiement_mode",
     "notes_acces", "ref_papier", "fichier_papier", "dossier_photos",
     "client_telephone_2", "client_courriel", "client_sms_ok", "client_notes",
@@ -244,10 +246,8 @@ class Ligne:
         return v
 
 
-def lire_ligne(brut, alias_types, taxes_auto):
-    """Retourne (valeurs, erreurs) pour une ligne brute du CSV."""
-    L = Ligne(brut)
-    v = {}
+def _lire_client(L, v):
+    """Champs du client et de son adresse (communs à la fiche chantier et à la fiche client)."""
     v["client_nom"] = L.texte("client_nom")
     v["client_prenom"] = L.texte("client_prenom")
     v["client_entreprise"] = L.texte("client_entreprise")
@@ -275,6 +275,21 @@ def lire_ligne(brut, alias_types, taxes_auto):
         L.erreurs.append("latitude et longitude vont ensemble (remplir les deux ou aucune)")
     v["notes_acces"] = L.texte("notes_acces", multiligne=True)
 
+
+def lire_client(brut):
+    """Valide la fiche d'un client seule. Retourne (valeurs, erreurs)."""
+    L = Ligne(brut)
+    v = {}
+    _lire_client(L, v)
+    return v, L.erreurs
+
+
+def lire_ligne(brut, alias_types, taxes_auto):
+    """Retourne (valeurs, erreurs) pour une ligne brute (CSV ou formulaire) : client + chantier."""
+    L = Ligne(brut)
+    v = {}
+    _lire_client(L, v)
+
     v["travaux"] = L.travaux("type_travaux", alias_types)
     v["statut"] = L.choix("statut", STATUTS, obligatoire=True)
     v["description"] = L.texte("description", multiligne=True)
@@ -291,6 +306,7 @@ def lire_ligne(brut, alias_types, taxes_auto):
         cent = Decimal("0.01")
         v["tps"] = (v["prix_ht"] * TAUX_TPS).quantize(cent, ROUND_HALF_UP)
         v["tvq"] = (v["prix_ht"] * TAUX_TVQ).quantize(cent, ROUND_HALF_UP)
+    v["modalite_paiement"] = L.texte("modalite_paiement")
     v["numero_facture"] = L.texte("numero_facture")
     v["date_facture"] = L.jour("date_facture")
 
@@ -337,11 +353,11 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version == 1:
-            raise SystemExit(f"La base {db_path} utilise l'ancien format (v1).\n"
+        if version in (1, 2):
+            raise SystemExit(f"La base {db_path} utilise un ancien format (v{version}).\n"
                              f"Convertis-la d'abord (une sauvegarde est faite) :  python outils/migrer.py \"{db_path}\"")
-        if version != 2:
-            raise SystemExit(f"Version de schéma inattendue ({version}, attendu : 2).")
+        if version != VERSION_SCHEMA:
+            raise SystemExit(f"Version de schéma inattendue ({version}, attendu : {VERSION_SCHEMA}).")
     return conn, existait
 
 
@@ -513,7 +529,7 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir):
 
 def _champs_differents(conn, chantier_id, v):
     """Champs de la ligne qui contredisent un chantier déjà présent (pour avertir, jamais pour écrire)."""
-    colonnes = ["statut", "heure_prevue", "duree_estimee_h", "duree_reelle_h", "tps", "tvq", "numero_facture",
+    colonnes = ["statut", "heure_prevue", "duree_estimee_h", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture",
                 "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
     actuel = dict(zip(colonnes, conn.execute(
         f"SELECT {', '.join(colonnes)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()))
@@ -535,12 +551,12 @@ def _champs_differents(conn, chantier_id, v):
 def _valeurs_chantier(v):
     return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"], v["heure_prevue"],
             _num(v["duree_estimee_h"]), _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0,
-            _num(v["tvq"]) or 0, v["numero_facture"], v["date_facture"], v["dossier_photos"],
+            _num(v["tvq"]) or 0, v["modalite_paiement"], v["numero_facture"], v["date_facture"], v["dossier_photos"],
             v["fichier_papier"], v["ref_papier"])
 
 
 COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue", "heure_prevue",
-                     "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "numero_facture",
+                     "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture",
                      "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
 
 
@@ -615,3 +631,180 @@ def mettre_a_jour_client(conn, client_id, v):
     }
     conn.execute(f"UPDATE clients SET {', '.join(f'{c} = ?' for c in champs)} WHERE id = ?",
                  (*champs.values(), client_id))
+
+
+# ---------------------------------------------------------------------------
+# Transactions, valeurs de formulaire
+# ---------------------------------------------------------------------------
+@contextmanager
+def transaction(conn):
+    """BEGIN ... COMMIT, ou ROLLBACK si une exception survient."""
+    conn.execute("BEGIN")
+    try:
+        yield
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
+def _txt(x, fmt=None):
+    return "" if x is None else (fmt(x) if fmt else str(x))
+
+
+def valeurs_client(conn, client_id):
+    """Fiche d'un client sous forme de textes (clés de la feuille de saisie), ou None."""
+    r = conn.execute("SELECT prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville,"
+                     " province, code_postal, latitude, longitude, notes_acces, notes FROM clients WHERE id = ?",
+                     (client_id,)).fetchone()
+    if r is None:
+        return None
+    cols = ["client_prenom", "client_nom", "client_entreprise", "client_telephone", "client_telephone_2",
+            "client_courriel", "client_sms_ok", "adresse", "ville", "province", "code_postal", "latitude",
+            "longitude", "notes_acces", "client_notes"]
+    return {c: _txt(x, repr if c in ("latitude", "longitude") else None) for c, x in zip(cols, r)}
+
+
+def travaux_depuis_formulaire(conn, form):
+    """Types cochés + précisions d'un formulaire. Retourne (liste [(code, précision)], valeurs à réafficher).
+
+    Une précision saisie sans case cochée coche le type d'office.
+    """
+    travaux, valeurs = [], {}
+    for (code,) in conn.execute("SELECT code FROM types_travaux ORDER BY code"):
+        precision = form.get(f"precision_{code}", "").strip()
+        valeurs[f"precision_{code}"] = precision
+        if form.get(f"type_{code}") or precision:
+            valeurs[f"type_{code}"] = "1"
+            travaux.append((code, precision))
+    return travaux, valeurs
+
+
+# ---------------------------------------------------------------------------
+# Délai d'attente (tableau de bord) : < 7 jours normal, 7 à 30 jours à surveiller, > 30 jours urgent
+# ---------------------------------------------------------------------------
+SEUIL_SURVEILLER = 7
+SEUIL_URGENT = 30
+
+
+def jours_attente(attente_depuis, aujourdhui=None):
+    """Nombre de jours écoulés depuis la date (AAAA-MM-JJ) à laquelle le client attend."""
+    if not attente_depuis:
+        return 0
+    aujourdhui = aujourdhui or datetime.date.today()
+    return max(0, (aujourdhui - datetime.date.fromisoformat(attente_depuis)).days)
+
+
+def priorite(jours):
+    if jours > SEUIL_URGENT:
+        return "urgente"
+    return "surveiller" if jours >= SEUIL_SURVEILLER else "normale"
+
+
+# ---------------------------------------------------------------------------
+# Actions rapides (tableau de bord, tournées). Chacune retourne la liste des erreurs
+# (vide = fait). À appeler dans une transaction.
+# ---------------------------------------------------------------------------
+def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None):
+    """Change le statut d'un chantier.
+
+    « soumission » / « accepte » : le chantier est à planifier, sa date est effacée.
+    « planifie » / « termine »   : une date des travaux est obligatoire (celle déjà en base si rien n'est fourni).
+    « refuse » / « annule »      : la date n'est pas touchée.
+    La durée, si fournie, est la durée ESTIMÉE (heures).
+    """
+    L = Ligne({"date_prevue": date_prevue or "", "duree_estimee_h": duree or ""})
+    d, h = L.jour("date_prevue"), L.duree("duree_estimee_h")
+    if statut not in STATUTS:
+        L.erreurs.append(f"statut « {statut} » inconnu")
+    actuel = conn.execute("SELECT date_prevue FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if actuel is None:
+        L.erreurs.append(f"chantier #{chantier_id} introuvable")
+    if L.erreurs:
+        return L.erreurs
+    if statut in ("planifie", "termine"):
+        d = d or actuel[0]
+        if not d:
+            return [f"la date des travaux est obligatoire pour le statut « {statut} »"]
+    elif statut in ("soumission", "accepte"):
+        d = None
+    else:
+        d = actuel[0]
+    colonnes = {"statut": statut, "date_prevue": d}
+    if statut in ("soumission", "accepte"):
+        colonnes["heure_prevue"] = None
+    if h is not None:
+        colonnes["duree_estimee_h"] = float(h)
+    conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in colonnes)} WHERE id = ?",
+                 (*colonnes.values(), chantier_id))
+    return []
+
+
+def facturer(conn, chantier_id, date_facture=None):
+    """Marque un chantier terminé comme facturé (date de la facture = aujourd'hui par défaut)."""
+    r = conn.execute("SELECT statut, prix_ht, date_facture FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"chantier #{chantier_id} introuvable"]
+    statut, prix, deja = r
+    if deja:
+        return [f"déjà facturé le {deja}"]
+    if statut != "termine":
+        return ["seul un chantier terminé peut être facturé"]
+    if prix is None:
+        return ["le prix est manquant : complète la fiche du chantier avant de facturer"]
+    conn.execute("UPDATE chantiers SET date_facture = ? WHERE id = ?",
+                 (date_facture or datetime.date.today().isoformat(), chantier_id))
+    return []
+
+
+def encaisser(conn, chantier_id, montant, mode, date_paiement=None):
+    """Enregistre un paiement reçu (montant taxes incluses ; date = aujourd'hui par défaut)."""
+    L = Ligne({"paiement_montant": montant or "", "paiement_date": date_paiement or "", "paiement_mode": mode or ""})
+    m, d, mo = L.montant("paiement_montant"), L.jour("paiement_date"), L.choix("paiement_mode", MODES)
+    if m is None and not any("paiement_montant" in e for e in L.erreurs):
+        L.erreurs.append("le montant est obligatoire")
+    if m is not None and m == 0:
+        L.erreurs.append("le montant doit être supérieur à 0")
+    if mo is None and not any("paiement_mode" in e for e in L.erreurs):
+        L.erreurs.append("le mode de paiement est obligatoire")
+    if conn.execute("SELECT 1 FROM chantiers WHERE id = ?", (chantier_id,)).fetchone() is None:
+        L.erreurs.append(f"chantier #{chantier_id} introuvable")
+    if L.erreurs:
+        return L.erreurs
+    conn.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (?,?,?,?)",
+                 (chantier_id, d or datetime.date.today().isoformat(), float(m), mo))
+    return []
+
+
+def planifier_lot(conn, ids, date_prevue, durees=None):
+    """Planifie plusieurs chantiers le même jour. Tout ou rien : s'il y a une erreur, rien n'est modifié.
+
+    durees : {id: texte} facultatif, durées estimées (heures) saisies pendant la planification.
+    Retourne la liste des erreurs.
+    """
+    durees = durees or {}
+    L = Ligne({"date_prevue": date_prevue or ""})
+    d = L.jour("date_prevue")
+    if d is None and not L.erreurs:
+        L.erreurs.append("choisis la date de la journée")
+    if not ids:
+        L.erreurs.append("aucun chantier sélectionné")
+    a_ecrire = []
+    for i in ids:
+        r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (i,)).fetchone()
+        if r is None or r[0] not in ("soumission", "accepte", "planifie"):
+            L.erreurs.append(f"chantier #{i} : ne peut pas être planifié (statut {r[0] if r else 'introuvable'})")
+            continue
+        Lh = Ligne({"duree_estimee_h": durees.get(i, "")})
+        h = Lh.duree("duree_estimee_h")
+        L.erreurs.extend(f"chantier #{i} : {e}" for e in Lh.erreurs)
+        a_ecrire.append((i, h))
+    if L.erreurs:
+        return L.erreurs
+    for i, h in a_ecrire:
+        if h is None:
+            conn.execute("UPDATE chantiers SET statut = 'planifie', date_prevue = ? WHERE id = ?", (d, i))
+        else:
+            conn.execute("UPDATE chantiers SET statut = 'planifie', date_prevue = ?, duree_estimee_h = ? WHERE id = ?",
+                         (d, float(h), i))
+    return []

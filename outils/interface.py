@@ -11,145 +11,23 @@ Arrêter : Ctrl+C dans la fenêtre du terminal.
 """
 import argparse
 import datetime
-import html
 import re
 import sqlite3
 import sys
 import threading
 import webbrowser
-from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
-from noyau import (COLONNES, DB_DEFAUT, MODES, STATUTS, Index, Ligne, Resultat, alias_types_travaux,  # noqa: E402
+from noyau import (COLONNES, _txt, DB_DEFAUT, MODES, STATUTS, Index, Ligne, Resultat, alias_types_travaux,  # noqa: E402
                    cle, creer_chantier, lire_ligne, mettre_a_jour_client, mettre_a_jour_fiche, ouvrir_base,
-                   sauvegarder, service_nuage, trouver_ou_creer_client)
-
-LIBELLES_STATUT = {"soumission": "Soumission", "refuse": "Refusé", "accepte": "Accepté",
-                   "planifie": "Planifié", "termine": "Terminé", "annule": "Annulé"}
-LIBELLES_PAIEMENT = {"non_facture": "À facturer", "a_payer": "Facturé, à recevoir", "partiel": "Partiel",
-                     "paye": "Payé", "a_venir": "À venir", "sans_objet": "—", "prix_manquant": "Prix manquant"}
-LIBELLES_MODE = {"comptant": "Comptant", "cheque": "Chèque", "interac": "Interac", "carte": "Carte", "autre": "Autre"}
-MESSAGES = {
-    "cree": "Chantier créé.",
-    "cree_reutilise": "Chantier créé pour un client déjà dans la base (même adresse) : sa fiche a été réutilisée.",
-    "maj": "Modifications enregistrées.",
-    "paiement": "Paiement ajouté.",
-    "paiement_supprime": "Paiement supprimé.",
-    "supprime": "Chantier supprimé.",
-}
-
-CSS = """
-:root{--fond:#f5f6f4;--carte:#fff;--texte:#1d2a22;--doux:#5b6b61;--trait:#d9ded9;--accent:#2f6b3f;--accent-fonce:#245232;
---alerte:#9b2c2c;--alerte-fond:#fbeaea;--ok-fond:#e7f3ea}
-@media (prefers-color-scheme:dark){:root{--fond:#161b18;--carte:#1f2622;--texte:#e8eee9;--doux:#a3b0a7;--trait:#34403a;
---accent:#6fbf86;--accent-fonce:#8fd3a3;--alerte:#f2a0a0;--alerte-fond:#3a2323;--ok-fond:#1f3326}}
-*{box-sizing:border-box}body{margin:0;background:var(--fond);color:var(--texte);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
-header{background:var(--carte);border-bottom:1px solid var(--trait);padding:12px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-header strong{font-size:18px}header a{color:var(--accent-fonce);text-decoration:none;font-weight:600}
-main a{color:var(--accent-fonce)}main{max-width:1100px;margin:0 auto;padding:16px}h1{font-size:22px;margin:8px 0 16px}h2{font-size:17px;margin:0 0 12px}
-.carte{background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:16px;margin-bottom:16px}
-.grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-label{display:block;font-size:14px;color:var(--doux);margin-bottom:2px}
-input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--trait);border-radius:8px;background:var(--carte);color:var(--texte);font:inherit}
-input[type=checkbox]{width:auto;margin-right:6px}textarea{min-height:70px}
-.large{grid-column:1/-1}
-button,.bouton{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
-@media (prefers-color-scheme:dark){button,.bouton{color:#0d1a11}}
-button.secondaire,.bouton.secondaire{background:transparent;color:var(--accent-fonce);border:1px solid var(--accent)}
-button.danger{background:transparent;color:var(--alerte);border:1px solid var(--alerte)}
-.puces{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
-.puce{background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:10px 14px;text-decoration:none;color:var(--texte);min-width:150px}
-.puce b{display:block;font-size:20px}.puce span{color:var(--doux);font-size:13px}
-table{width:100%;border-collapse:collapse;background:var(--carte);border:1px solid var(--trait);border-radius:10px;overflow:hidden}
-th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--trait);vertical-align:top;font-size:15px}
-td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);font-weight:600}tr:last-child td{border-bottom:0}td a{color:var(--accent-fonce);font-weight:600;text-decoration:none}
-.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:13px;border:1px solid var(--trait);white-space:nowrap}
-.b-non_facture,.b-prix_manquant{background:#fff1d6;color:#7a4b00;border-color:#e8c675}.b-a_payer{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte)}
-.b-partiel{background:#e3eefb;color:#1e4d86;border-color:#9cbbe3}.b-paye,.b-termine{background:var(--ok-fond);color:var(--accent-fonce);border-color:var(--accent)}
-.erreurs{background:var(--alerte-fond);border:1px solid var(--alerte);color:var(--alerte);border-radius:10px;padding:12px 16px;margin-bottom:16px}
-.erreurs ul{margin:6px 0 0 18px;padding:0}.message{background:var(--ok-fond);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-bottom:16px}
-.doux{color:var(--doux);font-size:14px}.droite{text-align:right}.barre{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.recherche{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.recherche input{flex:1;min-width:180px}.recherche select{width:auto}
-.type{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px;align-items:center;margin-bottom:8px}
-.type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
-.base{margin-left:auto;font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
-@media (max-width:600px){.type{grid-template-columns:1fr}}
-details summary{cursor:pointer;color:var(--accent-fonce);font-weight:600;margin-bottom:10px}
-@media (max-width:700px){th:nth-child(n+5),td:nth-child(n+5){display:none}}
-"""
-
-
-_BASE = {"db": None}   # base ouverte par ce serveur (affichée dans l'en-tête pour ne jamais s'y tromper)
-
-
-def esc(x):
-    return html.escape("" if x is None else str(x), quote=True)
-
-
-def argent(x):
-    return "" if x is None else f"{x:,.2f} $".replace(",", " ").replace(".", ",")
-
-
-def etiquette_base():
-    if not _BASE["db"]:
-        return ""
-    nom = Path(_BASE["db"]).name
-    if nom == DB_DEFAUT.name:
-        return f'<span class="base">Base : {esc(nom)}</span>'
-    return f'<span class="base essai" title="{esc(_BASE["db"])}">BASE D’ESSAI : {esc(nom)}</span>'
-
-
-def gabarit(titre, contenu, message=None):
-    msg = f'<div class="message">{esc(MESSAGES[message])}</div>' if message in MESSAGES else ""
-    return f"""<!doctype html><html lang="fr-CA"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(titre)} — SylvainCulteur</title>
-<style>{CSS}</style></head><body>
-<header><strong>SylvainCulteur</strong><a href="/">Chantiers</a><a href="/nouveau">+ Nouveau chantier</a>{etiquette_base()}</header>
-<main>{msg}{contenu}</main></body></html>"""
-
-
-def badge(code, libelle):
-    return f'<span class="badge b-{esc(code)}">{esc(libelle)}</span>'
-
-
-# ---------------------------------------------------------------------------
-# Formulaire
-# ---------------------------------------------------------------------------
-def champ(nom, libelle, valeurs, type_="text", large=False, **attrs):
-    extra = "".join(f' {k.replace("_", "-")}="{esc(v)}"' if v is not True else f' {k}' for k, v in attrs.items())
-    classe = ' class="large"' if large else ""
-    return (f'<div{classe}><label for="{nom}">{esc(libelle)}</label>'
-            f'<input id="{nom}" name="{nom}" type="{type_}" value="{esc(valeurs.get(nom, ""))}"{extra}></div>')
-
-
-def zone(nom, libelle, valeurs, large=True):
-    classe = ' class="large"' if large else ""
-    return (f'<div{classe}><label for="{nom}">{esc(libelle)}</label>'
-            f'<textarea id="{nom}" name="{nom}">{esc(valeurs.get(nom, ""))}</textarea></div>')
-
-
-def liste(nom, libelle, options, valeurs, vide=None, **attrs):
-    extra = "".join(f" {k}" for k, v in attrs.items() if v is True)
-    choix = f'<option value="">{esc(vide)}</option>' if vide is not None else ""
-    for code, lib in options:
-        sel = " selected" if valeurs.get(nom) == code else ""
-        choix += f'<option value="{esc(code)}"{sel}>{esc(lib)}</option>'
-    return f'<div><label for="{nom}">{esc(libelle)}</label><select id="{nom}" name="{nom}"{extra}>{choix}</select></div>'
-
-
-def bloc_types(types, valeurs):
-    lignes = ""
-    for code, libelle in types:
-        coche = " checked" if valeurs.get(f"type_{code}") else ""
-        lignes += (f'<div class="type"><label class="coche"><input type="checkbox" name="type_{esc(code)}" value="1"{coche}>{esc(libelle)}</label>'
-                   f'<input type="text" name="precision_{esc(code)}" value="{esc(valeurs.get("precision_" + code, ""))}" '
-                   f'placeholder="Précision (facultatif) : quel arbre, quelle haie, combien…" aria-label="Précision pour {esc(libelle)}"></div>')
-    return f'<div class="large"><label>Types de travaux : coche un ou plusieurs</label>{lignes}</div>'
-
+                   sauvegarder, service_nuage, transaction, travaux_depuis_formulaire, trouver_ou_creer_client,
+                   valeurs_client)
+from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge,  # noqa: E402
+                 bloc_types, carte_adresse, carte_client, champ, champ_modalite, esc, gabarit, liste, redirection, zone)
 
 def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, bouton="Enregistrer"):
     types = sorted(conn.execute("SELECT code, libelle FROM types_travaux"),
@@ -168,28 +46,15 @@ def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, 
 <p class="doux">Pour plusieurs versements (acompte + solde), enregistre ici le premier, puis ajoute les autres sur la page du chantier.</p></div>"""
     cid = f'<input type="hidden" name="client_id" value="{esc(client_id)}">' if client_id else ""
     return f"""{erreurs_html}<form method="post" action="{esc(action)}">{cid}
-<div class="carte"><h2>Client</h2><div class="grille">
-{champ("client_nom", "Nom", valeurs, autocomplete="off")}{champ("client_prenom", "Prénom", valeurs, autocomplete="off")}
-{champ("client_entreprise", "Entreprise / syndicat", valeurs)}{champ("client_telephone", "Téléphone", valeurs, "tel", placeholder="450-555-0142")}
-{champ("client_telephone_2", "Téléphone 2", valeurs, "tel")}{champ("client_courriel", "Courriel", valeurs, "email")}
-<div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="client_sms_ok" value="1"{sms}>Rappels par texto acceptés</label></div>
-{zone("client_notes", "Notes sur le client (préférences, historique)", valeurs)}</div></div>
+{carte_client(valeurs)}
 
-<div class="carte"><h2>Adresse des travaux</h2><div class="grille">
-{champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, required=True, placeholder="123 Rue des Érables")}
-{champ("ville", "Ville", valeurs, required=True)}{champ("code_postal", "Code postal", valeurs, placeholder="J7Z 1A1")}
-{champ("province", "Province", valeurs, placeholder="QC")}
-{zone("notes_acces", "Accès : barrière, chien, où stationner, où est l'arbre", valeurs)}</div>
-<details style="margin-top:12px"><summary>Coordonnées GPS (seulement pour un lot sans numéro civique)</summary><div class="grille">
-{champ("latitude", "Latitude", valeurs, inputmode="decimal", placeholder="45.6480")}
-{champ("longitude", "Longitude (négative au Québec)", valeurs, inputmode="decimal", placeholder="-74.0920")}</div>
-<p class="doux">Google Maps : clic droit sur l'endroit → cliquer sur les coordonnées pour les copier. Laisser vide sinon : le géocodage se fera plus tard.</p></details></div>
+{carte_adresse(valeurs)}
 
 <div class="carte"><h2>Travaux</h2><div class="grille">
 {bloc_types(types, valeurs)}
 {liste("statut", "Statut", [(s, LIBELLES_STATUT[s]) for s in STATUTS], valeurs, required=True)}
 {zone("description", "Description (imprimée sur la feuille de route)", valeurs)}
-{champ("date_soumission", "Date de la soumission", valeurs, "date")}{champ("date_prevue", "Date des travaux (prévue, puis réalisée)", valeurs, "date")}
+{champ("date_soumission", "Date de la demande ou de la soumission", valeurs, "date")}{champ("date_prevue", "Date des travaux (prévue, puis réalisée)", valeurs, "date")}
 {champ("heure_prevue", "Heure prévue (rendez-vous fixe)", valeurs, "time")}
 {champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5")}
 {champ("duree_reelle_h", "Durée réelle (heures)", valeurs, inputmode="decimal")}</div>
@@ -199,7 +64,7 @@ def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, 
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
 {champ("tps", "TPS ($)", valeurs, inputmode="decimal")}{champ("tvq", "TVQ ($)", valeurs, inputmode="decimal")}
 <div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="taxes_auto" value="1"{taxes}>Calculer TPS 5 % et TVQ 9,975 % si vides</label></div>
-{champ("numero_facture", "N° de facture", valeurs)}{champ("date_facture", "Date de la facture / du reçu", valeurs, "date")}</div></div>
+{champ_modalite(valeurs)}{champ("numero_facture", "N° de facture", valeurs)}{champ("date_facture", "Date de la facture / du reçu", valeurs, "date")}</div></div>
 {paiement}
 <div class="carte"><h2>Notes et fichiers</h2><div class="grille">
 {champ("ref_papier", "Où est la fiche papier ?", valeurs, placeholder="Classeur A, fiche 12")}
@@ -212,23 +77,9 @@ def valeurs_vides():
     return {"client_sms_ok": "1", "province": "QC", "statut": "soumission"}
 
 
-def _txt(x, fmt=None):
-    return "" if x is None else (fmt(x) if fmt else str(x))
-
-
-def valeurs_client(conn, client_id):
-    r = conn.execute("SELECT prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville,"
-                     " province, code_postal, latitude, longitude, notes_acces, notes FROM clients WHERE id = ?",
-                     (client_id,)).fetchone()
-    cols = ["client_prenom", "client_nom", "client_entreprise", "client_telephone", "client_telephone_2",
-            "client_courriel", "client_sms_ok", "adresse", "ville", "province", "code_postal", "latitude",
-            "longitude", "notes_acces", "client_notes"]
-    return {c: _txt(x, repr if c in ("latitude", "longitude") else None) for c, x in zip(cols, r)}
-
-
 def valeurs_chantier(conn, chantier_id):
     cols = ["client_id", "description", "statut", "date_soumission", "date_prevue", "heure_prevue",
-            "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "numero_facture", "date_facture",
+            "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
             "dossier_photos", "fichier_papier", "ref_papier"]
     r = conn.execute(f"SELECT {', '.join(cols)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
@@ -244,28 +95,12 @@ def valeurs_chantier(conn, chantier_id):
     return d, client_id
 
 
-@contextmanager
-def transaction(conn):
-    conn.execute("BEGIN")
-    try:
-        yield
-    except BaseException:
-        conn.execute("ROLLBACK")
-        raise
-    conn.execute("COMMIT")
-
-
 def lire_formulaire(conn, form):
     brut = {c: form.get(c, "") for c in COLONNES}
     brut["client_sms_ok"] = "1" if form.get("client_sms_ok") else "0"
     brut["taxes_auto"] = "1" if form.get("taxes_auto") else ""
-    travaux = []
-    for (code,) in conn.execute("SELECT code FROM types_travaux ORDER BY libelle"):
-        precision = form.get(f"precision_{code}", "").strip()
-        brut[f"precision_{code}"] = precision
-        if form.get(f"type_{code}") or precision:      # une précision saisie implique le type
-            brut[f"type_{code}"] = "1"
-            travaux.append((code, precision))
+    travaux, valeurs_travaux = travaux_depuis_formulaire(conn, form)
+    brut.update(valeurs_travaux)
     brut["type_travaux"] = travaux
     v, erreurs = lire_ligne(brut, alias_types_travaux(conn), taxes_auto=bool(form.get("taxes_auto")))
     return brut, v, erreurs
@@ -274,7 +109,7 @@ def lire_formulaire(conn, form):
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
-def page_liste(conn, query):
+def page_chantiers(conn, query):
     q = query.get("q", "").strip()
     statut = query.get("statut", "")
     paiement = query.get("paiement", "")
@@ -304,17 +139,17 @@ def page_liste(conn, query):
     ar = conn.execute("SELECT count(*), COALESCE(SUM(solde), 0) FROM v_chantiers WHERE statut_paiement IN ('a_payer','partiel')").fetchone()
     pl = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'planifie'").fetchone()[0]
     mq = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut_paiement = 'prix_manquant'").fetchone()[0]
-    puces = (puce("/?paiement=non_facture", nf[0], f"à facturer · {argent(nf[1])}")
-             + puce("/?paiement=a_recevoir", ar[0], f"à recevoir · {argent(ar[1])}")
-             + puce("/?statut=planifie", pl, "planifiés")
-             + (puce("/?paiement=prix_manquant", mq, "prix manquants") if mq else ""))
+    puces = (puce("/chantiers?paiement=non_facture", nf[0], f"à facturer · {argent(nf[1])}")
+             + puce("/chantiers?paiement=a_recevoir", ar[0], f"à recevoir · {argent(ar[1])}")
+             + puce("/chantiers?statut=planifie", pl, "planifiés")
+             + (puce("/chantiers?paiement=prix_manquant", mq, "prix manquants") if mq else ""))
 
     opt_statut = '<option value="">Tous les statuts</option>' + "".join(
         f'<option value="{s}"{" selected" if s == statut else ""}>{LIBELLES_STATUT[s]}</option>' for s in STATUTS)
     paiements = [("a_recevoir", "À recevoir (facturé ou partiel)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
     opt_paiement = '<option value="">Tous les paiements</option>' + "".join(
         f'<option value="{k}"{" selected" if k == paiement else ""}>{esc(v)}</option>' for k, v in paiements)
-    recherche = (f'<form class="recherche" method="get" action="/"><input type="search" name="q" value="{esc(q)}" '
+    recherche = (f'<form class="recherche" method="get" action="/chantiers"><input type="search" name="q" value="{esc(q)}" '
                  f'placeholder="Chercher : nom, téléphone, adresse, ville…"><select name="statut">{opt_statut}</select>'
                  f'<select name="paiement">{opt_paiement}</select><button type="submit">Chercher</button></form>')
 
@@ -327,7 +162,7 @@ def page_liste(conn, query):
             corps += (f'<tr><td>{esc(date_)}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
                       f'<td>{esc(adresse)}, {esc(ville)}</td><td>{esc(type_)}</td><td>{badge(st, LIBELLES_STATUT[st])}</td>'
                       f'<td>{badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""}</td><td class="droite">{esc(solde_aff)}</td></tr>')
-        tableau = ('<table><thead><tr><th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
+        tableau = ('<table class="liste"><thead><tr><th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
                    f'<th>Paiement</th><th class="droite">Solde</th></tr></thead><tbody>{corps}</tbody></table>')
         if total > len(lignes):
             tableau += f'<p class="doux">{len(lignes)} premiers résultats sur {total} : précise la recherche.</p>'
@@ -339,50 +174,37 @@ def page_liste(conn, query):
 def page_nouveau(conn, query):
     q = query.get("q", "").strip()
     client_id = query.get("client_id", "")
-    valeurs, bandeau = valeurs_vides(), ""
-    if client_id.isdigit() and conn.execute("SELECT 1 FROM clients WHERE id = ?", (client_id,)).fetchone():
-        valeurs = {**valeurs, **valeurs_client(conn, client_id)}
-        valeurs["statut"] = "soumission"
-        bandeau = (f'<div class="message">Nouveau chantier pour <b>{esc(valeurs.get("client_prenom"))} {esc(valeurs.get("client_nom"))} '
-                   f'{esc(valeurs.get("client_entreprise"))}</b>, {esc(valeurs.get("adresse"))}. Les informations du client sont celles de sa fiche.'
-                   f' <a href="/nouveau">Plutôt un nouveau client</a></div>')
-    else:
-        client_id = ""
+    if client_id.isdigit():          # ancien lien : un client existant passe par sa fiche
+        return redirection(f"/client/{client_id}")
     trouves = ""
-    if q and not client_id:
+    if q:
         mots = cle(q).split()
         lignes = [r for r in conn.execute("SELECT id, prenom, nom, entreprise, adresse, ville, telephone FROM clients ORDER BY nom")
                   if all(m in cle(" ".join(str(x) for x in r[1:] if x)) for m in mots)][:10]
-        liens = "".join(f'<li><a href="/nouveau?client_id={r[0]}">{esc(" ".join(x for x in r[1:4] if x))} — {esc(r[4])}, {esc(r[5])}'
+        liens = "".join(f'<li><a href="/client/{r[0]}">{esc(" ".join(x for x in r[1:4] if x))} — {esc(r[4])}, {esc(r[5])}'
                         f' {esc(r[6] or "")}</a></li>' for r in lignes) or "<li>Aucun client trouvé : remplis le formulaire ci-dessous.</li>"
-        trouves = f'<div class="carte"><h2>Clients trouvés</h2><ul>{liens}</ul></div>'
-    recherche = ""
-    if not client_id:
-        recherche = (f'<form class="recherche" method="get" action="/nouveau"><input type="search" name="q" value="{esc(q)}" '
-                     'placeholder="Le client existe déjà ? Chercher par nom, téléphone ou adresse…"><button class="secondaire" type="submit">Chercher</button></form>')
-    contenu = f'<h1>Nouveau chantier</h1>{bandeau}{recherche}{trouves}{formulaire(conn, valeurs, "/nouveau", client_id=client_id or None)}'
-    return gabarit("Nouveau chantier", contenu)
+        trouves = (f'<div class="carte"><h2>Clients trouvés</h2><ul>{liens}</ul>'
+                   '<p class="doux">Ouvre la fiche du client pour lui ajouter un chantier (nom et adresse sont déjà connus).</p></div>')
+    recherche = (f'<form class="recherche" method="get" action="/nouveau"><input type="search" name="q" value="{esc(q)}" '
+                 'placeholder="Le client existe déjà ? Chercher par nom, téléphone ou adresse…"><button class="secondaire" type="submit">Chercher</button></form>')
+    contenu = f'<h1>Nouveau client et chantier</h1>{recherche}{trouves}{formulaire(conn, valeurs_vides(), "/nouveau")}'
+    return gabarit("Nouveau client et chantier", contenu)
 
 
 def creer(conn, form):
     brut, v, erreurs = lire_formulaire(conn, form)
-    client_id = form.get("client_id", "")
-    client_id = int(client_id) if client_id.isdigit() else None
     if not erreurs:
         res, avertissements = Resultat(), []
         try:
             with transaction(conn):
-                if client_id:
-                    mettre_a_jour_client(conn, client_id, v)
-                else:
-                    client_id = trouver_ou_creer_client(conn, Index(conn), v, res, avertissements.append)
+                client_id = trouver_ou_creer_client(conn, Index(conn), v, res, avertissements.append)
                 chantier_id = creer_chantier(conn, client_id, v, res, avertissements.append, verifier_doublon=False)
             ok = "cree_reutilise" if res.clients_reutilises else "cree"
             return redirection(f"/chantier/{chantier_id}?ok={ok}")
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]
-    contenu = f'<h1>Nouveau chantier</h1>{formulaire(conn, brut, "/nouveau", erreurs, client_id=client_id)}'
-    return gabarit("Nouveau chantier", contenu)
+    contenu = f'<h1>Nouveau client et chantier</h1>{formulaire(conn, brut, "/nouveau", erreurs)}'
+    return gabarit("Nouveau client et chantier", contenu)
 
 
 def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_paiement=()):
@@ -421,7 +243,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
             f'<li><a href="/chantier/{i}">{esc(d)} — {esc(t)}</a> {badge(s, LIBELLES_STATUT[s])}</li>' for i, t, d, s in autres) + "</ul></div>")
     form_html = formulaire(conn, valeurs if valeurs is not None else depuis_base, f"/chantier/{chantier_id}", erreurs,
                            client_id=client_id, nouveau=False, bouton="Enregistrer les modifications")
-    actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton secondaire" href="/nouveau?client_id={client_id}">+ Nouveau chantier pour ce client</a></div>')
+    actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton secondaire" href="/client/{client_id}">Fiche client</a><a class="bouton secondaire" href="/client/{client_id}/chantier/nouveau">+ Nouveau chantier pour ce client</a></div>')
     supprimer = (f'<form method="post" action="/chantier/{chantier_id}/supprimer" onsubmit="return confirm(\'Supprimer ce chantier ? '
                  f'Le client sera aussi supprimé s\\\'il n\\\'a aucun autre chantier. Cette action est définitive.\')">'
                  f'<button class="danger" type="submit">Supprimer ce chantier</button></form>')
@@ -483,18 +305,17 @@ def supprimer_chantier(conn, chantier_id):
                 conn.execute("DELETE FROM clients WHERE id = ?", (ligne[0],))
     except sqlite3.IntegrityError:
         return page_chantier(conn, chantier_id, {}, erreurs=["Impossible de supprimer : ce chantier a des paiements. Supprime-les d'abord."])
-    return redirection("/?ok=supprime")
-
-
-def redirection(url):
-    return ("303 See Other", [("Location", url)], b"")
+    return redirection("/chantiers?ok=supprime")
 
 
 # ---------------------------------------------------------------------------
 # Routage (indépendant du réseau : facile à tester)
 # ---------------------------------------------------------------------------
-ROUTES = [
-    ("GET", r"^/$", lambda c, q, f, *g: page_liste(c, q)),
+from pages_clients import ROUTES_CLIENTS  # noqa: E402
+from tableau import ROUTES_TABLEAU  # noqa: E402
+
+ROUTES = ROUTES_TABLEAU + ROUTES_CLIENTS + [
+    ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
     ("POST", r"^/nouveau$", lambda c, q, f, *g: creer(c, f)),
     ("GET", r"^/chantier/(\d+)$", lambda c, q, f, i: page_chantier(c, int(i), q)),

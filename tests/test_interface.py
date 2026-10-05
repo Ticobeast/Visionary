@@ -56,7 +56,7 @@ class BaseInterface(unittest.TestCase):
 
 class TestPages(BaseInterface):
     def test_liste_et_puces(self):
-        statut, page = self.get("/")
+        statut, page = self.get("/chantiers")
         self.assertTrue(statut.startswith("200"))
         for nom in ("Marie Gagnon", "Pierre Lavoie", "Luc Boucher"):
             self.assertIn(nom, page)
@@ -64,13 +64,13 @@ class TestPages(BaseInterface):
         self.assertIn("1 437,19 $", page)       # Lavoie : 1250 + taxes, non facturé
 
     def test_filtres_et_recherche_sans_accent(self):
-        self.assertNotIn("Marie Gagnon", self.get("/?paiement=non_facture")[1])
-        self.assertIn("Pierre Lavoie", self.get("/?paiement=non_facture")[1])
-        self.assertIn("Luc Boucher", self.get("/?statut=planifie")[1])
-        self.assertNotIn("Pierre Lavoie", self.get("/?statut=planifie")[1])
-        self.assertIn("Marie Gagnon", self.get("/?q=erables")[1])             # « Érables » trouvé sans accent
-        self.assertIn("Marie Gagnon", self.get("/?q=450-555-0142")[1])
-        self.assertNotIn("Pierre Lavoie", self.get("/?q=gagnon")[1])
+        self.assertNotIn("Marie Gagnon", self.get("/chantiers?paiement=non_facture")[1])
+        self.assertIn("Pierre Lavoie", self.get("/chantiers?paiement=non_facture")[1])
+        self.assertIn("Luc Boucher", self.get("/chantiers?statut=planifie")[1])
+        self.assertNotIn("Pierre Lavoie", self.get("/chantiers?statut=planifie")[1])
+        self.assertIn("Marie Gagnon", self.get("/chantiers?q=erables")[1])             # « Érables » trouvé sans accent
+        self.assertIn("Marie Gagnon", self.get("/chantiers?q=450-555-0142")[1])
+        self.assertNotIn("Pierre Lavoie", self.get("/chantiers?q=gagnon")[1])
 
     def test_pages_de_detail_et_introuvable(self):
         statut, page = self.get("/chantier/1")
@@ -81,17 +81,18 @@ class TestPages(BaseInterface):
         self.assertTrue(self.get("/nimporte")[0].startswith("404"))
 
     def test_recherche_de_client_existant(self):
-        self.assertIn("/nouveau?client_id=2", self.get("/nouveau?q=lavoie")[1])
+        self.assertIn('href="/client/2"', self.get("/nouveau?q=lavoie")[1])           # on passe par la fiche du client
         self.assertIn("Aucun client trouvé", self.get("/nouveau?q=zzz")[1])
-        self.assertIn("Nouveau chantier pour", self.get("/nouveau?client_id=2")[1])
+        statut, en_tetes, _ = interface.repondre(self.db, "GET", "/nouveau", {"client_id": "2"})
+        self.assertEqual((statut[:3], dict(en_tetes)["Location"]), ("303", "/client/2"))
 
     def test_html_est_echappe(self):
         self.post("/nouveau", fiche(client_nom="<script>alert(1)</script>", description="<img src=x onerror=alert(2)>"))
-        for chemin in ("/", "/chantier/4", "/nouveau?q=script"):
+        for chemin in ("/chantiers", "/chantier/4", "/nouveau?q=script", "/clients", "/client/4", "/"):
             page = self.get(chemin)[1]
             self.assertNotIn("<script>alert", page, chemin)
             self.assertNotIn("<img src=x", page, chemin)
-        self.assertIn("&lt;script&gt;", self.get("/")[1])
+        self.assertIn("&lt;script&gt;", self.get("/chantiers")[1])
 
 
 class TestCreation(BaseInterface):
@@ -130,16 +131,6 @@ class TestCreation(BaseInterface):
         self.assertEqual(en_tetes["Location"], "/chantier/4?ok=cree_reutilise")
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
         self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id = 4"), [(1,)])
-
-    def test_nouveau_chantier_pour_client_existant(self):
-        _, en_tetes, _ = self.post("/nouveau", fiche(client_id="2", client_nom="Lavoie", client_prenom="Pierre",
-                                                     adresse="Lot 12-4, Rang du Ruisseau", ville="Mirabel",
-                                                     client_telephone="+14505550177", latitude="45.6480", longitude="-74.0920",
-                                                     type_emondage="", type_taille_haie="1"))
-        self.assertTrue(en_tetes["Location"].startswith("/chantier/4"))
-        self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
-        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 2"), [(2,)])
-        self.assertEqual(self.sql("SELECT geocode_statut FROM clients WHERE id = 2"), [("manuel",)])
 
 
 class TestModification(BaseInterface):
@@ -241,12 +232,12 @@ class TestPaiementsEtSuppression(BaseInterface):
         self.assertIn("a des paiements", page)
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
         statut, en_tetes, _ = self.post("/chantier/2/supprimer", {})        # aucun paiement
-        self.assertEqual(en_tetes["Location"], "/?ok=supprime")
+        self.assertEqual(en_tetes["Location"], "/chantiers?ok=supprime")
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(2,)])
         self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 2"), [(0,)])
 
     def test_client_avec_autre_chantier_n_est_pas_supprime(self):
-        self.post("/nouveau", fiche(client_id="2", client_nom="Lavoie", adresse="Lot 12-4, Rang du Ruisseau", ville="Mirabel"))
+        self.post("/client/2/chantier/nouveau", {"type_emondage": "1"})
         self.post("/chantier/2/supprimer", {})
         self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 2"), [(1,)])
 
@@ -279,7 +270,7 @@ class TestServeurReel(BaseInterface):
             return e.code, e.headers, e.read().decode()
 
     def test_get_et_post_legitimes(self):
-        statut, _, page = self.requete("/")
+        statut, _, page = self.requete("/chantiers")
         self.assertEqual(statut, 200)
         self.assertIn("Marie Gagnon", page)
         statut, entetes, _ = self.requete("/nouveau", fiche(), {"Origin": f"http://127.0.0.1:{self.port}"})
