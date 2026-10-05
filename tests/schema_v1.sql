@@ -6,7 +6,6 @@
 --          ou  python3 outils/importer_saisie.py ...   (crée la base si absente)
 --
 -- Modèle :  clients 1─N chantiers 1─N paiements
---                         └─N chantier_travaux (un ou plusieurs types de travaux, avec précision)
 --   clients    = la personne / l'entreprise ET son adresse (géocodée UNE fois)
 --   chantiers  = un travail pour un client (statut, date, durée, prix) :
 --                un client qui revient = un nouveau chantier, jamais une nouvelle fiche
@@ -28,7 +27,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 2;
+PRAGMA user_version = 1;
 
 
 -- -----------------------------------------------------------------------------
@@ -118,9 +117,10 @@ CREATE TABLE clients (
 CREATE TABLE chantiers (
     id              INTEGER PRIMARY KEY,
     client_id       INTEGER NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
+    type_travaux    TEXT NOT NULL REFERENCES types_travaux(code),
 
-    description     TEXT,     -- description générale (imprimée sur la feuille de route) ;
-                              -- le détail par type de travaux est dans chantier_travaux
+    description     TEXT,     -- ce qu'il y a à faire (imprimé sur la feuille de route)
+    notes           TEXT,     -- remarques propres à ce chantier
 
     -- soumission = estimé donné, réponse attendue     refuse  = client a dit non
     -- accepte    = accepté, pas encore de date         planifie = date fixée
@@ -128,10 +128,9 @@ CREATE TABLE chantiers (
     statut          TEXT NOT NULL DEFAULT 'soumission',
 
     date_soumission TEXT,     -- AAAA-MM-JJ
-    date_prevue     TEXT,     -- AAAA-MM-JJ : UNE seule date des travaux. Prévue tant que non fait ;
-                              -- si le chantier change de jour, on met simplement cette date à jour.
-                              -- Obligatoire si statut = planifie ou termine.
+    date_prevue     TEXT,     -- AAAA-MM-JJ  (obligatoire si statut = planifie)
     heure_prevue    TEXT,     -- HH:MM       (facultatif : rendez-vous fixe)
+    date_realisee   TEXT,     -- AAAA-MM-JJ  (obligatoire si, et seulement si, statut = termine)
 
     duree_estimee_h REAL,     -- heures décimales, temps écoulé sur place
     duree_reelle_h  REAL,     -- idem, mesuré après coup (sert à améliorer les estimés)
@@ -155,6 +154,7 @@ CREATE TABLE chantiers (
     -- Dates : `date(x, '+0 days') IS x` rejette 2026-02-30, 2026-13-01, 14/06/2026, "2026-06-14 10:00".
     CONSTRAINT ck_chantiers_date_soumission CHECK (date_soumission IS NULL OR date(date_soumission, '+0 days') IS date_soumission),
     CONSTRAINT ck_chantiers_date_prevue     CHECK (date_prevue     IS NULL OR date(date_prevue, '+0 days')     IS date_prevue),
+    CONSTRAINT ck_chantiers_date_realisee   CHECK (date_realisee   IS NULL OR date(date_realisee, '+0 days')   IS date_realisee),
     CONSTRAINT ck_chantiers_date_facture    CHECK (date_facture    IS NULL OR date(date_facture, '+0 days')    IS date_facture),
     CONSTRAINT ck_chantiers_heure_prevue
         CHECK (heure_prevue IS NULL OR (time(heure_prevue) IS heure_prevue || ':00' AND heure_prevue < '24:00')),
@@ -177,7 +177,7 @@ CREATE TABLE chantiers (
     CONSTRAINT ck_chantiers_planifie_a_une_date
         CHECK (statut <> 'planifie' OR date_prevue IS NOT NULL),
     CONSTRAINT ck_chantiers_termine_a_une_date
-        CHECK (statut <> 'termine' OR date_prevue IS NOT NULL),
+        CHECK ((statut = 'termine') = (date_realisee IS NOT NULL)),
     CONSTRAINT ck_chantiers_facture_a_un_prix
         CHECK (date_facture IS NULL OR prix_ht IS NOT NULL),
     CONSTRAINT ck_chantiers_numero_facture
@@ -194,17 +194,6 @@ CREATE TABLE chantiers (
                AND fichier_papier NOT GLOB '/*' AND fichier_papier NOT GLOB '*/'
                AND fichier_papier NOT GLOB '*\*' AND fichier_papier NOT GLOB '*..*'
                AND fichier_papier NOT GLOB '[A-Za-z]:*'))
-);
-
--- -----------------------------------------------------------------------------
--- Travaux d'un chantier : un chantier peut combiner plusieurs types (élagage +
--- taille de haie...), chacun avec sa précision (« érable argenté côté garage »).
--- -----------------------------------------------------------------------------
-CREATE TABLE chantier_travaux (
-    chantier_id  INTEGER NOT NULL REFERENCES chantiers(id) ON DELETE CASCADE,
-    type_travaux TEXT NOT NULL REFERENCES types_travaux(code),
-    precision    TEXT,
-    PRIMARY KEY (chantier_id, type_travaux)
 );
 
 CREATE INDEX idx_chantiers_client     ON chantiers(client_id);
@@ -257,17 +246,9 @@ WITH recu AS (
 base AS (
     SELECT
         c.id AS chantier_id,
-        c.statut,
-        (SELECT group_concat(code, '+') FROM (SELECT ct.type_travaux AS code FROM chantier_travaux ct
-            WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS types_codes,
-        (SELECT group_concat(libelle, ' + ') FROM (SELECT t.libelle FROM chantier_travaux ct
-            JOIN types_travaux t ON t.code = ct.type_travaux
-            WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS type_libelle,
-        (SELECT group_concat(detail, ' ; ') FROM (SELECT t.libelle || COALESCE(' : ' || ct.precision, '') AS detail
-            FROM chantier_travaux ct JOIN types_travaux t ON t.code = ct.type_travaux
-            WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS travaux_detail,
-        c.description,
-        c.date_soumission, c.date_prevue, c.heure_prevue,
+        c.statut, c.type_travaux, t.libelle AS type_libelle,
+        c.description, c.notes,
+        c.date_soumission, c.date_prevue, c.heure_prevue, c.date_realisee,
         c.duree_estimee_h, c.duree_reelle_h,
 
         cl.id AS client_id, cl.prenom, cl.nom, cl.entreprise,
@@ -286,6 +267,7 @@ base AS (
         c.dossier_photos, c.fichier_papier, c.ref_papier
     FROM chantiers c
     JOIN clients cl       ON cl.id = c.client_id
+    JOIN types_travaux t  ON t.code = c.type_travaux
     LEFT JOIN recu r      ON r.chantier_id = c.id
 ),
 calcul AS (

@@ -34,9 +34,11 @@ coûte 10 minutes, pas après 150 fiches.
 ## Phase 1 — Essai à blanc sur de fausses données (1 h)
 
 ```bash
-python3 outils/donnees_test.py                    # crée data/test.db : ~40 chantiers fictifs
-python3 outils/interface.py --db data/test.db     # ouvre l'interface dessus
+python3 outils/interface.py --essai               # crée data/test.db (~40 chantiers fictifs) au besoin et l'ouvre
 ```
+
+Le bandeau orange **« BASE D’ESSAI : test.db »** en haut à droite confirme que tu es sur les fausses données ; sur ta
+vraie base, il affiche simplement « Base : sylvainculteur.db ».
 
 Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 
@@ -44,11 +46,12 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 |---|---|---|
 | 1 | Page d'accueil : cliquer la puce « à facturer » | seuls les chantiers faits et non facturés s'affichent, avec leur solde |
 | 2 | Chercher un client par nom **sans accent** (ex. « cote » pour Côté), puis par téléphone | le bon client apparaît |
-| 3 | **Nouveau chantier**, client neuf : nom, adresse, ville, type, statut « Soumission » | « Chantier créé » ; le chantier apparaît dans la liste |
+| 3 | **Nouveau chantier**, client neuf : nom, adresse, ville, au moins un type coché, statut « Soumission » | « Chantier créé » ; le chantier apparaît dans la liste |
 | 4 | **Client qui revient** : « Nouveau chantier » → chercher son nom → cliquer sa fiche → choisir un type | adresse et téléphone déjà remplis ; **aucun nouveau client** créé |
-| 5 | Passer le chantier de 3 à « Planifié » **sans** date prévue | l'enregistrement est refusé, avec un message clair |
-| 6 | Mettre une date prévue + une heure + une durée estimée (ex. `2,5`) | enregistré ; `2,5` est compris comme 2 h 30 |
-| 7 | Le passer à « Terminé » avec la date réalisée | statut « À facturer » (si prix saisi) |
+| 5 | Passer le chantier de 3 à « Planifié » **sans** date | l'enregistrement est refusé, avec un message clair |
+| 6 | Mettre une date + une heure + une durée estimée (ex. `2,5`) | enregistré ; `2,5` est compris comme 2 h 30 |
+| 7 | Changer la date du chantier (« il est déplacé à jeudi »), puis le passer à « Terminé » | **une seule date** : elle se met à jour ; statut « À facturer » (si prix saisi) |
+| 7b | **Plusieurs types** : cocher « Élagage » et « Taille de haie » et écrire une précision pour chacun | la page du chantier affiche « Élagage : … ; Taille de haie : … » |
 | 8 | Saisir le prix + cocher « Calculer TPS et TVQ » + n° et date de facture | total = prix + 5 % + 9,975 % ; statut « Facturé, à recevoir » |
 | 9 | Ajouter un **acompte**, puis le **solde** | « Partiel » puis « Payé » ; solde à 0 |
 | 10 | Se tromper exprès : téléphone `123`, code postal `ZZZ`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
@@ -142,3 +145,5 @@ Quand c'est validé, on enchaîne sur l'étape 2 (géocodage, itinéraire, feuil
 | « La base est occupée » | DB Browser a la base ouverte en écriture | fermer DB Browser (ou « Écrire les modifications ») |
 | Les accents s'affichent mal dans un CSV | encodage du tableur | enregistrer en UTF-8 ; l'import lit aussi le Windows-1252 |
 | Une date est refusée | format | l'interface utilise un sélecteur de date ; dans un CSV, `AAAA-MM-JJ` seulement |
+| L'interface est vide alors que tu as créé la base d'essai | tu as ouvert la vraie base | lancer avec `--essai` (ou `--db data/test.db`) ; l'étiquette en haut à droite indique la base ouverte |
+| « La base utilise l'ancien format (v1) » | base créée avant la mise à jour | `python outils/migrer.py data/sylvainculteur.db` : convertit sans rien perdre (sauvegarde faite avant) |

@@ -22,7 +22,7 @@ EXEMPLES = RACINE / "modeles" / "saisie_papier_exemples.csv"
 
 def fiche(**perso):
     base = dict(client_nom="Roy", client_prenom="Sylvie", client_telephone="450-555-0111", client_sms_ok="1",
-                adresse="22 Rue des Pins", ville="Mirabel", province="QC", type_travaux="emondage", statut="soumission")
+                adresse="22 Rue des Pins", ville="Mirabel", province="QC", type_emondage="1", statut="soumission")
     base.update(perso)
     return base
 
@@ -126,7 +126,7 @@ class TestCreation(BaseInterface):
 
     def test_meme_adresse_reutilise_le_client(self):
         _, en_tetes, _ = self.post("/nouveau", fiche(client_nom="Gagnon", client_prenom="Marie", adresse="123 rue des erables",
-                                                     ville="Saint-Jerome", type_travaux="elagage"))
+                                                     ville="Saint-Jerome", type_emondage="", type_elagage="1"))
         self.assertEqual(en_tetes["Location"], "/chantier/4?ok=cree_reutilise")
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
         self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id = 4"), [(1,)])
@@ -135,7 +135,7 @@ class TestCreation(BaseInterface):
         _, en_tetes, _ = self.post("/nouveau", fiche(client_id="2", client_nom="Lavoie", client_prenom="Pierre",
                                                      adresse="Lot 12-4, Rang du Ruisseau", ville="Mirabel",
                                                      client_telephone="+14505550177", latitude="45.6480", longitude="-74.0920",
-                                                     type_travaux="taille_haie"))
+                                                     type_emondage="", type_taille_haie="1"))
         self.assertTrue(en_tetes["Location"].startswith("/chantier/4"))
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 2"), [(2,)])
@@ -161,14 +161,44 @@ class TestModification(BaseInterface):
         self.assertEqual(self.sql("SELECT * FROM clients ORDER BY id") + self.sql("SELECT * FROM chantiers ORDER BY id"), avant)
 
     def test_passer_a_termine_exige_la_date(self):
-        f = {**self.formulaire_de(3), "statut": "termine", "client_sms_ok": "1"}
-        _, _, page = self.post("/chantier/3", f)
-        self.assertIn("date_realisee est obligatoire", page)
-        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 3"), [("planifie",)])
-        self.post("/chantier/3", {**f, "date_realisee": "2026-10-14", "duree_reelle_h": "6,5"})
-        self.assertEqual(self.sql("SELECT statut, date_realisee, duree_reelle_h FROM chantiers WHERE id = 3"),
+        self.post("/nouveau", fiche(statut="accepte"))                        # chantier #4, sans date
+        f = {**self.formulaire_de(4), "statut": "termine", "client_sms_ok": "1"}
+        _, _, page = self.post("/chantier/4", f)
+        self.assertIn("date_prevue est obligatoire", page)
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 4"), [("accepte",)])
+        self.post("/chantier/4", {**f, "date_prevue": "2026-10-14", "duree_reelle_h": "6,5"})
+        self.assertEqual(self.sql("SELECT statut, date_prevue, duree_reelle_h FROM chantiers WHERE id = 4"),
                          [("termine", "2026-10-14", 6.5)])
-        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 3"), [("partiel",)])
+
+    def test_une_seule_date_changer_le_jour_met_a_jour_la_date_prevue(self):
+        f = {**self.formulaire_de(3), "client_sms_ok": "1"}
+        self.post("/chantier/3", {**f, "date_prevue": "2026-10-16"})          # le chantier est déplacé
+        self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 3"), [("planifie", "2026-10-16")])
+        self.post("/chantier/3", {**f, "date_prevue": "2026-10-16", "statut": "termine"})   # puis il est fait ce jour-là
+        self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 3"), [("termine", "2026-10-16")])
+        self.assertNotIn("Date réalisée", self.get("/chantier/3")[1])
+
+    def test_plusieurs_types_avec_precision_et_une_seule_description(self):
+        _, _, page = self.post("/chantier/1", {**self.formulaire_de(1), "client_sms_ok": "1",
+                                                "type_elagage": "1", "precision_elagage": "érable côté garage",
+                                                "precision_taille_haie": "cèdres, 35 m",
+                                                "precision_abattage": "frêne mort"})   # précision seule : le type est coché d'office
+        self.assertEqual(self.sql("SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = 1 ORDER BY type_travaux"),
+                         [("abattage", "frêne mort"), ("elagage", "érable côté garage"), ("taille_haie", "cèdres, 35 m")])
+        detail = self.get("/chantier/1")[1]
+        self.assertIn("Élagage : érable côté garage", detail)
+        self.assertIn('name="precision_elagage" value="érable côté garage"', detail)
+        self.assertIn('name="type_elagage" value="1" checked', detail)
+        self.assertEqual(detail.count('name="description"'), 1)           # une seule description
+        self.assertNotIn('name="notes"', detail)                          # plus de notes de chantier
+
+    def test_au_moins_un_type_de_travaux(self):
+        _, _, page = self.post("/nouveau", fiche(type_emondage=""))
+        self.assertIn("au moins un type de travaux", page)
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
+
+    def test_la_base_ouverte_est_toujours_affichee(self):
+        self.assertIn("BASE D’ESSAI : t.db", self.get("/")[1])       # t.db n'est pas la vraie base
 
     def test_changer_l_adresse_efface_les_coordonnees_perimees(self):
         f = {**self.formulaire_de(2), "client_sms_ok": "1"}

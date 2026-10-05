@@ -70,34 +70,33 @@ class TestSchema(unittest.TestCase):
             self.c.execute(sql, args)
 
     def test_version_et_integrite(self):
-        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 1)
+        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 2)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
         for d in ("2026-02-30", "2026-02-29", "2026-04-31", "2026-13-01", "14/06/2026", "2026-6-1", "2026-06-14 10:00"):
-            self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut, date_prevue) VALUES (1,'emondage','accepte',?)", (d,))
+            self.refuse("INSERT INTO chantiers (client_id, statut, date_prevue) VALUES (1,'accepte',?)", (d,))
 
     def test_dates_valides_acceptees(self):
         for d in ("2028-02-29", "2026-02-28", "2026-12-31", "2026-04-30"):   # 2028 est bissextile
-            self.c.execute("INSERT INTO chantiers (client_id, type_travaux, statut, date_prevue) VALUES (1,'emondage','accepte',?)", (d,))
+            self.c.execute("INSERT INTO chantiers (client_id, statut, date_prevue) VALUES (1,'accepte',?)", (d,))
 
     def test_coherence_statut(self):
-        self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut) VALUES (1,'emondage','planifie')")
-        self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut) VALUES (1,'emondage','termine')")
-        self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut, date_realisee) VALUES (1,'emondage','accepte','2026-01-01')")
-        self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut) VALUES (1,'emondage','fini')")
+        self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'planifie')")
+        self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'termine')")
+        self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'fini')")
 
     def test_argent_et_durees(self):
         for prix in (450.123, -1, "abc"):
-            self.refuse("INSERT INTO chantiers (client_id, type_travaux, prix_ht) VALUES (1,'emondage',?)", (prix,))
+            self.refuse("INSERT INTO chantiers (client_id, prix_ht) VALUES (1,?)", (prix,))
         for duree in (0, 25, "2h"):
-            self.refuse("INSERT INTO chantiers (client_id, type_travaux, duree_estimee_h) VALUES (1,'emondage',?)", (duree,))
-        self.refuse("INSERT INTO chantiers (client_id, type_travaux, date_facture) VALUES (1,'emondage','2026-06-14')")
+            self.refuse("INSERT INTO chantiers (client_id, duree_estimee_h) VALUES (1,?)", (duree,))
+        self.refuse("INSERT INTO chantiers (client_id, date_facture) VALUES (1,'2026-06-14')")
 
     def test_chemins_relatifs_stricts(self):
         for chemin in ("/abs/photos", "photos/", "photos\\2026", "photos/../x", "C:photos"):
-            self.refuse("INSERT INTO chantiers (client_id, type_travaux, dossier_photos) VALUES (1,'emondage',?)", (chemin,))
-        self.c.execute("INSERT INTO chantiers (client_id, type_travaux, dossier_photos) VALUES (1,'emondage','photos/2026/x_y')")
+            self.refuse("INSERT INTO chantiers (client_id, dossier_photos) VALUES (1,?)", (chemin,))
+        self.c.execute("INSERT INTO chantiers (client_id, dossier_photos) VALUES (1,'photos/2026/x_y')")
 
     def test_clients(self):
         self.refuse("INSERT INTO clients (prenom, adresse, ville) VALUES ('SansNom', '1 A', 'V')")
@@ -112,24 +111,28 @@ class TestSchema(unittest.TestCase):
         self.c.execute("INSERT INTO clients (nom, adresse, ville, latitude, longitude, geocode_statut) VALUES ('X', 'Lot 3', 'V', 45.65, -74.08, 'manuel')")
 
     def test_integrite_referentielle(self):
-        self.refuse("INSERT INTO chantiers (client_id, type_travaux) VALUES (1,'pizza')")
+        self.c.execute("INSERT INTO chantiers (client_id) VALUES (1)")
+        self.refuse("INSERT INTO chantier_travaux (chantier_id, type_travaux) VALUES (1, 'pizza')")
+        self.refuse("INSERT INTO chantier_travaux (chantier_id, type_travaux) VALUES (99, 'emondage')")
+        self.c.execute("INSERT INTO chantier_travaux (chantier_id, type_travaux, precision) VALUES (1, 'emondage', 'érable')")
+        self.refuse("INSERT INTO chantier_travaux (chantier_id, type_travaux) VALUES (1, 'emondage')")   # même type deux fois
         self.refuse("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (99,'2026-06-14',5,'interac')")
-        self.c.execute("INSERT INTO chantiers (client_id, type_travaux) VALUES (1,'emondage')")
+        self.c.execute("INSERT INTO chantiers (client_id) VALUES (1)")
         self.refuse("DELETE FROM clients WHERE id = 1")
         self.refuse("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (1,'2026-06-14',0,'interac')")
         self.refuse("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (1,'2026-06-14',5,'bitcoin')")
 
     def statut(self, **chantier):
         cols = ", ".join(chantier)
-        self.c.execute(f"INSERT INTO chantiers (client_id, type_travaux, {cols}) VALUES (1,'emondage',{', '.join('?' * len(chantier))})",
+        self.c.execute(f"INSERT INTO chantiers (client_id, {cols}) VALUES (1,{', '.join('?' * len(chantier))})",
                        tuple(chantier.values()))
         return self.c.execute("SELECT statut_paiement, total_ttc, paye, solde FROM v_chantiers ORDER BY chantier_id DESC LIMIT 1").fetchone()
 
     def test_statuts_de_paiement_calcules(self):
         self.assertEqual(self.statut(statut="soumission", prix_ht=100)[0], "sans_objet")
         self.assertEqual(self.statut(statut="accepte", prix_ht=100)[0], "a_venir")
-        self.assertEqual(self.statut(statut="termine", date_realisee="2026-06-01")[0], "prix_manquant")
-        r = self.statut(statut="termine", date_realisee="2026-06-01", prix_ht=100, tps=5, tvq=9.98)
+        self.assertEqual(self.statut(statut="termine", date_prevue="2026-06-01")[0], "prix_manquant")
+        r = self.statut(statut="termine", date_prevue="2026-06-01", prix_ht=100, tps=5, tvq=9.98)
         self.assertEqual(r, ("non_facture", 114.98, 0, 114.98))
         cid = self.c.execute("SELECT max(id) FROM chantiers").fetchone()[0]
         self.c.execute("UPDATE chantiers SET date_facture = '2026-06-02' WHERE id = ?", (cid,))
@@ -141,7 +144,7 @@ class TestSchema(unittest.TestCase):
 
     def test_adresse_maps(self):
         self.c.execute("UPDATE clients SET adresse = '123 Rue des Érables', ville = 'Saint-Jérôme', code_postal = 'J7Z 1A1' WHERE id = 1")
-        self.c.execute("INSERT INTO chantiers (client_id, type_travaux) VALUES (1,'emondage')")
+        self.c.execute("INSERT INTO chantiers (client_id) VALUES (1)")
         self.assertEqual(self.c.execute("SELECT adresse_maps FROM v_chantiers").fetchone()[0],
                          "123 Rue des Érables, Saint-Jérôme, QC J7Z 1A1, Canada")
         self.c.execute("UPDATE clients SET code_postal = NULL WHERE id = 1")
@@ -217,7 +220,7 @@ class TestImportSouple(BaseTest):
         """Point-virgule, Windows-1252, virgule décimale, « 1 250,00 $ », téléphone et code postal libres."""
         chemin = self.ecrire_csv([ligne_valide(
             client_nom="Côté", client_telephone="(450) 555-0142", code_postal="j7z1a1", adresse="5 Rue Éléonore",
-            type_travaux="Taille de haie", statut="Terminé", date_realisee="2026-06-14", prix_ht="1 250,00 $",
+            type_travaux="Taille de haie", statut="Terminé", prix_ht="1 250,00 $",
             tps="62,50", tvq="124,69", duree_estimee_h="2,5", heure_prevue="8h30", date_prevue="2026-06-14",
             paiement_date="2026-06-14", paiement_montant="1437,19", paiement_mode="Chèque")],
             delimiteur=";", encodage="cp1252")
@@ -226,8 +229,9 @@ class TestImportSouple(BaseTest):
         self.assertIn("Windows-1252", " ".join(res.avertissements))
         self.assertEqual(self.requete("SELECT nom, telephone FROM clients"), [("Côté", "+14505550142")])
         self.assertEqual(self.requete("SELECT code_postal FROM clients"), [("J7Z 1A1",)])
-        self.assertEqual(self.requete("SELECT type_travaux, statut, prix_ht, duree_estimee_h, heure_prevue FROM chantiers"),
-                         [("taille_haie", "termine", 1250.0, 2.5, "08:30")])
+        self.assertEqual(self.requete("SELECT statut, prix_ht, duree_estimee_h, heure_prevue FROM chantiers"),
+                         [("termine", 1250.0, 2.5, "08:30")])
+        self.assertEqual(self.requete("SELECT type_travaux, precision FROM chantier_travaux"), [("taille_haie", None)])
         self.assertEqual(self.requete("SELECT statut_paiement FROM v_chantiers"), [("paye",)])
 
     def test_colonnes_inutiles_peuvent_etre_supprimees(self):
@@ -257,6 +261,36 @@ class TestImportSouple(BaseTest):
         self.assertIn("même adresse et même téléphone", messages)
         self.assertIn("mais à une autre adresse", messages)
 
+    def test_plusieurs_types_de_travaux_avec_precisions(self):
+        chemin = self.ecrire_csv([
+            ligne_valide(type_travaux="Élagage: érable argenté, côté garage + taille_haie : cèdres, 35 m + abattage"),
+            ligne_valide(adresse="2 Rue B", type_travaux="emondage"),
+        ])
+        res = imp.importer(chemin, self.db)
+        self.assertEqual((res.erreurs, res.chantiers), ([], 2))
+        self.assertEqual(self.requete("SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = 1 ORDER BY type_travaux"),
+                         [("abattage", None), ("elagage", "érable argenté, côté garage"), ("taille_haie", "cèdres, 35 m")])
+        self.assertEqual(self.requete("SELECT types_codes, travaux_detail FROM v_chantiers WHERE chantier_id = 1"),
+                         [("abattage+elagage+taille_haie", "Abattage ; Élagage : érable argenté, côté garage ; Taille de haie : cèdres, 35 m")])
+        # le même fichier relancé : doublons reconnus (mêmes types), pas de nouveau chantier
+        res = imp.importer(chemin, self.db)
+        self.assertEqual((res.chantiers, res.doublons), (0, 2))
+        # mêmes champs mais autre combinaison de types : c'est un autre chantier
+        res = imp.importer(self.ecrire_csv([ligne_valide(type_travaux="elagage + abattage")], nom="b.csv"), self.db)
+        self.assertEqual((res.chantiers, res.doublons), (1, 0))
+
+    def test_types_de_travaux_invalides(self):
+        chemin = self.ecrire_csv([
+            ligne_valide(type_travaux="elagage + pizza"),
+            ligne_valide(adresse="2 B", type_travaux="elagage + élagage"),
+            ligne_valide(adresse="3 C", type_travaux=""),
+            ligne_valide(adresse="4 D", type_travaux="+"),
+        ])
+        res = imp.importer(chemin, self.db)
+        self.assertEqual([no for no, _ in res.erreurs], [2, 3, 4, 5])
+        self.assertIn("pizza", res.erreurs[0][1][0])
+        self.assertIn("deux fois", res.erreurs[1][1][0])
+
     def test_taxes_auto(self):
         chemin = self.ecrire_csv([ligne_valide(prix_ht="2200.00"), ligne_valide(adresse="2 B", prix_ht="480.00", tps="0", tvq="0")])
         imp.importer(chemin, self.db, taxes_auto=True)
@@ -268,10 +302,10 @@ class TestErreurs(BaseTest):
     def test_toutes_les_erreurs_sont_listees_et_rien_n_est_ecrit(self):
         chemin = self.ecrire_csv([
             ligne_valide(),                                                                   # ligne 2 : bonne
-            ligne_valide(date_realisee="14/06/2026", statut="termine"),                       # ligne 3 : date
+            ligne_valide(date_prevue="14/06/2026", statut="termine"),                          # ligne 3 : date
             ligne_valide(client_telephone="12345", code_postal="ZZZ"),                        # ligne 4 : tél + code postal
             ligne_valide(type_travaux="pizza", statut="fini"),                                # ligne 5 : listes
-            ligne_valide(statut="termine"),                                                   # ligne 6 : date_realisee manquante
+            ligne_valide(statut="termine"),                                                   # ligne 6 : date des travaux manquante
             ligne_valide(adresse="7 Rue Sept", date_facture="2026-06-14"),                    # ligne 7 : refusée par la base
             ligne_valide(paiement_montant="50"),                                              # ligne 8 : paiement incomplet
             ligne_valide(latitude="45.6", longitude="74.1"),                                  # ligne 9 : longitude sans « - »

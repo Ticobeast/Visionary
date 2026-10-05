@@ -29,11 +29,11 @@ RUES = ["Rue des Érables", "Rue des Pins", "Boulevard du Lac", "Chemin des Cèd
 VILLES = [("Saint-Jérôme", "J7Z"), ("Blainville", "J7C"), ("Mirabel", "J7J"), ("Sainte-Thérèse", "J7E"),
           ("Saint-Eustache", "J7R"), ("Prévost", "J0R"), ("Boisbriand", "J7G"), ("Lorraine", "J6Z")]
 TYPES = {  # code: (prix min, prix max, description)
-    "taille_haie": (250, 900, "Taille de haie de cèdres, environ {n} m. Résidus ramassés."),
-    "emondage": (300, 1500, "Émondage de {n} arbres matures. Branches ramassées."),
-    "elagage": (400, 1800, "Élagage d'un grand arbre au-dessus de la maison. Grimpeur requis."),
-    "abattage": (600, 2500, "Abattage d'un arbre mort, {n} m. Débitage et ramassage."),
-    "essouchement": (150, 500, "Essouchement de {n} souches."),
+    "taille_haie": (250, 900, "haie de cèdres, environ {n} m"),
+    "emondage": (300, 1500, "{n} arbres matures"),
+    "elagage": (400, 1800, "grand arbre au-dessus de la maison, grimpeur requis"),
+    "abattage": (600, 2500, "arbre mort d'environ {n} m, débitage inclus"),
+    "essouchement": (150, 500, "{n} souches"),
 }
 MODES = ["interac", "interac", "cheque", "comptant", "carte"]
 
@@ -64,13 +64,18 @@ def generer(db, nombre=40, graine=2026):
         pmin, pmax, modele = TYPES[type_]
         prix = round(rnd.randint(pmin, pmax) / 5) * 5
         duree = max(1.0, round(prix / 250 * 2) / 2)
-        ligne = {**c, "type_travaux": type_, "description": modele.format(n=rnd.randint(2, 40)),
+        travaux = f"{type_}: {modele.format(n=rnd.randint(2, 40))}"
+        if rnd.random() < 0.2:      # un chantier sur cinq combine deux types de travaux
+            autre = rnd.choice([t_ for t_ in TYPES if t_ != type_])
+            travaux += f" + {autre}: {TYPES[autre][2].format(n=rnd.randint(2, 20))}"
+            prix += round(rnd.randint(TYPES[autre][0], TYPES[autre][1]) / 5) * 5
+        ligne = {**c, "type_travaux": travaux, "description": rnd.choice(["", "", "Résidus ramassés.", "Appeler avant de venir."]),
                  "duree_estimee_h": f"{min(duree, 8):g}", "prix_ht": f"{prix:.2f}", "ref_papier": f"Classeur A, fiche {k + 1}"}
         sort = rnd.random()
         if sort < 0.70:        # passé : terminé
             realise = aujourdhui - datetime.timedelta(days=rnd.randint(8, 540))
             ligne.update(statut="termine", date_soumission=jour(realise - datetime.timedelta(days=rnd.randint(3, 20))),
-                         date_prevue=jour(realise), date_realisee=jour(realise),
+                         date_prevue=jour(realise),
                          duree_reelle_h=f"{min(duree + rnd.choice([-0.5, 0, 0, 0.5, 1]), 8):g}")
             etat = rnd.random()
             if etat < 0.70:    # facturé et payé

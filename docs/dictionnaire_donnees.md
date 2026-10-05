@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v1)
+# Dictionnaire de données (schéma v2)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -6,13 +6,14 @@ désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle
 ```
 clients (personne/entreprise + adresse) 1 ─── N chantiers 1 ─── N paiements
                                                   │
-                                                  └── type_travaux → types_travaux (table de référence)
+                                                  └── N chantier_travaux → types_travaux (types + précision)
 ```
 
 | Table | Une ligne = | Pourquoi une table à part |
 |---|---|---|
 | `clients` | une personne ou une entreprise, **avec son adresse** | un client revient : on ne retape ni son téléphone ni son adresse ; l'adresse est géocodée une seule fois |
 | `chantiers` | un travail pour un client (environ 2 h : plusieurs par journée) | c'est l'unité que l'itinéraire, la feuille de route et la facturation manipulent ; garder les chantiers séparés conserve l'historique d'un client récurrent |
+| `chantier_travaux` | un type de travaux d'un chantier, avec sa précision | un chantier peut combiner plusieurs types (élagage + taille de haie) |
 | `paiements` | une somme reçue | acompte + solde, chèque en deux versements… |
 | `types_travaux` | un type de travaux | on ajoute un type avec un `INSERT`, sans modifier le schéma |
 
@@ -68,14 +69,11 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 |---|---|---|---|---|
 | `id` | entier | auto | | |
 | `client_id` | entier | oui | → `clients.id` ; un client ne peut pas être supprimé s'il a des chantiers | `1` |
-| `type_travaux` | texte | oui | un `code` de `types_travaux` : `emondage`, `elagage`, `taille_haie`, `abattage`, `essouchement`, `autre` | `taille_haie` |
-| `description` | texte | non | ce qu'il y a à faire — **sera imprimé sur la feuille de route** | `Haie de cèdres, 35 m, hauteur 2 m` |
-| `notes` | texte | non | remarques propres à ce chantier | `Prévenir le gardien la veille` |
+| `description` | texte | non | **la** description du chantier (une seule), imprimée sur la feuille de route ; le détail par type est dans `chantier_travaux` | `Résidus ramassés. Prévenir le gardien la veille.` |
 | `statut` | texte | oui, défaut `soumission` | voir ci-dessous | `planifie` |
 | `date_soumission` | date | non | quand l'estimé a été donné | `2026-05-28` |
-| `date_prevue` | date | **si `planifie`** | jour prévu (c'est elle que le script d'itinéraire filtre) | `2026-10-14` |
+| `date_prevue` | date | **si `planifie` ou `termine`** | **la** date des travaux : prévue d'abord, puis réalisée. Si le chantier change de jour, on la met simplement à jour. C'est elle que le script d'itinéraire filtre | `2026-10-14` |
 | `heure_prevue` | heure | non | seulement pour un rendez-vous fixe | `08:00` |
-| `date_realisee` | date | **si, et seulement si, `termine`** | | `2026-06-14` |
 | `duree_estimee_h` | réel | non | pour l'itinéraire et la feuille de route | `3.0` |
 | `duree_reelle_h` | réel | non | mesurée après coup, pour affiner les estimés | `3.5` |
 | `prix_ht` | réel | non | avant taxes ; estimé tant que non facturé, puis final | `480.00` |
@@ -88,6 +86,21 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `ref_papier` | texte | non | où retrouver l'original en attendant le scan | `Classeur A, fiche 12` |
 | `cree_le` | texte | auto | | |
 
+### Types de travaux d'un chantier : `chantier_travaux`
+
+Un chantier peut combiner plusieurs types (par exemple un élagage et une taille de haie chez le même client le
+même jour). Chaque type coché a sa **précision** libre (« érable argenté côté garage », « cèdres, 35 m »).
+
+| Colonne | Type | Oblig. | Règle | Exemple |
+|---|---|---|---|---|
+| `chantier_id` | entier | oui | → `chantiers.id` (supprimé avec le chantier) | `11` |
+| `type_travaux` | texte | oui | un `code` de `types_travaux` : `emondage`, `elagage`, `taille_haie`, `abattage`, `essouchement`, `autre` ; un type par chantier au maximum | `elagage` |
+| `precision` | texte | non | ce qu'il y a à faire pour ce type | `érable argenté côté garage` |
+
+Au moins un type est exigé par l'interface et par l'import. Dans `v_chantiers` : `types_codes`
+(`elagage+taille_haie`), `type_libelle` (`Élagage + Taille de haie`) et `travaux_detail`
+(`Élagage : érable argenté côté garage ; Taille de haie : cèdres, 35 m`).
+
 ### Statuts des travaux
 
 | `statut` | Signification | Contrainte |
@@ -96,7 +109,7 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `refuse` | le client a dit non | |
 | `accepte` | accepté, pas encore de date | |
 | `planifie` | date fixée | `date_prevue` obligatoire |
-| `termine` | travaux faits | `date_realisee` obligatoire (et réciproquement) |
+| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) |
 | `annule` | annulé après acceptation | |
 
 Un travail de plusieurs jours = un chantier par journée.
@@ -142,12 +155,12 @@ Ajouter un type : `INSERT INTO types_travaux (code, libelle) VALUES ('haubanage'
 ## La vue `v_chantiers` (ce que les scripts Python liront)
 
 Une ligne par chantier, tout déjà joint : client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
-(`adresse_maps`, `latitude`, `longitude`, `notes_acces`), travaux (`type_libelle`, `description`,
-`date_prevue`, `duree_estimee_h`, `dossier_photos`…) et finances (`total_ttc`, `paye`, `solde`,
+(`adresse_maps`, `latitude`, `longitude`, `notes_acces`), travaux (`type_libelle`, `travaux_detail`,
+`description`, `date_prevue`, `duree_estimee_h`, `dossier_photos`…) et finances (`total_ttc`, `paye`, `solde`,
 `statut_paiement`). Exemple — le travail de la journée pour l'étape 2 :
 
 ```sql
-SELECT client_nom_complet, adresse_maps, latitude, longitude, duree_estimee_h, notes, dossier_photos
+SELECT client_nom_complet, adresse_maps, latitude, longitude, duree_estimee_h, travaux_detail, description, dossier_photos
 FROM v_chantiers
 WHERE date_prevue = '2026-10-14' AND statut = 'planifie';
 ```
@@ -156,7 +169,7 @@ Autres requêtes utiles :
 
 ```sql
 -- Travaux faits, à facturer
-SELECT date_realisee, client_nom_complet, total_ttc FROM v_chantiers WHERE statut_paiement = 'non_facture';
+SELECT date_prevue, client_nom_complet, total_ttc FROM v_chantiers WHERE statut_paiement = 'non_facture';
 -- Argent à recevoir
 SELECT client_nom_complet, solde FROM v_chantiers WHERE statut_paiement IN ('a_payer', 'partiel');
 -- Adresses à géocoder
@@ -176,14 +189,15 @@ une fiche = un chantier) ; l'import range chaque colonne dans la bonne table :
 | Colonnes de la feuille | Destination |
 |---|---|
 | `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes`, `adresse`, `ville`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `clients` |
-| `type_travaux`, `statut`, `description`, `notes`, `date_*`, `heure_prevue`, `duree_*`, `prix_ht`, `tps`, `tvq`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
+| `type_travaux`, `statut`, `description`, `date_*`, `heure_prevue`, `duree_*`, `prix_ht`, `tps`, `tvq`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
 | `paiement_date`, `paiement_montant`, `paiement_mode` | `paiements` (un paiement par ligne ; les acomptes supplémentaires se saisissent dans l'interface) |
 
 L'import est plus souple que la base, puis écrit toujours le format strict :
 
 - téléphone `450-555-0142` ou `(450) 555-0142` → `+14505550142` ; code postal `j7z1a1` → `J7Z 1A1`
 - `1 250,00 $` ou `1250,00` → `1250.00` ; heure `8h30` → `08:30`
-- `type_travaux` accepte le code ou le libellé (`taille_haie`, `Taille de haie`) ; `statut` et `paiement_mode`
+- `type_travaux` accepte un ou plusieurs types séparés par `+`, chacun avec une précision facultative après `:`
+  (`elagage: érable côté garage + taille_haie: cèdres, 35 m`) ; le code ou le libellé (`taille_haie`, `Taille de haie`) ; `statut` et `paiement_mode`
   acceptent accents et majuscules (`Terminé`, `Chèque`)
 - séparateur `,` ou `;`, encodage UTF-8 ou Windows-1252 (export d'Excel) : détectés automatiquement
 - les **dates** restent strictes (`AAAA-MM-JJ`), parce que c'est là qu'un tableur fait des dégâts :

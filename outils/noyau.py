@@ -27,11 +27,11 @@ COLONNES = [
     "client_nom", "client_prenom", "client_entreprise", "client_telephone",
     "adresse", "ville", "code_postal",
     "type_travaux", "statut", "description",
-    "date_soumission", "date_prevue", "heure_prevue", "date_realisee",
+    "date_soumission", "date_prevue", "heure_prevue",
     "duree_estimee_h", "duree_reelle_h",
     "prix_ht", "tps", "tvq", "numero_facture", "date_facture",
     "paiement_date", "paiement_montant", "paiement_mode",
-    "notes", "notes_acces", "ref_papier", "fichier_papier", "dossier_photos",
+    "notes_acces", "ref_papier", "fichier_papier", "dossier_photos",
     "client_telephone_2", "client_courriel", "client_sms_ok", "client_notes",
     "province", "latitude", "longitude",
 ]
@@ -196,6 +196,33 @@ class Ligne:
             self.erreurs.append(f"{col} « {v} » inconnu (valeurs permises : {', '.join(sorted(set(valides)))})")
         return trouve
 
+    def travaux(self, col, alias):
+        """Liste [(code, précision ou None)].
+
+        Reçoit soit une liste déjà prête (interface), soit un texte (CSV) du genre
+        « taille_haie: cèdres côté rue + elagage: érable » : types séparés par « + »,
+        précision facultative après « : ».
+        """
+        brut = self.brut.get(col)
+        if isinstance(brut, (list, tuple)):
+            morceaux = list(brut)
+        else:
+            texte = self._cellule(col)
+            morceaux = [tuple(part.partition(":")[::2]) for part in re.split(r"\s*\+\s*", texte) if part.strip()] if texte else []
+        resultat, vus = [], set()
+        for code_brut, precision in morceaux:
+            code = alias.get(cle(code_brut))
+            if code is None:
+                self.erreurs.append(f"{col} « {code_brut.strip()} » inconnu (valeurs permises : {', '.join(sorted(set(alias.values())))})")
+            elif code in vus:
+                self.erreurs.append(f"{col} « {code} » est indiqué deux fois")
+            else:
+                vus.add(code)
+                resultat.append((code, re.sub(r"\s+", " ", (precision or "").strip()) or None))
+        if not morceaux:
+            self.erreurs.append(f"{col} est obligatoire (au moins un type de travaux)")
+        return resultat
+
     def chemin(self, col):
         v = self.texte(col)
         if v is None:
@@ -241,14 +268,12 @@ def lire_ligne(brut, alias_types, taxes_auto):
         L.erreurs.append("latitude et longitude vont ensemble (remplir les deux ou aucune)")
     v["notes_acces"] = L.texte("notes_acces", multiligne=True)
 
-    v["type_travaux"] = L.choix("type_travaux", set(alias_types.values()), alias_types, obligatoire=True)
+    v["travaux"] = L.travaux("type_travaux", alias_types)
     v["statut"] = L.choix("statut", STATUTS, obligatoire=True)
     v["description"] = L.texte("description", multiligne=True)
-    v["notes"] = L.texte("notes", multiligne=True)
     v["date_soumission"] = L.jour("date_soumission")
     v["date_prevue"] = L.jour("date_prevue")
     v["heure_prevue"] = L.heure("heure_prevue")
-    v["date_realisee"] = L.jour("date_realisee")
     v["duree_estimee_h"] = L.duree("duree_estimee_h")
     v["duree_reelle_h"] = L.duree("duree_reelle_h")
 
@@ -276,13 +301,10 @@ def lire_ligne(brut, alias_types, taxes_auto):
     v["fichier_papier"] = L.chemin("fichier_papier")
     v["dossier_photos"] = L.chemin("dossier_photos")
 
-    # Cohérence statut / dates (les mêmes règles existent dans la base).
-    if v["statut"] == "termine" and not v["date_realisee"] and not any("date_realisee" in e for e in L.erreurs):
-        L.erreurs.append("statut « termine » : date_realisee est obligatoire")
-    if v["statut"] == "planifie" and not v["date_prevue"] and not any("date_prevue" in e for e in L.erreurs):
-        L.erreurs.append("statut « planifie » : date_prevue est obligatoire")
-    if v["date_realisee"] and v["statut"] and v["statut"] != "termine":
-        L.erreurs.append("date_realisee remplie mais statut n'est pas « termine »")
+    # Cohérence statut / date (la même règle existe dans la base).
+    for statut_exige in ("planifie", "termine"):
+        if v["statut"] == statut_exige and not v["date_prevue"] and not any("date_prevue" in e for e in L.erreurs):
+            L.erreurs.append(f"statut « {statut_exige} » : date_prevue est obligatoire")
     return v, L.erreurs
 
 
@@ -306,8 +328,13 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
     if not existait:
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
         conn.execute("PRAGMA foreign_keys = ON")
-    elif conn.execute("PRAGMA user_version").fetchone()[0] != 1:
-        raise SystemExit("Version de schéma inattendue (attendu : 1).")
+    else:
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if version == 1:
+            raise SystemExit(f"La base {db_path} utilise l'ancien format (v1).\n"
+                             f"Convertis-la d'abord (une sauvegarde est faite) :  python outils/migrer.py \"{db_path}\"")
+        if version != 2:
+            raise SystemExit(f"Version de schéma inattendue ({version}, attendu : 2).")
     return conn, existait
 
 
@@ -480,13 +507,17 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir):
 def _champs_differents(conn, chantier_id, v):
     """Champs de la ligne qui contredisent un chantier déjà présent (pour avertir, jamais pour écrire)."""
     colonnes = ["statut", "heure_prevue", "duree_estimee_h", "duree_reelle_h", "tps", "tvq", "numero_facture",
-                "date_facture", "dossier_photos", "fichier_papier", "ref_papier", "notes"]
+                "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
     actuel = dict(zip(colonnes, conn.execute(
         f"SELECT {', '.join(colonnes)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()))
     nouveau = {c: (_num(v[c]) if isinstance(v[c], Decimal) else v[c]) for c in colonnes}
     nouveau["tps"] = nouveau["tps"] or 0.0
     nouveau["tvq"] = nouveau["tvq"] or 0.0
     diffs = [c for c in colonnes if nouveau[c] != actuel[c] and not (nouveau[c] is None and c != "statut")]
+    precisions = {code: (precision or None) for code, precision in conn.execute(
+        "SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = ?", (chantier_id,))}
+    if precisions != {code: precision for code, precision in v["travaux"]}:
+        diffs.append("précisions des travaux")
     if v["paiement_montant"] is not None and not conn.execute(
             "SELECT 1 FROM paiements WHERE chantier_id = ? AND date_paiement = ? AND montant = ? AND mode = ?",
             (chantier_id, v["paiement_date"], float(v["paiement_montant"]), v["paiement_mode"])).fetchone():
@@ -495,35 +526,45 @@ def _champs_differents(conn, chantier_id, v):
 
 
 def _valeurs_chantier(v):
-    return (v["type_travaux"], v["description"], v["notes"], v["statut"], v["date_soumission"],
-            v["date_prevue"], v["heure_prevue"], v["date_realisee"], _num(v["duree_estimee_h"]),
-            _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0, _num(v["tvq"]) or 0,
-            v["numero_facture"], v["date_facture"], v["dossier_photos"], v["fichier_papier"], v["ref_papier"])
+    return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"], v["heure_prevue"],
+            _num(v["duree_estimee_h"]), _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0,
+            _num(v["tvq"]) or 0, v["numero_facture"], v["date_facture"], v["dossier_photos"],
+            v["fichier_papier"], v["ref_papier"])
 
 
-COLONNES_CHANTIER = ("type_travaux, description, notes, statut, date_soumission, date_prevue, heure_prevue,"
-                     " date_realisee, duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, numero_facture,"
-                     " date_facture, dossier_photos, fichier_papier, ref_papier")
+COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue", "heure_prevue",
+                     "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "numero_facture",
+                     "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
+
+
+def _ecrire_travaux(conn, chantier_id, travaux):
+    conn.execute("DELETE FROM chantier_travaux WHERE chantier_id = ?", (chantier_id,))
+    conn.executemany("INSERT INTO chantier_travaux (chantier_id, type_travaux, precision) VALUES (?,?,?)",
+                     [(chantier_id, code, precision) for code, precision in travaux])
 
 
 def creer_chantier(conn, client_id, v, res, avertir, verifier_doublon=True):
     """Crée le chantier (et son paiement éventuel). Retourne son id, ou None si déjà présent."""
     if verifier_doublon:
-        existant = conn.execute(
-            "SELECT id FROM chantiers WHERE client_id = ? AND type_travaux = ? AND description IS ?"
-            " AND date_soumission IS ? AND date_prevue IS ? AND date_realisee IS ? AND prix_ht IS ?",
-            (client_id, v["type_travaux"], v["description"], v["date_soumission"], v["date_prevue"],
-             v["date_realisee"], _num(v["prix_ht"]))).fetchone()
-        if existant:
+        codes = {code for code, _ in v["travaux"]}
+        candidats = conn.execute(
+            "SELECT id FROM chantiers WHERE client_id = ? AND description IS ? AND date_soumission IS ?"
+            " AND date_prevue IS ? AND prix_ht IS ?",
+            (client_id, v["description"], v["date_soumission"], v["date_prevue"], _num(v["prix_ht"]))).fetchall()
+        for (existant,) in candidats:
+            actuels = {r[0] for r in conn.execute("SELECT type_travaux FROM chantier_travaux WHERE chantier_id = ?", (existant,))}
+            if actuels != codes:
+                continue
             res.doublons += 1
-            differences = _champs_differents(conn, existant[0], v)
+            differences = _champs_differents(conn, existant, v)
             if differences:
-                avertir(f"chantier #{existant[0]} déjà présent : {', '.join(differences)} diffère(nt) "
+                avertir(f"chantier #{existant} déjà présent : {', '.join(differences)} diffère(nt) "
                         "dans la ligne, qui est ignorée (corriger dans la base, pas par réimportation)")
             return None
     cur = conn.execute(
-        f"INSERT INTO chantiers (client_id, {COLONNES_CHANTIER}) VALUES (?{',?' * 18})",
+        f"INSERT INTO chantiers (client_id, {', '.join(COLONNES_CHANTIER)}) VALUES (?{',?' * len(COLONNES_CHANTIER)})",
         (client_id, *_valeurs_chantier(v)))
+    _ecrire_travaux(conn, cur.lastrowid, v["travaux"])
     res.chantiers += 1
     if v["paiement_montant"] is not None:
         conn.execute(
@@ -537,9 +578,9 @@ def mettre_a_jour_fiche(conn, chantier_id, v):
     """Corrige un chantier ET la fiche de son client avec les valeurs de v (les champs vides effacent)."""
     client_id, = conn.execute("SELECT client_id FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     mettre_a_jour_client(conn, client_id, v)
-    conn.execute(
-        f"UPDATE chantiers SET {', '.join(c.strip() + ' = ?' for c in COLONNES_CHANTIER.split(','))} WHERE id = ?",
-        (*_valeurs_chantier(v), chantier_id))
+    conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in COLONNES_CHANTIER)} WHERE id = ?",
+                 (*_valeurs_chantier(v), chantier_id))
+    _ecrire_travaux(conn, chantier_id, v["travaux"])
 
 
 def mettre_a_jour_client(conn, client_id, v):

@@ -29,8 +29,8 @@ Une fiche de la pile C se retranscrit **à la demande**, en 2 minutes, le jour o
 ## Étape 2 — La fiche minimale
 
 Obligatoire (l'interface refuse d'enregistrer sans) :
-**nom** (ou entreprise), **adresse**, **ville**, **type de travaux**, **statut**
-— et **date réalisée** si le statut est « Terminé ».
+**nom** (ou entreprise), **adresse**, **ville**, **au moins un type de travaux**, **statut**
+— et la **date des travaux** si le statut est « Planifié » ou « Terminé ».
 
 Recommandé : **téléphone** (rappels futurs), **prix avant taxes**, et le paiement reçu s'il y en a un.
 Tout le reste reste vide : les coordonnées GPS seront remplies par le script de géocodage, les photos

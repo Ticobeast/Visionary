@@ -74,9 +74,16 @@ td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);
 .erreurs ul{margin:6px 0 0 18px;padding:0}.message{background:var(--ok-fond);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-bottom:16px}
 .doux{color:var(--doux);font-size:14px}.droite{text-align:right}.barre{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .recherche{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.recherche input{flex:1;min-width:180px}.recherche select{width:auto}
+.type{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px;align-items:center;margin-bottom:8px}
+.type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
+.base{margin-left:auto;font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
+@media (max-width:600px){.type{grid-template-columns:1fr}}
 details summary{cursor:pointer;color:var(--accent-fonce);font-weight:600;margin-bottom:10px}
 @media (max-width:700px){th:nth-child(n+5),td:nth-child(n+5){display:none}}
 """
+
+
+_BASE = {"db": None}   # base ouverte par ce serveur (affichée dans l'en-tête pour ne jamais s'y tromper)
 
 
 def esc(x):
@@ -87,12 +94,21 @@ def argent(x):
     return "" if x is None else f"{x:,.2f} $".replace(",", " ").replace(".", ",")
 
 
+def etiquette_base():
+    if not _BASE["db"]:
+        return ""
+    nom = Path(_BASE["db"]).name
+    if nom == DB_DEFAUT.name:
+        return f'<span class="base">Base : {esc(nom)}</span>'
+    return f'<span class="base essai" title="{esc(_BASE["db"])}">BASE D’ESSAI : {esc(nom)}</span>'
+
+
 def gabarit(titre, contenu, message=None):
     msg = f'<div class="message">{esc(MESSAGES[message])}</div>' if message in MESSAGES else ""
     return f"""<!doctype html><html lang="fr-CA"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(titre)} — SylvainCulteur</title>
 <style>{CSS}</style></head><body>
-<header><strong>SylvainCulteur</strong><a href="/">Chantiers</a><a href="/nouveau">+ Nouveau chantier</a></header>
+<header><strong>SylvainCulteur</strong><a href="/">Chantiers</a><a href="/nouveau">+ Nouveau chantier</a>{etiquette_base()}</header>
 <main>{msg}{contenu}</main></body></html>"""
 
 
@@ -125,8 +141,19 @@ def liste(nom, libelle, options, valeurs, vide=None, **attrs):
     return f'<div><label for="{nom}">{esc(libelle)}</label><select id="{nom}" name="{nom}"{extra}>{choix}</select></div>'
 
 
+def bloc_types(types, valeurs):
+    lignes = ""
+    for code, libelle in types:
+        coche = " checked" if valeurs.get(f"type_{code}") else ""
+        lignes += (f'<div class="type"><label class="coche"><input type="checkbox" name="type_{esc(code)}" value="1"{coche}>{esc(libelle)}</label>'
+                   f'<input type="text" name="precision_{esc(code)}" value="{esc(valeurs.get("precision_" + code, ""))}" '
+                   f'placeholder="Précision (facultatif) : quel arbre, quelle haie, combien…" aria-label="Précision pour {esc(libelle)}"></div>')
+    return f'<div class="large"><label>Types de travaux : coche un ou plusieurs</label>{lignes}</div>'
+
+
 def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, bouton="Enregistrer"):
-    types = list(conn.execute("SELECT code, libelle FROM types_travaux ORDER BY libelle"))
+    types = sorted(conn.execute("SELECT code, libelle FROM types_travaux"),
+                   key=lambda t: (t[0] == "autre", cle(t[1])))     # alphabétique sans tenir compte des accents, « Autre » en dernier
     erreurs_html = ""
     if erreurs:
         erreurs_html = ('<div class="erreurs"><strong>À corriger avant d\'enregistrer :</strong><ul>'
@@ -159,14 +186,14 @@ def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, 
 <p class="doux">Google Maps : clic droit sur l'endroit → cliquer sur les coordonnées pour les copier. Laisser vide sinon : le géocodage se fera plus tard.</p></details></div>
 
 <div class="carte"><h2>Travaux</h2><div class="grille">
-{liste("type_travaux", "Type de travaux", types, valeurs, vide="Choisir…", required=True)}
+{bloc_types(types, valeurs)}
 {liste("statut", "Statut", [(s, LIBELLES_STATUT[s]) for s in STATUTS], valeurs, required=True)}
 {zone("description", "Description (imprimée sur la feuille de route)", valeurs)}
-{champ("date_soumission", "Date de la soumission", valeurs, "date")}{champ("date_prevue", "Date prévue", valeurs, "date")}
-{champ("heure_prevue", "Heure prévue (rendez-vous fixe)", valeurs, "time")}{champ("date_realisee", "Date réalisée", valeurs, "date")}
+{champ("date_soumission", "Date de la soumission", valeurs, "date")}{champ("date_prevue", "Date des travaux (prévue, puis réalisée)", valeurs, "date")}
+{champ("heure_prevue", "Heure prévue (rendez-vous fixe)", valeurs, "time")}
 {champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5")}
 {champ("duree_reelle_h", "Durée réelle (heures)", valeurs, inputmode="decimal")}</div>
-<p class="doux">Durée = temps passé sur place, en heures décimales (2,5 = 2 h 30). Statut « Planifié » : date prévue obligatoire. « Terminé » : date réalisée obligatoire.</p></div>
+<p class="doux">Durée = temps passé sur place, en heures décimales (2,5 = 2 h 30). Statuts « Planifié » et « Terminé » : la date des travaux est obligatoire. Si le chantier change de jour, modifie simplement cette date.</p></div>
 
 <div class="carte"><h2>Prix et facture</h2><div class="grille">
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
@@ -175,7 +202,6 @@ def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, 
 {champ("numero_facture", "N° de facture", valeurs)}{champ("date_facture", "Date de la facture / du reçu", valeurs, "date")}</div></div>
 {paiement}
 <div class="carte"><h2>Notes et fichiers</h2><div class="grille">
-{zone("notes", "Notes sur ce chantier", valeurs)}
 {champ("ref_papier", "Où est la fiche papier ?", valeurs, placeholder="Classeur A, fiche 12")}
 {champ("fichier_papier", "Scan de la fiche (chemin dans data/)", valeurs, placeholder="papier/2026/gagnon.pdf")}
 {champ("dossier_photos", "Dossier de photos (chemin dans data/)", valeurs, placeholder="photos/2026/2026-06-14_gagnon")}</div></div>
@@ -201,18 +227,18 @@ def valeurs_client(conn, client_id):
 
 
 def valeurs_chantier(conn, chantier_id):
-    r = conn.execute("SELECT client_id, type_travaux, description, notes, statut, date_soumission, date_prevue,"
-                     " heure_prevue, date_realisee, duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq,"
-                     " numero_facture, date_facture, dossier_photos, fichier_papier, ref_papier"
-                     " FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    cols = ["client_id", "description", "statut", "date_soumission", "date_prevue", "heure_prevue",
+            "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "numero_facture", "date_facture",
+            "dossier_photos", "fichier_papier", "ref_papier"]
+    r = conn.execute(f"SELECT {', '.join(cols)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
         return None
-    cols = ["client_id", "type_travaux", "description", "notes", "statut", "date_soumission", "date_prevue",
-            "heure_prevue", "date_realisee", "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq",
-            "numero_facture", "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
     fmt = {"duree_estimee_h": lambda x: f"{x:g}", "duree_reelle_h": lambda x: f"{x:g}",
            "prix_ht": lambda x: f"{x:.2f}", "tps": lambda x: f"{x:.2f}" if x else "", "tvq": lambda x: f"{x:.2f}" if x else ""}
     d = {c: _txt(x, fmt.get(c)) for c, x in zip(cols, r)}
+    for code, precision in conn.execute("SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = ?", (chantier_id,)):
+        d[f"type_{code}"] = "1"
+        d[f"precision_{code}"] = precision or ""
     client_id = r[0]
     d.update(valeurs_client(conn, client_id))
     return d, client_id
@@ -233,6 +259,14 @@ def lire_formulaire(conn, form):
     brut = {c: form.get(c, "") for c in COLONNES}
     brut["client_sms_ok"] = "1" if form.get("client_sms_ok") else "0"
     brut["taxes_auto"] = "1" if form.get("taxes_auto") else ""
+    travaux = []
+    for (code,) in conn.execute("SELECT code FROM types_travaux ORDER BY libelle"):
+        precision = form.get(f"precision_{code}", "").strip()
+        brut[f"precision_{code}"] = precision
+        if form.get(f"type_{code}") or precision:      # une précision saisie implique le type
+            brut[f"type_{code}"] = "1"
+            travaux.append((code, precision))
+    brut["type_travaux"] = travaux
     v, erreurs = lire_ligne(brut, alias_types_travaux(conn), taxes_auto=bool(form.get("taxes_auto")))
     return brut, v, erreurs
 
@@ -244,8 +278,8 @@ def page_liste(conn, query):
     q = query.get("q", "").strip()
     statut = query.get("statut", "")
     paiement = query.get("paiement", "")
-    sql = ("SELECT chantier_id, client_nom_complet, entreprise, adresse, ville, telephone, type_libelle, description,"
-           " statut, statut_paiement, solde, date_prevue, date_realisee, date_soumission FROM v_chantiers WHERE 1=1")
+    sql = ("SELECT chantier_id, client_nom_complet, entreprise, adresse, ville, telephone, travaux_detail, description,"
+           " statut, statut_paiement, solde, date_prevue, date_soumission, type_libelle FROM v_chantiers WHERE 1=1")
     params = []
     if statut in STATUTS:
         sql += " AND statut = ?"
@@ -256,7 +290,7 @@ def page_liste(conn, query):
         sql += " AND statut_paiement = ?"
         params.append(paiement)
     ordre = "ASC" if statut == "planifie" else "DESC"
-    sql += f" ORDER BY COALESCE(date_prevue, date_realisee, date_soumission, '') {ordre}, chantier_id DESC"
+    sql += f" ORDER BY COALESCE(date_prevue, date_soumission, '') {ordre}, chantier_id DESC"
     lignes = conn.execute(sql, params).fetchall()
     if q:
         mots = cle(q).split()
@@ -286,8 +320,8 @@ def page_liste(conn, query):
 
     if lignes:
         corps = ""
-        for (cid, nom, entreprise, adresse, ville, tel, type_, desc, st, stp, solde, dp, dr, ds) in lignes:
-            date_ = dp or dr or ds or ""
+        for (cid, nom, entreprise, adresse, ville, tel, detail, desc, st, stp, solde, dp, ds, type_) in lignes:
+            date_ = dp or ds or ""
             nom_aff = nom if not entreprise or entreprise == nom else f"{nom} · {entreprise}"
             solde_aff = argent(solde) if stp in ("non_facture", "a_payer", "partiel") else ""
             corps += (f'<tr><td>{esc(date_)}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
@@ -356,13 +390,14 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if trouve is None:
         return gabarit("Introuvable", '<h1>Chantier introuvable</h1><p><a href="/">Retour à la liste</a></p>'), 404
     depuis_base, client_id = trouve
-    fiche = conn.execute("SELECT statut, statut_paiement, total_ttc, paye, solde, prix_ht, tps, tvq, client_nom_complet, adresse_maps"
+    fiche = conn.execute("SELECT statut, statut_paiement, total_ttc, paye, solde, prix_ht, tps, tvq, client_nom_complet, adresse_maps, travaux_detail"
                          " FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
-    statut, stp, total, paye, solde, prix, tps, tvq, nom, adresse_maps = fiche
+    statut, stp, total, paye, solde, prix, tps, tvq, nom, adresse_maps, detail = fiche
     maps = f"https://www.google.com/maps/search/?api=1&query={quote(adresse_maps)}"
     resume = (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(nom)}</h2>{badge(statut, LIBELLES_STATUT[statut])}'
               f'{badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""}'
               f'<span class="doux">{esc(adresse_maps)}</span> <a href="{esc(maps)}" target="_blank" rel="noopener">Voir sur Google Maps</a></div>'
+              f'<p style="margin:10px 0 0"><b>Travaux :</b> {esc(detail)}</p>'
               f'<p class="doux" style="margin-bottom:0">Prix {argent(prix)} · TPS {argent(tps)} · TVQ {argent(tvq)} · '
               f'<b>Total {argent(total)}</b> · Reçu {argent(paye)} · <b>Solde {argent(solde)}</b></p></div>')
     pmts = conn.execute("SELECT id, date_paiement, mode, montant, reference FROM paiements WHERE chantier_id = ? ORDER BY date_paiement, id", (chantier_id,)).fetchall()
@@ -378,7 +413,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
 {champ("paiement_date", "Date", ev, "date", required=True)}{champ("paiement_montant", "Montant ($)", ev, inputmode="decimal", required=True, placeholder="500,00")}
 {liste("paiement_mode", "Mode", [(m, LIBELLES_MODE[m]) for m in MODES], ev, required=True)}{champ("paiement_reference", "Référence (n° de chèque…)", ev)}
 <div><label>&nbsp;</label><button type="submit">Ajouter le paiement</button></div></div></form>"""
-    autres = conn.execute("SELECT chantier_id, type_libelle, COALESCE(date_prevue, date_realisee, date_soumission, ''), statut"
+    autres = conn.execute("SELECT chantier_id, type_libelle, COALESCE(date_prevue, date_soumission, ''), statut"
                           " FROM v_chantiers WHERE client_id = ? AND chantier_id <> ? ORDER BY 3 DESC", (client_id, chantier_id)).fetchall()
     autres_html = ""
     if autres:
@@ -473,6 +508,7 @@ ROUTES = [
 def repondre(db_path, methode, chemin, query=None, form=None):
     """Retourne (statut HTTP, en-têtes, corps en bytes)."""
     query, form = query or {}, form or {}
+    _BASE["db"] = str(db_path)
     for m, motif, gestionnaire in ROUTES:
         correspondance = re.match(motif, chemin)
         if m == methode and correspondance:
@@ -553,10 +589,15 @@ def creer_serveur(db_path, port):
 def main(argv=None):
     p = argparse.ArgumentParser(description="Interface de saisie locale (navigateur).")
     p.add_argument("--db", default=str(DB_DEFAUT), help=f"fichier de base (défaut : {DB_DEFAUT})")
+    p.add_argument("--essai", action="store_true", help="ouvre la base d'essai (data/test.db) au lieu de la vraie base")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--sans-navigateur", action="store_true", help="ne pas ouvrir le navigateur automatiquement")
     a = p.parse_args(argv)
-    db = Path(a.db)
+    db = DB_DEFAUT.parent / "test.db" if a.essai else Path(a.db)
+    if a.essai and not (db.exists() and db.stat().st_size > 0):
+        import donnees_test
+        res = donnees_test.generer(db)
+        print(f"Base d'essai créée avec de fausses données : {res.chantiers} chantiers.")
     conn, existait = ouvrir_base(db)
     conn.close()
     if existait and not list((db.parent / "sauvegardes").glob(f"{datetime.date.today():%Y-%m-%d}_*")):

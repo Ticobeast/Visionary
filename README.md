@@ -20,10 +20,12 @@ sans retranscription.
 
 ```
 clients (personne ou entreprise + son adresse)  1 ─── N  chantiers  1 ─── N  paiements
+                                                              └── N  types de travaux (avec précision)
 ```
 
 Un client = une personne **et** son adresse. Un client qui revient = un nouveau chantier sur sa fiche. Un
-chantier dure en moyenne 2 h : plusieurs par journée. Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
+chantier dure en moyenne 2 h : plusieurs par journée ; il peut combiner plusieurs types de travaux, et il n'a
+qu'**une seule date** (prévue, puis réalisée : si le chantier est déplacé, on la modifie). Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
 
 ## Contenu
 
@@ -33,8 +35,10 @@ outils/interface.py                     interface de saisie dans le navigateur
 outils/importer_saisie.py               import d'une feuille CSV (validation, tout ou rien, sauvegarde)
 outils/noyau.py                         règles de validation et d'écriture partagées par les deux
 outils/donnees_test.py                  crée une base d'ESSAI avec de fausses données
+outils/migrer.py                        convertit une base de l'ancien format (v1) sans rien perdre
 modeles/saisie_papier_*.csv             feuille de saisie CSV : vide + 3 exemples fictifs
-lancer_interface.bat / .command         double-clic pour ouvrir l'interface (Windows / Mac)
+lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
+lancer_essai.bat / .command             double-clic : ouvre l'interface sur la base d'ESSAI (fausses données)
 docs/dictionnaire_donnees.md            toutes les colonnes : type, format, règle, exemple
 docs/transition_papier.md               méthode pour numériser les dossiers papier
 docs/plan_de_tests.md                   plan de mise en route et de tests, phase par phase
@@ -46,11 +50,13 @@ data/                                   TES données (exclu de Git) : base, phot
 
 ```bash
 python3 -m unittest discover -s tests                  # vérifier l'installation : doit finir par OK
-python3 outils/donnees_test.py                         # base d'essai fictive : data/test.db
-python3 outils/interface.py --db data/test.db          # l'essayer (s'ouvre dans le navigateur)
-
-python3 outils/interface.py                            # la vraie base (créée au premier lancement)
+python3 outils/interface.py --essai                    # base d'ESSAI (fausses données) : data/test.db
+python3 outils/interface.py                            # la VRAIE base (créée au premier lancement)
+python3 outils/migrer.py data/sylvainculteur.db        # seulement si une base créée avant la mise à jour refuse de s'ouvrir
 ```
+
+Le coin supérieur droit de l'interface indique toujours la base ouverte : **« BASE D’ESSAI »** en orange pour
+les fausses données, « Base : sylvainculteur.db » pour la vraie.
 
 Pas à pas : [`docs/plan_de_tests.md`](docs/plan_de_tests.md). Sous Windows, remplacer `python3` par `python`
 ou `py`. Outil graphique gratuit pour consulter la base : [DB Browser for SQLite](https://sqlitebrowser.org/).
@@ -67,8 +73,8 @@ avant chaque import CSV (`data/sauvegardes/`).
 
 ## Prérequis
 
-Python 3 (testé avec 3.11, bibliothèque standard seulement : rien à installer). La suite de tests passe avec
-SQLite 3.40, 3.43, 3.45 et 3.51. Le schéma évite volontairement `STRICT`, les colonnes générées et les autres
-nouveautés récentes de SQLite, pour qu'un outil plus ancien (DB Browser…) puisse ouvrir le fichier ; ce point
-n'a pas été testé sur des versions antérieures à 3.40. Les lanceurs `.bat` et `.command` n'ont pas été testés
-sur Windows ni sur Mac.
+Python 3.9 ou plus récent (testé avec 3.11 ; la suite de tests a aussi été exécutée par l'utilisateur sous Windows
+avec Python 3.9.13). Bibliothèque standard seulement : rien à installer. La suite de tests passe avec SQLite 3.40, 3.43,
+3.45 et 3.51. Le schéma évite volontairement `STRICT`, les colonnes générées et les autres nouveautés récentes de
+SQLite, pour qu'un outil plus ancien (DB Browser…) puisse ouvrir le fichier. Les lanceurs `.bat` et `.command`
+n'ont pas été testés sur Mac ; sous Windows, ils n'ont pas été confirmés.
