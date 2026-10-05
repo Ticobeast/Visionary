@@ -1,4 +1,4 @@
-"""Tests de la migration d'une ancienne base (v1, v2 ou v3) vers le format actuel (v4) : outils/migrer.py."""
+"""Tests de la migration d'une ancienne base (v1 à v4) vers le format actuel (v5) : outils/migrer.py."""
 import sqlite3
 import sys
 import tempfile
@@ -69,7 +69,7 @@ class Base(unittest.TestCase):
             c.close()
 
     def verifier_base_valide(self):
-        self.assertEqual(self.sql("PRAGMA user_version"), [(4,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(5,)])
         self.assertEqual(self.sql("PRAGMA integrity_check"), [("ok",)])
         self.assertEqual(self.sql("PRAGMA foreign_key_check"), [])
 
@@ -129,12 +129,61 @@ class TestMigrationV2V3(Base):
         copie.close()
         self.assertIsNone(migrer.migrer(self.db))            # deuxième passage : rien à faire
 
-    def test_v2_vers_v4(self):
+    def test_v2_vers_v5(self):
         self.verifier("schema_v2.sql", 2)
 
-    def test_v3_vers_v4_conserve_la_modalite(self):
+    def test_v3_vers_v5_convertit_la_modalite_en_choix_unique(self):
         self.verifier("schema_v3.sql", 3)
-        self.assertEqual(self.sql("SELECT modalite_paiement FROM chantiers WHERE id = 5"), [("Interac à la fin",)])
+        self.assertEqual(self.sql("SELECT modalite_paiement FROM chantiers WHERE id = 5"), [("interac",)])
+
+    def test_modalites_libres_converties_ou_rangees_dans_autre(self):
+        base_v2_ou_v3(self.db, "schema_v3.sql")
+        c = sqlite3.connect(self.db)
+        for i, texte in ((6, "Chèque à la réception"), (7, "Acompte 500 $ puis solde comptant"), (8, "Virement"), (9, "  "), (10, "CARTE")):
+            c.execute("UPDATE chantiers SET modalite_paiement = ? WHERE id = ?", (texte, i))
+        c.commit()
+        c.close()
+        migrer.migrer(self.db)
+        self.assertEqual(self.sql("SELECT id, modalite_paiement FROM chantiers WHERE id BETWEEN 6 AND 10 ORDER BY id"),
+                         [(6, "cheque"), (7, "comptant"), (8, "autre"), (9, None), (10, "carte")])
+
+    def test_v4_vers_v5(self):
+        c = sqlite3.connect(self.db)
+        c.executescript((RACINE / "tests" / "schema_v4.sql").read_text(encoding="utf-8"))
+        c.execute("INSERT INTO clients (id, nom, adresse, ville) VALUES (1, 'Roy', '2 Rue B', 'Mirabel')")
+        c.execute("INSERT INTO chantiers (id, client_id, statut, date_prevue, ordre_jour, duree_estimee_h, prix_ht, tps, tvq, modalite_paiement)"
+                  " VALUES (1, 1, 'termine', '2026-05-10', 1, 2, 300, 15, 29.93, 'Chèque')")
+        c.execute("INSERT INTO chantiers (id, client_id, statut, date_prevue, ordre_jour, duree_estimee_h) VALUES (2, 1, 'planifie', '2026-10-20', 1, 2)")
+        c.execute("INSERT INTO chantier_travaux VALUES (1, 'taille_haie', 'cèdres')")
+        c.execute("INSERT INTO chantier_travaux VALUES (2, 'emondage', NULL)")
+        c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (1, '2026-05-10', 344.93, 'cheque')")
+        c.commit()
+        c.close()
+        r = migrer.migrer(self.db)
+        self.verifier_base_valide()
+        self.assertEqual((r["clients"], r["chantiers"], r["paiements"], r["soldes_negatifs"]), (1, 2, 1, 0))
+        self.assertEqual(self.sql("SELECT modalite_paiement, archive FROM v_chantiers ORDER BY chantier_id"), [("cheque", 1), (None, 0)])
+        # les nouvelles protections sont en place après la migration
+        c = sqlite3.connect(self.db)
+        for requete in ("UPDATE chantiers SET prix_ht = 1 WHERE id = 1", "DELETE FROM chantiers WHERE id = 1",
+                        "UPDATE chantiers SET modalite_paiement = 'Virement' WHERE id = 2",
+                        "INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (1, '2026-10-01', 0.01, 'interac')"):
+            with self.assertRaises(sqlite3.IntegrityError, msg=requete):
+                c.execute(requete)
+        c.close()
+
+    def test_paiement_en_trop_herite_est_signale_sans_perte(self):
+        c = sqlite3.connect(self.db)
+        c.executescript((RACINE / "tests" / "schema_v4.sql").read_text(encoding="utf-8"))
+        c.execute("INSERT INTO clients (id, nom, adresse, ville) VALUES (1, 'Roy', '2 Rue B', 'Mirabel')")
+        c.execute("INSERT INTO chantiers (id, client_id, statut, prix_ht) VALUES (1, 1, 'a_planifier', 100)")
+        c.execute("INSERT INTO chantier_travaux VALUES (1, 'emondage', NULL)")
+        c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (1, '2026-05-10', 150, 'cheque')")
+        c.commit()
+        c.close()
+        r = migrer.migrer(self.db)
+        self.assertEqual(r["soldes_negatifs"], 1)                                      # signalé à l'utilisateur
+        self.assertEqual(self.sql("SELECT montant FROM paiements"), [(150.0,)])        # rien n'est perdu ni modifié
 
     def test_la_base_migree_est_identique_a_une_base_neuve(self):
         base_v2_ou_v3(self.db, "schema_v3.sql")
@@ -150,10 +199,15 @@ class TestMigrationV2V3(Base):
 
 class TestAncienneBaseRefusee(Base):
     def test_refus_avec_instruction(self):
-        for fixture, version in (("schema_v2.sql", "v2"), ("schema_v3.sql", "v3")):
+        for fixture, version in (("schema_v2.sql", "v2"), ("schema_v3.sql", "v3"), ("schema_v4.sql", "v4")):
             if self.db.exists():
                 self.db.unlink()
-            base_v2_ou_v3(self.db, fixture)
+            if fixture == "schema_v4.sql":
+                c = sqlite3.connect(self.db)
+                c.executescript((RACINE / "tests" / fixture).read_text(encoding="utf-8"))
+                c.close()
+            else:
+                base_v2_ou_v3(self.db, fixture)
             with self.assertRaises(SystemExit) as e:
                 noyau.ouvrir_base(self.db)
             self.assertIn("migrer.py", str(e.exception))

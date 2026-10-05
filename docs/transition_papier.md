@@ -29,8 +29,10 @@ Une fiche de la pile C se retranscrit **à la demande**, en 2 minutes, le jour o
 ## Étape 2 — La fiche minimale
 
 Obligatoire (l'interface refuse d'enregistrer sans) :
-**nom** (ou entreprise), **adresse**, **ville**, **au moins un type de travaux**, **statut**
+**nom** (ou entreprise), **adresse**, **ville**, **au moins un type de travaux**, **durée estimée**, **statut**
 — et la **date des travaux** si le statut est « Planifié » ou « Terminé ».
+
+> Attention : un chantier **Terminé** est ensuite verrouillé (lecture seule). Pour des fiches papier déjà faites, relis-les avant de les saisir « Terminé ».
 
 Recommandé : **téléphone** (rappels futurs), **prix avant taxes**, et le paiement reçu s'il y en a un.
 Tout le reste reste vide : les coordonnées GPS seront remplies par le script de géocodage, les photos
@@ -52,7 +54,7 @@ montants taxes incluses. Pour les chantiers **vivants** (pile A), saisis le vrai
 - L'interface valide chaque fiche **tout de suite** (dates, téléphone, code postal, montants) : une erreur se
   corrige à l'écran, pas trois semaines plus tard.
 - Ordre : pile A en entier, puis pile B par ordre de récurrence.
-- Après chaque bloc, regarde les **puces de la page d'accueil** : « à facturer », « à recevoir », « prix
+- Après chaque bloc, regarde les **puces de la page Chantiers** : « à facturer », « à recevoir », « prix
   manquants ». Ce sont tes contrôles de qualité *et* ta liste de choses à faire.
 - Une **sauvegarde automatique** de la base est faite une fois par jour au démarrage de l'interface
   (`data/sauvegardes/`).

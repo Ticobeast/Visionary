@@ -42,7 +42,7 @@ class BaseTableau(unittest.TestCase):
                          (nom, f"1 Rue {nom}", ville, cp, "+14505550100"))
             cid = conn.execute("SELECT max(id) FROM clients").fetchone()[0]
             conn.execute("INSERT INTO chantiers (client_id, statut, date_soumission, duree_estimee_h, prix_ht, modalite_paiement) VALUES (?,?,?,?,?,?)",
-                         (cid, statut, soumission, duree, prix, "Chèque à la fin" if nom == "Urgent" else None))
+                         (cid, statut, soumission, duree, prix, "cheque" if nom == "Urgent" else None))
             chid = conn.execute("SELECT max(id) FROM chantiers").fetchone()[0]
             for code, precision in types:
                 conn.execute("INSERT INTO chantier_travaux VALUES (?,?,?)", (chid, code, precision))
@@ -60,6 +60,18 @@ class BaseTableau(unittest.TestCase):
 
     def tearDown(self):
         self._tmp.cleanup()
+
+    def terminer_sans_toucher(self, nom, prix, modalite=None):
+        """Insère un chantier DÉJÀ terminé (non facturé) : une fois terminé, on ne peut plus le modifier."""
+        conn, _ = noyau.ouvrir_base(self.db)
+        conn.execute("INSERT INTO clients (nom, adresse, ville, code_postal) VALUES (?, '9 Rue X', 'Mirabel', 'J7J 4D4')", (nom,))
+        cid = conn.execute("SELECT max(id) FROM clients").fetchone()[0]
+        conn.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, duree_reelle_h, prix_ht, modalite_paiement)"
+                     " VALUES (?, 'termine', ?, 2, 2, ?, ?)", (cid, il_y_a(20), prix, modalite))
+        chid = conn.execute("SELECT max(id) FROM chantiers").fetchone()[0]
+        conn.execute("INSERT INTO chantier_travaux VALUES (?,'emondage',NULL)", (chid,))
+        conn.close()
+        return chid
 
     def get(self, chemin, query=None):
         statut, _, corps = interface.repondre(self.db, "GET", chemin, query or {})
@@ -128,7 +140,7 @@ class TestTableauDeBord(BaseTableau):
         self.assertIn("durée à estimer", page)                              # Normal : pas de durée
         self.assertIn('href="https://www.google.com/maps/search/?api=1&amp;query=1%20Rue%20Urgent%2C%20Blainville%2C%20QC%20J7C%201A1%2C%20Canada"', page)
         self.assertIn('target="_blank"', page)
-        self.assertIn("Modalité : Chèque à la fin", page)
+        self.assertIn("Règlement prévu : Chèque", page)
 
     def test_planifies_groupes_par_jour(self):
         page = self.get("/suivi", {"vue": "planifies"})[1]
@@ -193,12 +205,10 @@ class TestActionsRapides(BaseTableau):
         self.assertIn("err=", en_tetes["Location"])
 
     def test_facturer_sans_prix_refuse(self):
-        conn, _ = noyau.ouvrir_base(self.db)
-        conn.execute("UPDATE chantiers SET prix_ht = NULL WHERE id = ?", (self.ids["Fait"],))
-        conn.close()
-        _, en_tetes, _ = self.post("/action/facturer", {"chantier_id": str(self.ids["Fait"]), "retour": "/"})
+        i = self.terminer_sans_toucher("SansPrix", prix=None)           # un terminé est verrouillé : on l'insère tel quel
+        _, en_tetes, _ = self.post("/action/facturer", {"chantier_id": str(i), "retour": "/"})
         self.assertIn("prix", en_tetes["Location"])
-        self.assertEqual(self.sql("SELECT date_facture FROM chantiers WHERE id = ?", (self.ids["Fait"],)), [(None,)])
+        self.assertEqual(self.sql("SELECT date_facture FROM chantiers WHERE id = ?", (i,)), [(None,)])
 
     def test_encaisser_partiel_puis_solde(self):
         i = self.ids["Fait"]                                                 # 800 + 40 + 79,80 = 919,80 $
@@ -221,9 +231,7 @@ class TestActionsRapides(BaseTableau):
         self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(0,)])
 
     def test_le_mode_propose_suit_la_modalite(self):
-        conn, _ = noyau.ouvrir_base(self.db)
-        conn.execute("UPDATE chantiers SET modalite_paiement = 'Chèque à la fin' WHERE id = ?", (self.ids["Fait"],))
-        conn.close()
+        self.terminer_sans_toucher("ParCheque", prix=100, modalite="cheque")
         page = self.get("/suivi", {"vue": "afacturer"})[1]
         self.assertIn('<option value="cheque" selected>', page)
 

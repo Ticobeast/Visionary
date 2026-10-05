@@ -3,11 +3,10 @@ import html
 from pathlib import Path
 from urllib.parse import quote
 
-from noyau import DB_DEFAUT, LIBELLES_STATUT  # noqa: F401  (réexporté pour les pages)
+from noyau import DB_DEFAUT, LIBELLES_MODE, LIBELLES_STATUT, MODES  # noqa: F401  (réexportés pour les pages)
 
 LIBELLES_PAIEMENT = {"non_facture": "À facturer", "a_payer": "Facturé, à recevoir", "partiel": "Partiel",
                      "paye": "Payé", "a_venir": "À venir", "sans_objet": "—", "prix_manquant": "Prix manquant"}
-LIBELLES_MODE = {"comptant": "Comptant", "cheque": "Chèque", "interac": "Interac", "carte": "Carte", "autre": "Autre"}
 MESSAGES = {
     "cree": "Chantier créé.",
     "cree_reutilise": "Chantier créé pour un client déjà dans la base (même adresse) : sa fiche a été réutilisée.",
@@ -23,11 +22,8 @@ MESSAGES = {
     "deplace": "Ordre de passage mis à jour : les heures sont recalculées.",
     "client_maj": "Fiche client enregistrée.",
     "client_cree": "Chantier créé pour ce client.",
+    "duplique": "Nouvelle soumission créée d'après le chantier précédent : ajuste le prix si besoin.",
 }
-
-MODALITES_SUGGEREES = ["Interac à la fin des travaux", "Chèque à la fin des travaux", "Comptant à la fin des travaux",
-                       "Chèque à la réception de la facture", "Acompte de 50 % puis solde à la fin",
-                       "Payé d'avance"]
 
 CSS = """
 :root{--fond:#f5f6f4;--carte:#fff;--texte:#1d2a22;--doux:#5b6b61;--trait:#d9ded9;--accent:#2f6b3f;--accent-fonce:#245232;
@@ -94,6 +90,11 @@ button.fleche{padding:2px 8px;font-size:13px;background:transparent;color:var(--
 .modale-carte{background:var(--carte);border-radius:14px;padding:24px;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .modale .question{font-size:19px;font-weight:700;margin:12px 0 18px}
 @media (max-width:700px){.cal-jour{min-height:58px;padding:4px}.cal-info{font-size:10px}}
+.requis{color:var(--alerte);font-weight:700}
+.verrou-termine{background:var(--ok-fond);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;margin-bottom:16px}
+dl.lecture{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:6px 14px;margin:0}dl.lecture dt{color:var(--doux);font-size:14px}dl.lecture dd{margin:0}
+@media (max-width:600px){dl.lecture{grid-template-columns:1fr}}
+.lecture-seule{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}
 details summary{cursor:pointer;color:var(--accent-fonce);font-weight:600;margin-bottom:10px}
 @media (max-width:700px){table.liste th:nth-child(n+5),table.liste td:nth-child(n+5){display:none}}
 """
@@ -126,7 +127,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False):
     return f"""<!doctype html><html lang="fr-CA"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(titre)} — SylvainCulteur</title>
 <style>{CSS}</style></head><body>
-<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/tournee">Tournées</a><a href="/chantiers">Chantiers</a><a href="/clients">Clients</a><a href="/nouveau">+ Nouveau</a>{etiquette_base()}</header>
+<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/tournee">Tournées</a><a href="/suivi">Suivi</a><a href="/chantiers">Chantiers</a><a href="/chantiers?vue=archives">Archives</a><a href="/clients">Clients</a><a href="/nouveau">+ Nouveau</a>{etiquette_base()}</header>
 <main{" class=large" if large else ""}>{msg}{contenu}</main></body></html>"""
 
 
@@ -150,11 +151,8 @@ def badge_attente(jours, priorite):
 
 
 def champ_modalite(valeurs):
-    options = "".join(f'<option value="{esc(m)}">' for m in MODALITES_SUGGEREES)
-    return (f'<div><label for="modalite_paiement">Modalité de paiement</label>'
-            f'<input id="modalite_paiement" name="modalite_paiement" type="text" list="modalites" autocomplete="off" '
-            f'value="{esc(valeurs.get("modalite_paiement", ""))}" placeholder="Interac à la fin, 50 % d\'acompte…">'
-            f'<datalist id="modalites">{options}</datalist></div>')
+    """Mode de règlement prévu : UN seul choix (comptant, chèque, Interac, carte, autre)."""
+    return liste("modalite_paiement", "Mode de règlement", [(m, LIBELLES_MODE[m]) for m in MODES], valeurs, vide="Non précisé")
 
 
 def redirection(url):
@@ -168,7 +166,8 @@ def badge(code, libelle):
 def champ(nom, libelle, valeurs, type_="text", large=False, **attrs):
     extra = "".join(f' {k.replace("_", "-")}="{esc(v)}"' if v is not True else f' {k}' for k, v in attrs.items())
     classe = ' class="large"' if large else ""
-    return (f'<div{classe}><label for="{nom}">{esc(libelle)}</label>'
+    etoile = ' <span class="requis" title="obligatoire">*</span>' if attrs.get("required") else ""
+    return (f'<div{classe}><label for="{nom}">{esc(libelle)}{etoile}</label>'
             f'<input id="{nom}" name="{nom}" type="{type_}" value="{esc(valeurs.get(nom, ""))}"{extra}></div>')
 
 
@@ -184,7 +183,8 @@ def liste(nom, libelle, options, valeurs, vide=None, **attrs):
     for code, lib in options:
         sel = " selected" if valeurs.get(nom) == code else ""
         choix += f'<option value="{esc(code)}"{sel}>{esc(lib)}</option>'
-    return f'<div><label for="{nom}">{esc(libelle)}</label><select id="{nom}" name="{nom}"{extra}>{choix}</select></div>'
+    etoile = ' <span class="requis" title="obligatoire">*</span>' if attrs.get("required") else ""
+    return f'<div><label for="{nom}">{esc(libelle)}{etoile}</label><select id="{nom}" name="{nom}"{extra}>{choix}</select></div>'
 
 
 def bloc_types(types, valeurs):

@@ -88,14 +88,16 @@ def avec_params(url, **params):
 # Composants
 # ---------------------------------------------------------------------------
 def mode_conseille(modalite):
-    m = cle(modalite or "")
-    for mot, mode in (("interac", "interac"), ("cheque", "cheque"), ("comptant", "comptant"), ("carte", "carte")):
-        if mot in m:
-            return mode
-    return "interac"
+    """Mode de règlement prévu du chantier (choix unique) ; Interac à défaut."""
+    return modalite if modalite in MODES else "interac"
+
+
+VERROUILLE = '<span class="badge b-termine" title="Chantier terminé : verrouillé en lecture seule">🔒 Terminé</span>'
 
 
 def form_statut(l, retour, avec_date=True):
+    if l["statut"] == "termine":              # un chantier terminé ne change plus de statut
+        return VERROUILLE
     options = "".join(f'<option value="{s}"{" selected" if s == l["statut"] else ""}>{esc(LIBELLES_STATUT[s])}</option>' for s in STATUTS)
     duree = f"{l['duree_estimee_h']:g}" if l["duree_estimee_h"] else ""
     date = ""
@@ -119,7 +121,7 @@ def actions_paiement(l, retour):
             detail += f' · reçu {argent(l["paye"])} · solde <b>{argent(l["solde"])}</b>'
         out.append(f'<div class="doux">{detail}</div>')
     if l["modalite_paiement"]:
-        out.append(f'<div class="doux">Modalité : {esc(l["modalite_paiement"])}</div>')
+        out.append(f'<div class="doux">Règlement prévu : {esc(LIBELLES_MODE.get(l["modalite_paiement"], l["modalite_paiement"]))}</div>')
     if sp == "non_facture":
         out.append(f'<form class="mini" method="post" action="/action/facturer"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
                    f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire">Facturer</button></form>')
@@ -155,6 +157,8 @@ def cellule_travaux(l):
 
 def form_statut_jour(l, retour):
     """Statut + durée estimée d'un chantier, dans la vue d'une journée (la date reste celle de la journée)."""
+    if l["statut"] == "termine":
+        return VERROUILLE
     options = "".join(f'<option value="{s}"{" selected" if s == l["statut"] else ""}>{esc(LIBELLES_STATUT[s])}</option>' for s in STATUTS)
     duree = f"{l['duree_estimee_h']:g}" if l["duree_estimee_h"] else ""
     return (f'<form class="mini" method="post" action="/action/statut"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
@@ -170,7 +174,7 @@ def fenetre_terminer(conn, chantier_id, chemin, query):
 
     Vide si le chantier n'existe plus ou n'est plus « Planifié » (lien périmé).
     """
-    r = conn.execute("SELECT statut, client_nom_complet, travaux_detail, type_libelle FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
+    r = conn.execute("SELECT statut, client_nom_complet, travaux_detail, type_libelle, duree_estimee_h FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
     if r is None or r[0] != "planifie":
         return ""
     reste = {k: v for k, v in query.items() if k not in ("terminer", "ok", "err")}
@@ -178,7 +182,10 @@ def fenetre_terminer(conn, chantier_id, chemin, query):
     return (f'<div class="modale" role="dialog" aria-modal="true" aria-labelledby="modale-titre"><div class="modale-carte">'
             f'<h2 id="modale-titre">Paiement enregistré</h2><p><b>{esc(r[1])}</b> — {esc(r[2] or r[3])}</p>'
             f'<p class="question">Voulez-vous passer ce chantier au statut &quot;Terminé&quot; ?</p>'
+            f'<p class="doux">Une fois terminé, le chantier est verrouillé en lecture seule.</p>'
             f'<div class="barre"><form method="post" action="/action/statut"><input type="hidden" name="chantier_id" value="{chantier_id}">'
             f'<input type="hidden" name="statut" value="termine"><input type="hidden" name="retour" value="{esc(retour)}">'
+            f'<div style="margin-bottom:12px"><label for="duree_reelle_h">Durée réelle (heures) — reprise de la durée estimée</label>'
+            f'<input id="duree_reelle_h" name="duree_reelle_h" value="{r[4] and format(r[4], "g") or ""}" inputmode="decimal"></div>'
             f'<button type="submit">Oui, passer à Terminé</button></form>'
             f'<a class="bouton secondaire" href="{esc(retour)}">Non, laisser Planifié</a></div></div></div>')

@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v4)
+# Dictionnaire de données (schéma v5)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -73,12 +73,12 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `date_soumission` | date | non | date de la **demande ou de la soumission** : sert à calculer le délai d'attente (à défaut, la date de création de la fiche) | `2026-05-28` |
 | `date_prevue` | date | **si `planifie` ou `termine`** | **la** date des travaux : prévue d'abord, puis réalisée. Si le chantier change de jour, on la met simplement à jour. C'est elle que le script d'itinéraire filtre | `2026-10-14` |
 | `ordre_jour` | entier | auto | rang du chantier dans sa journée (1, 2, 3…), géré par l'application (flèches ▲ ▼) ; vide si le chantier n'est ni planifié ni terminé. **Les heures de passage n'y sont pas stockées : elles sont calculées** (début 7 h 30, dîner 12 h - 12 h 30, d'après l'ordre et `duree_estimee_h`) | `2` |
-| `duree_estimee_h` | réel | non | pour l'itinéraire et la feuille de route | `3.0` |
-| `duree_reelle_h` | réel | non | mesurée après coup, pour affiner les estimés | `3.5` |
+| `duree_estimee_h` | réel | **oui (interface et import)** | durée sur place en heures, 0 < d ≤ 24 ; calcule les heures de la journée. Exigée par l'application (formulaires, import CSV, planification) ; la base elle-même accepte `NULL` pour pouvoir lire d'anciennes données | `3.0` |
+| `duree_reelle_h` | réel | non | n'existe pas à la création d'une soumission ; **préremplie avec la durée estimée au passage à « Terminé »** (modifiable à ce moment-là seulement) | `3.5` |
 | `prix_ht` | réel | non | avant taxes ; estimé tant que non facturé, puis final | `480.00` |
 | `tps` | réel | oui, défaut `0` | montant de TPS (laisser `0` si non inscrit aux taxes) | `24.00` |
 | `tvq` | réel | oui, défaut `0` | montant de TVQ (idem) | `47.88` |
-| `modalite_paiement` | texte | non | comment le client paiera (texte libre) ; imprimée sur la feuille de route pour savoir quoi encaisser sur place | `Interac à la fin des travaux` |
+| `modalite_paiement` | texte | non | **un seul choix** : `comptant`, `cheque`, `interac`, `carte`, `autre` (CHECK) ; imprimée sur la feuille de route pour savoir quoi encaisser sur place. Pas de paiement en plusieurs versements : les acomptes se saisissent comme paiements | `interac` |
 | `numero_facture` | texte | non | le numéro de ta facture papier ; exige `date_facture` | `2026-031` |
 | `date_facture` | date | non | date de la facture ou du reçu remis ; exige `prix_ht` | `2026-06-14` |
 | `dossier_photos` | chemin | non | **un dossier par chantier** ; les photos qu'il contient seront lues par le script (miniatures) | `photos/2026/2026-06-14_gagnon` |
@@ -112,7 +112,9 @@ Au moins un type est exigé par l'interface et par l'import. Dans `v_chantiers` 
 | `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) ; garde son rang dans la journée |
 | `annule` | abandonné : refus du client, annulation… (il n'existe plus de statut « Refusé ») | |
 
-Parcours normal : *Soumission → En attente → À planifier → Planifié → Terminé* ; *Annulé* à tout moment. Anciens noms
+**Terminé = définitivement verrouillé** : des déclencheurs de la base (`trg_chantiers_termine_verrouille`, `trg_chantiers_termine_non_supprimable`, `trg_travaux_termine_*`) refusent toute modification du chantier terminé (statut, client, description, dates, durées, prix, taxes, modalité, fichiers), de ses types de travaux et sa suppression. Restent permis : la **facturation** (`numero_facture`, `date_facture`), les **paiements** et la **duplication**. Le verrou est donc garanti même pour un autre outil (DB Browser…). Limite connue : l'ajout d'un type de travaux à un chantier déjà terminé n'est pas bloqué par la base (nécessaire à la création d'un chantier directement terminé, par import) ; l'interface ne l'offre pas.
+
+Parcours normal : *Soumission → En attente → À planifier → Planifié → Terminé* ; *Annulé* à tout moment (sauf après Terminé). Anciens noms
 encore compris à l'import : « Accepté » = À planifier, « Refusé » = Annulé.
 
 Un travail de plusieurs jours = un chantier par journée.
@@ -133,6 +135,16 @@ travaux, de `date_facture` et de la somme des `paiements`. Il ne peut donc jamai
 | `sans_objet` | `soumission`, `en_attente`, `annule`, ou travail gratuit | |
 
 Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiements`, `solde = total_ttc − paye`.
+
+**Jamais de solde négatif** : l'interface refuse un paiement supérieur au solde, et la base aussi (`trg_paiements_pas_de_solde_negatif_ajout` / `_modif`, `trg_chantiers_prix_sous_les_paiements` : on ne peut pas non plus baisser le prix sous ce qui est déjà payé ; un paiement sans prix saisi est refusé).
+
+### Archives — calculées, jamais saisies
+
+`v_chantiers.archive = 1` quand le chantier est **Terminé ET payé** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Le chantier passe tout seul des « Actifs » aux « Archives » (menu *Archives*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent.
+
+### Dupliquer un chantier
+
+Crée une **nouvelle soumission** pour le même client : travaux (avec précisions), description, durée estimée, prix, taxes et modalité sont repris ; la date de la demande repart d'aujourd'hui ; pas de date de travaux, ni de paiement, ni de facture, ni de durée réelle, ni de fichiers. Le prix et la durée sont ajustables dans le formulaire.
 
 ## `paiements`
 

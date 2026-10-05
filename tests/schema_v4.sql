@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 5;
+PRAGMA user_version = 4;
 
 
 -- -----------------------------------------------------------------------------
@@ -144,8 +144,8 @@ CREATE TABLE chantiers (
     prix_ht         REAL,     -- $ CAD avant taxes (estimé tant que non facturé, puis final)
     tps             REAL NOT NULL DEFAULT 0,   -- $ TPS (0 si non inscrit aux taxes)
     tvq             REAL NOT NULL DEFAULT 0,   -- $ TVQ (0 si non inscrit aux taxes)
-    modalite_paiement TEXT,   -- mode de règlement prévu, UN SEUL choix : comptant, cheque, interac, carte, autre
-                              -- (imprimé sur la feuille de route pour savoir quoi encaisser sur place)
+    modalite_paiement TEXT,   -- comment le client paiera (« Interac à la fin », « 50 % d'acompte »...) ;
+                              -- imprimée sur la feuille de route pour savoir quoi encaisser sur place
     numero_facture  TEXT,
     date_facture    TEXT,     -- AAAA-MM-JJ : date de la facture / du reçu remis
 
@@ -156,8 +156,6 @@ CREATE TABLE chantiers (
 
     cree_le         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
-    CONSTRAINT ck_chantiers_modalite
-        CHECK (modalite_paiement IS NULL OR modalite_paiement IN ('comptant','cheque','interac','carte','autre')),
     CONSTRAINT ck_chantiers_statut
         CHECK (statut IN ('soumission','en_attente','a_planifier','planifie','termine','annule')),
     CONSTRAINT ck_chantiers_ordre_jour
@@ -245,68 +243,6 @@ CREATE INDEX idx_paiements_chantier ON paiements(chantier_id);
 
 
 -- -----------------------------------------------------------------------------
--- Règle financière : JAMAIS de solde négatif. Le total des paiements d'un chantier ne peut pas dépasser son
--- total (prix + TPS + TVQ), et on ne peut pas baisser le prix sous ce qui est déjà payé.
--- -----------------------------------------------------------------------------
-CREATE TRIGGER trg_paiements_pas_de_solde_negatif_ajout BEFORE INSERT ON paiements
-WHEN ROUND((SELECT COALESCE(SUM(montant), 0) FROM paiements WHERE chantier_id = NEW.chantier_id) + NEW.montant, 2)
-     > (SELECT ROUND(COALESCE(prix_ht, 0) + tps + tvq, 2) FROM chantiers WHERE id = NEW.chantier_id)
-BEGIN
-    SELECT RAISE(ABORT, 'Solde négatif interdit : le total des paiements dépasserait le total du chantier');
-END;
-
-CREATE TRIGGER trg_paiements_pas_de_solde_negatif_modif BEFORE UPDATE OF montant, chantier_id ON paiements
-WHEN ROUND((SELECT COALESCE(SUM(montant), 0) FROM paiements WHERE chantier_id = NEW.chantier_id AND id <> NEW.id) + NEW.montant, 2)
-     > (SELECT ROUND(COALESCE(prix_ht, 0) + tps + tvq, 2) FROM chantiers WHERE id = NEW.chantier_id)
-BEGIN
-    SELECT RAISE(ABORT, 'Solde négatif interdit : le total des paiements dépasserait le total du chantier');
-END;
-
-CREATE TRIGGER trg_chantiers_prix_sous_les_paiements BEFORE UPDATE OF prix_ht, tps, tvq ON chantiers
-WHEN ROUND((SELECT COALESCE(SUM(montant), 0) FROM paiements WHERE chantier_id = NEW.id), 2)
-     > ROUND(COALESCE(NEW.prix_ht, 0) + NEW.tps + NEW.tvq, 2)
-BEGIN
-    SELECT RAISE(ABORT, 'Solde négatif interdit : le prix ne peut pas être inférieur à ce qui est déjà payé');
-END;
-
-
--- -----------------------------------------------------------------------------
--- Verrouillage : un chantier « Terminé » est en lecture seule, définitivement. Restent possibles les suites
--- financières (facture, paiements) et l'ordre dans la journée. Il ne peut pas être supprimé.
--- (Les types de travaux d'un chantier terminé ne peuvent être ni modifiés ni supprimés.)
--- -----------------------------------------------------------------------------
-CREATE TRIGGER trg_chantiers_termine_verrouille BEFORE UPDATE ON chantiers
-WHEN OLD.statut = 'termine' AND (
-        NEW.statut IS NOT OLD.statut OR NEW.client_id IS NOT OLD.client_id OR NEW.description IS NOT OLD.description
-     OR NEW.date_soumission IS NOT OLD.date_soumission OR NEW.date_prevue IS NOT OLD.date_prevue
-     OR NEW.duree_estimee_h IS NOT OLD.duree_estimee_h OR NEW.duree_reelle_h IS NOT OLD.duree_reelle_h
-     OR NEW.prix_ht IS NOT OLD.prix_ht OR NEW.tps IS NOT OLD.tps OR NEW.tvq IS NOT OLD.tvq
-     OR NEW.modalite_paiement IS NOT OLD.modalite_paiement OR NEW.dossier_photos IS NOT OLD.dossier_photos
-     OR NEW.fichier_papier IS NOT OLD.fichier_papier OR NEW.ref_papier IS NOT OLD.ref_papier)
-BEGIN
-    SELECT RAISE(ABORT, 'Chantier terminé : verrouillé en lecture seule');
-END;
-
-CREATE TRIGGER trg_chantiers_termine_non_supprimable BEFORE DELETE ON chantiers
-WHEN OLD.statut = 'termine'
-BEGIN
-    SELECT RAISE(ABORT, 'Chantier terminé : verrouillé, il ne peut pas être supprimé');
-END;
-
-CREATE TRIGGER trg_travaux_termine_verrouilles_modif BEFORE UPDATE ON chantier_travaux
-WHEN (SELECT statut FROM chantiers WHERE id = OLD.chantier_id) = 'termine'
-BEGIN
-    SELECT RAISE(ABORT, 'Chantier terminé : verrouillé en lecture seule');
-END;
-
-CREATE TRIGGER trg_travaux_termine_verrouilles_suppr BEFORE DELETE ON chantier_travaux
-WHEN (SELECT statut FROM chantiers WHERE id = OLD.chantier_id) = 'termine'
-BEGIN
-    SELECT RAISE(ABORT, 'Chantier terminé : verrouillé en lecture seule');
-END;
-
-
--- -----------------------------------------------------------------------------
 -- Vue de lecture pour les scripts Python (itinéraire, feuille de route,
 -- finances) : tout est déjà joint et calculé.
 --
@@ -363,8 +299,7 @@ base AS (
 ),
 calcul AS (
     SELECT base.*, ROUND(total_ttc - paye, 2) AS solde FROM base
-),
-paiement AS (
+)
 SELECT
     calcul.*,
     CASE
@@ -377,9 +312,4 @@ SELECT
         WHEN date_facture IS NOT NULL                       THEN 'a_payer'
         ELSE 'a_venir'
     END AS statut_paiement
-FROM calcul
-)
--- archive = 1 : chantier terminé ET réglé (ou gratuit) : sort de la liste active, il va dans les « Archives »
-SELECT paiement.*,
-       CASE WHEN statut = 'termine' AND statut_paiement IN ('paye', 'sans_objet') THEN 1 ELSE 0 END AS archive
-FROM paiement;
+FROM calcul;

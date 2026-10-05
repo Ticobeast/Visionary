@@ -9,11 +9,10 @@ import calendar
 import datetime
 from urllib.parse import urlencode
 
-from composants import (JOURNEE_H, JOURS, MOIS, VUES, actions_paiement, cellule_adresse, cellule_client, cellule_travaux,
-                        dans_vue, form_statut_jour, lignes_vue, reference_attente)
-from noyau import (DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, calculer_horaire, heure_texte, ids_de_la_journee, jours_attente,
-                   priorite)
-from vue import esc, gabarit, heures
+from composants import (JOURNEE_H, JOURS, MOIS, actions_paiement, cellule_adresse, cellule_client, cellule_travaux,
+                        form_statut_jour, lignes_vue)
+from noyau import DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, calculer_horaire, heure_texte, ids_de_la_journee
+from vue import argent, esc, gabarit, heures
 
 
 def _jour_valide(texte):
@@ -44,6 +43,7 @@ def panneau_jour(conn, jour, retour):
     horaire = calculer_horaire([l["duree_estimee_h"] for l in chantiers])
 
     total_h = sum(l["duree_estimee_h"] or 0 for l in chantiers)
+    total_jour = round(sum(l["total_ttc"] or 0 for l in chantiers), 2)
     sans_duree = sum(1 for l in chantiers if not l["duree_estimee_h"])
     titre = f'{JOURS[d.weekday()].capitalize()} {d.day} {MOIS[d.month - 1]} {d.year}'
     lien_ajout = f'<a class="bouton secondaire" href="/tournee?date={jour}">+ Ajouter / organiser des chantiers</a>'
@@ -57,6 +57,7 @@ def panneau_jour(conn, jour, retour):
               f' · début <b>{heure_texte(DEBUT_JOURNEE)}</b> · fin prévue <b>{heure_texte(fin)}</b>'
               + (f' <span class="attente a-urgente">journée chargée (plus de {heures(JOURNEE_H)})</span>' if chargee else "")
               + "</p>"
+              f'<p class="total-jour">Total de la journée : <span class="total">{esc(argent(total_jour))}</span> <span class="doux">(taxes incluses)</span></p>'
               f'<p class="doux">Heures calculées d\'après l\'ordre et les durées estimées ; dîner {heure_texte(DINER_DEBUT)} - {heure_texte(DINER_FIN)} ; trajets non comptés.'
               + (f' <b>⚠ {sans_duree} chantier{"s" if sans_duree > 1 else ""} sans durée estimée : les heures sont approximatives.</b>' if sans_duree else "")
               + "</p>")
@@ -140,22 +141,6 @@ def _grille(conn, premier, selection, aujourdhui):
     return f'<div class="carte">{nav}<div class="cal-grille">{entetes}{cases}</div></div>'
 
 
-def _puces(conn):
-    lignes, aujourdhui = lignes_vue(conn, "statut IN ('soumission','en_attente','a_planifier') OR statut_paiement IN "
-                                          "('non_facture','prix_manquant','a_payer','partiel')")
-    puces = ""
-    for code, titre in VUES:
-        if code == "planifies":
-            continue
-        dedans = [l for l in lignes if dans_vue(l, code)]
-        if not dedans and code in ("soumissions", "enattente"):
-            continue
-        urgents = sum(1 for l in dedans if priorite(jours_attente(reference_attente(l, code), aujourdhui)) == "urgente")
-        extra = f'<span class="a-urgente attente">{urgents} urgent{"s" if urgents > 1 else ""}</span>' if urgents else ""
-        puces += f'<a class="puce" href="/suivi?vue={code}"><b>{len(dedans)}</b><span>{esc(titre)}</span> {extra}</a>'
-    return f'<div class="puces">{puces}</div>'
-
-
 def page_calendrier(conn, query):
     aujourdhui = datetime.date.today()
     jour = _jour_valide(query.get("date")) or aujourdhui.isoformat()
@@ -163,6 +148,6 @@ def page_calendrier(conn, query):
     premier = _mois_valide(query.get("mois")) or d.replace(day=1)
     mois_code = f"{premier.year}-{premier.month:02d}"
     retour = "/?" + urlencode({"date": jour, "mois": mois_code})
-    contenu = (f'<h1>Tableau de bord</h1>{_puces(conn)}{_grille(conn, premier, jour, aujourdhui)}'
+    contenu = (f'<h1>Tableau de bord</h1>{_grille(conn, premier, jour, aujourdhui)}'
                f'{panneau_jour(conn, jour, retour)}')
     return gabarit("Tableau de bord", contenu, query.get("ok"), query.get("err"), large=True)

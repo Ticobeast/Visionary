@@ -4,11 +4,12 @@ Le formulaire simplifié s'ouvre depuis la fiche d'un client : le nom et l'adres
 non modifiables : le serveur ignore tout ce que le navigateur enverrait à leur sujet) et seuls les éléments
 essentiels sont demandés : travaux à faire, prix, modalité de paiement, notes.
 """
+import datetime
 import sqlite3
 
 from noyau import (COLONNES, Resultat, _txt, alias_types_travaux, cle, creer_chantier, lire_client, lire_ligne,
                    mettre_a_jour_client, transaction, travaux_depuis_formulaire, valeurs_client)
-from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, argent, badge, bloc_types, carte_adresse, carte_client, champ,
+from vue import (LIBELLES_STATUT, badge, bloc_types, carte_adresse, carte_client, champ,
                  champ_modalite, esc, gabarit, heures, lien_maps, redirection, zone)
 
 
@@ -48,23 +49,21 @@ def _tel(t):
 # Liste et fiche
 # ---------------------------------------------------------------------------
 def page_clients(conn, query):
+    """Liste épurée : Nom, Téléphone, Adresse (ni nombre de chantiers, ni montants : ils sont dans la fiche du client)."""
     q = query.get("q", "").strip()
     lignes = conn.execute(
-        "SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.adresse, cl.ville, cl.province, cl.code_postal,"
-        " (SELECT count(*) FROM chantiers ch WHERE ch.client_id = cl.id),"
-        " (SELECT COALESCE(SUM(solde), 0) FROM v_chantiers v WHERE v.client_id = cl.id AND v.statut_paiement IN ('non_facture','a_payer','partiel'))"
-        " FROM clients cl ORDER BY cl.nom, cl.entreprise").fetchall()
+        "SELECT id, prenom, nom, entreprise, telephone, adresse, ville, province, code_postal"
+        " FROM clients ORDER BY nom, entreprise, prenom").fetchall()
     if q:
         mots = cle(q).split()
         lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in r[1:9] if x)) for m in mots)]
     corps = ""
-    for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, nb, du in lignes[:300]:
+    for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp in lignes[:300]:
         maps = f"{adresse}, {ville}, {prov}" + (f" {cp}" if cp else "") + ", Canada"
         corps += (f'<tr><td><a href="/client/{cid}">{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</a></td>'
-                  f'<td>{esc(_tel(tel))}</td><td>{lien_maps(maps, f"{adresse}, {ville}")}</td><td class="droite">{nb}</td>'
-                  f'<td class="droite">{esc(argent(du) if du else "")}</td></tr>')
-    tableau = (f'<div class="liste-defile"><table><thead><tr><th>Client</th><th>Téléphone</th><th>Adresse</th><th class="droite">Chantiers</th>'
-               f'<th class="droite">À recevoir / facturer</th></tr></thead><tbody>{corps}</tbody></table></div>'
+                  f'<td>{esc(_tel(tel))}</td><td>{lien_maps(maps, f"{adresse}, {ville}")}</td></tr>')
+    tableau = (f'<div class="liste-defile"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th></tr></thead>'
+               f'<tbody>{corps}</tbody></table></div>'
                if corps else '<div class="carte">Aucun client. <a href="/nouveau">Créer le premier ?</a></div>')
     recherche = (f'<form class="recherche" method="get" action="/clients"><input type="search" name="q" value="{esc(q)}" '
                  'placeholder="Chercher : nom, téléphone, adresse, ville…"><button type="submit">Chercher</button></form>')
@@ -76,15 +75,14 @@ def page_client(conn, client_id, query):
     if c is None:
         return _introuvable()
     chantiers = conn.execute(
-        "SELECT chantier_id, COALESCE(date_prevue, date_soumission, ''), type_libelle, statut, statut_paiement, total_ttc, solde"
+        "SELECT chantier_id, COALESCE(date_prevue, date_soumission, ''), type_libelle, statut, archive"
         " FROM v_chantiers WHERE client_id = ? ORDER BY 2 DESC, chantier_id DESC", (client_id,)).fetchall()
     lignes = "".join(
-        f'<tr><td><a href="/chantier/{i}">{esc(d) or "sans date"}</a></td><td>{esc(t)}</td><td>{badge(st, LIBELLES_STATUT[st])}</td>'
-        f'<td>{badge(sp, LIBELLES_PAIEMENT[sp]) if sp != "sans_objet" else ""}</td><td class="droite">{argent(tot)}</td>'
-        f'<td class="droite">{argent(sol) if sp in ("non_facture", "a_payer", "partiel") else ""}</td></tr>'
-        for i, d, t, st, sp, tot, sol in chantiers)
-    historique = (f'<div class="liste-defile"><table><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th><th>Paiement</th>'
-                  f'<th class="droite">Total</th><th class="droite">Solde</th></tr></thead><tbody>{lignes}</tbody></table></div>'
+        f'<tr><td><a href="/chantier/{i}">{esc(d) or "sans date"}</a></td><td>{esc(t)}</td><td>{badge(st, LIBELLES_STATUT[st])}'
+        f'{" <span class=doux>archivé</span>" if arch else ""}</td></tr>'
+        for i, d, t, st, arch in chantiers)
+    historique = (f'<div class="liste-defile"><table><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
+                  f'<tbody>{lignes}</tbody></table></div>'
                   if lignes else '<p class="doux">Aucun chantier pour ce client.</p>')
     tels = " · ".join(esc(_tel(t)) for t in (c["telephone"], c["telephone_2"]) if t) or "—"
 
@@ -149,31 +147,34 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
               f'<div class="doux">Nom et adresse verrouillés. <a href="/client/{client_id}/modifier">Modifier la fiche client</a></div></div>')
     return f"""{err}{verrou}<form method="post" action="/client/{client_id}/chantier/nouveau">
 <div class="carte"><h2>Travaux à faire</h2><div class="grille">{bloc_types(_types(conn), valeurs)}</div></div>
-<div class="carte"><h2>Prix et paiement</h2><div class="grille">
+<div class="carte"><h2>Demande, durée, prix et paiement</h2><div class="grille">
+{champ("date_soumission", "Date de la demande de soumission", valeurs, "date")}
+{champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5", required=True)}
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
 <div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="taxes_auto" value="1"{taxes}>Ajouter TPS 5 % et TVQ 9,975 %</label></div>
-{champ_modalite(valeurs)}</div></div>
+{champ_modalite(valeurs)}</div>
+<p class="doux">La durée estimée est obligatoire (heures décimales : 2,5 = 2 h 30) ; elle sert à calculer les heures de la journée.</p></div>
 <div class="carte"><h2>Notes</h2><div class="grille">{zone("description", "Notes (description du chantier, imprimée sur la feuille de route)", valeurs)}</div></div>
 <div class="barre"><button type="submit">Créer le chantier</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>
-<p class="doux">Le chantier est créé « À planifier ». La date, la durée et le statut se règlent ensuite depuis le tableau de bord ou les tournées.</p>"""
+<p class="doux">Le chantier est créé « À planifier ». La date des travaux et le statut se règlent ensuite depuis le tableau de bord ou les tournées.</p>"""
 
 
 def page_chantier_nouveau(conn, client_id):
     if _client(conn, client_id) is None:
         return _introuvable()
-    return gabarit("Nouveau chantier", f'<h1>Nouveau chantier</h1>{_form_simplifie(conn, client_id, {})}')
+    return gabarit("Nouveau chantier", f'<h1>Nouveau chantier</h1>{_form_simplifie(conn, client_id, {"date_soumission": datetime.date.today().isoformat()})}')
 
 
 def chantier_creer(conn, client_id, form):
     if _client(conn, client_id) is None:
         return _introuvable()
     travaux, valeurs = travaux_depuis_formulaire(conn, form)
-    saisie = {**valeurs, **{c: form.get(c, "") for c in ("prix_ht", "modalite_paiement", "description")},
+    saisie = {**valeurs, **{c: form.get(c, "") for c in ("prix_ht", "modalite_paiement", "description", "date_soumission", "duree_estimee_h")},
               "taxes_auto": "1" if form.get("taxes_auto") else ""}
     # Nom, adresse et coordonnées viennent TOUJOURS de la base : ce que le navigateur enverrait est ignoré.
     brut = {c: "" for c in COLONNES}
     brut.update(valeurs_client(conn, client_id))
-    brut.update({c: saisie[c] for c in ("prix_ht", "modalite_paiement", "description")})
+    brut.update({c: saisie[c] for c in ("prix_ht", "modalite_paiement", "description", "date_soumission", "duree_estimee_h")})
     brut.update(statut="a_planifier", type_travaux=travaux)
     v, erreurs = lire_ligne(brut, alias_types_travaux(conn), taxes_auto=bool(saisie["taxes_auto"]))
     if not erreurs:

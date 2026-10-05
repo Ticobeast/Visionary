@@ -44,21 +44,21 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 
 | # | Scénario | Résultat attendu |
 |---|---|---|
-| 1 | Page d'accueil : cliquer la puce « à facturer » | seuls les chantiers faits et non facturés s'affichent, avec leur solde |
+| 1 | Menu **Suivi** → onglet « À facturer » | seuls les chantiers faits et non facturés s'affichent, avec leur solde |
 | 2 | Chercher un client par nom **sans accent** (ex. « cote » pour Côté), puis par téléphone | le bon client apparaît |
-| 3 | **Nouveau chantier**, client neuf : nom, adresse, ville, au moins un type coché, statut « Soumission » | « Chantier créé » ; le chantier apparaît dans la liste |
+| 3 | **Nouveau chantier**, client neuf : nom, adresse, ville, au moins un type coché, **durée estimée**, statut « Soumission » (la date de la demande est déjà celle d'aujourd'hui) | « Chantier créé » ; le chantier apparaît dans la liste |
 | 4 | **Client qui revient** : « Nouveau chantier » → chercher son nom → cliquer sa fiche → choisir un type | adresse et téléphone déjà remplis ; **aucun nouveau client** créé |
 | 5 | Passer le chantier de 3 à « Planifié » **sans** date | l'enregistrement est refusé, avec un message clair |
-| 6 | Mettre une date + une heure + une durée estimée (ex. `2,5`) | enregistré ; `2,5` est compris comme 2 h 30 |
-| 7 | Changer la date du chantier (« il est déplacé à jeudi »), puis le passer à « Terminé » | **une seule date** : elle se met à jour ; statut « À facturer » (si prix saisi) |
+| 6 | Mettre une date + une durée estimée (ex. `2,5`) ; essayer de la laisser vide | `2,5` est compris comme 2 h 30 ; durée vide = refusé (« obligatoire ») |
+| 7 | Changer la date du chantier (« il est déplacé à jeudi »), puis le passer à « Terminé » | **une seule date** : elle se met à jour ; statut « À facturer » (si prix saisi) ; **la durée réelle reprend la durée estimée** |
 | 7b | **Plusieurs types** : cocher « Élagage » et « Taille de haie » et écrire une précision pour chacun | la page du chantier affiche « Élagage : … ; Taille de haie : … » |
 | 8 | Saisir le prix + cocher « Calculer TPS et TVQ » + n° et date de facture | total = prix + 5 % + 9,975 % ; statut « Facturé, à recevoir » |
 | 9 | Ajouter un **acompte**, puis le **solde** | « Partiel » puis « Payé » ; solde à 0 |
 | 10 | Se tromper exprès : téléphone `123`, code postal `ZZZ`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 11 | Modifier l'adresse d'un client, puis supprimer un paiement et un chantier de test | tout se passe sans erreur |
 | 12 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
-| 13 | **Tableau de bord** (accueil) | un **calendrier du mois** : les jours planifiés montrent « 3 chantiers · 6 h 30 » ; les jours trop chargés (> 8 h) sont en rouge |
-| 14 | Cliquer sur une **date** du calendrier | le **déroulement de la journée** s'affiche dessous : chantiers dans l'ordre, avec heures de début → fin (le premier à 7 h 30) |
+| 13 | **Tableau de bord** (accueil) | **seulement** un calendrier du mois (pas de tuiles) : les jours planifiés montrent « 3 chantiers · 6 h 30 » ; les jours trop chargés (> 8 h) sont en rouge |
+| 14 | Cliquer sur une **date** du calendrier | le **déroulement de la journée** s'affiche dessous : durée totale, **puis le total en $ de la journée** (taxes incluses), chantiers dans l'ordre, avec heures de début → fin (le premier à 7 h 30) |
 | 15 | Repérer le **dîner** : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
 | 16 | Cliquer **▼** sur le 1er chantier, puis **▲** sur le 3e | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités la flèche est grisée |
 | 17 | Changer la **durée** d'un chantier de la journée (ex. `1`) + OK | les heures de début et de fin des suivants se décalent |
@@ -68,9 +68,17 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 21 | Page **Suivi** : onglets À planifier / En attente / Soumissions / À facturer / À recevoir | chantiers regroupés par délai (rouge > 30 j, jaune 7 à 30 j, vert < 7 j) ; filtres délai / secteur / tri |
 | 22 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
 | 23 | **Facturer** (onglet « À facturer »), puis **Encaisser** un acompte et le solde (« À recevoir ») | « Facturé », « Partiel », « Payé » sans ouvrir de fiche |
-| 24 | **Clients** → un client → **+ Nouveau chantier** | nom et adresse **verrouillés** ; seulement travaux, prix, modalité de paiement, notes ; le chantier arrive « À planifier » |
+| 24 | **Clients** → un client → **+ Nouveau chantier** | nom et adresse **verrouillés** ; travaux, date de la demande (aujourd'hui), durée estimée obligatoire, prix, mode de règlement (un seul choix), notes ; le chantier arrive « À planifier » |
 | 25 | **Tournées** : choisir demain, filtrer par secteur, cocher 3 chantiers, ajuster une durée, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché ; le total d'heures se met à jour en cochant |
 | 26 | Dans la journée : **Retirer** un chantier | il redevient « À planifier » (sans date) |
+| 27 | **Clients** (liste) | seulement 3 colonnes : Nom, Téléphone, Adresse ; la fiche d'un client n'affiche aucun montant |
+| 28 | Ouvrir un chantier existant : chercher un champ pour changer le nom ou l'adresse du client | il n'y en a pas : le client est en lecture seule (🔒) ; le bouton **Modifier le client** mène à sa fiche ; même chose après « Enregistrer » |
+| 29 | Chantier « Planifié » avec un solde de 100 $ : encaisser **150 $** | refusé (« solde négatif interdit ») ; 100 $ passe ; plus aucun paiement possible ensuite |
+| 30 | Mode de règlement | une seule liste : Comptant, Chèque, Interac, Carte, Autre |
+| 31 | Passer un chantier à « Terminé » (fenêtre de confirmation) | la durée réelle est préremplie avec l'estimée |
+| 32 | Ouvrir ce chantier terminé | page en **lecture seule** (🔒) ; ni formulaire, ni « Supprimer » ; il reste « Facturer », « Encaisser », « Dupliquer » |
+| 33 | Facturer puis encaisser **tout** le solde du chantier terminé | il quitte *Chantiers* et apparaît dans **Archives** tout seul |
+| 34 | **Dupliquer le chantier** sur un chantier terminé : changer le prix, valider | nouvelle **soumission** du même client : mêmes travaux, date de demande = aujourd'hui, aucun paiement ni facture ; l'original est intact |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

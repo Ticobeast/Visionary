@@ -158,12 +158,12 @@ def _id(form):
 
 def action_statut(conn, form):
     return _terminer(conn, form, "statut_change", lambda: changer_statut(
-        conn, _id(form), form.get("statut", ""), form.get("date_prevue"), form.get("duree_estimee_h")),
+        conn, _id(form), form.get("statut", ""), form.get("date_prevue"), form.get("duree_estimee_h"), form.get("duree_reelle_h")),
         extra={"terminer": None})
 
 
 def action_facturer(conn, form):
-    return _terminer(conn, form, "facture", lambda: facturer(conn, _id(form)))
+    return _terminer(conn, form, "facture", lambda: facturer(conn, _id(form), form.get("date_facture") or None, form.get("numero_facture")))
 
 
 def action_encaisser(conn, form):

@@ -12,6 +12,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
 import importer_saisie as imp  # noqa: E402
+import noyau  # noqa: E402
 
 EXEMPLES = RACINE / "modeles" / "saisie_papier_exemples.csv"
 VIDE = RACINE / "modeles" / "saisie_papier_vide.csv"
@@ -19,7 +20,7 @@ VIDE = RACINE / "modeles" / "saisie_papier_vide.csv"
 
 def ligne_valide(**perso):
     base = dict(client_nom="Tremblay", client_prenom="Jean", client_telephone="450-555-0101",
-                adresse="10 Rue Test", ville="Blainville", type_travaux="emondage", statut="soumission")
+                adresse="10 Rue Test", ville="Blainville", type_travaux="emondage", statut="soumission", duree_estimee_h="2")
     base.update(perso)
     return base
 
@@ -70,7 +71,8 @@ class TestSchema(unittest.TestCase):
             self.c.execute(sql, args)
 
     def test_version_et_integrite(self):
-        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 4)
+        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
+        self.assertEqual(noyau.VERSION_SCHEMA, 5)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
@@ -241,9 +243,25 @@ class TestImportSouple(BaseTest):
         self.assertEqual(self.requete("SELECT statut_paiement FROM v_chantiers"), [("paye",)])
 
     def test_colonnes_inutiles_peuvent_etre_supprimees(self):
-        colonnes = ["client_nom", "adresse", "ville", "type_travaux", "statut"]
+        colonnes = ["client_nom", "adresse", "ville", "type_travaux", "statut", "duree_estimee_h"]
         chemin = self.ecrire_csv([{c: ligne_valide()[c] for c in colonnes}], colonnes=colonnes)
         self.assertEqual(imp.importer(chemin, self.db).chantiers, 1)
+
+    def test_duree_estimee_obligatoire_a_l_import(self):
+        chemin = self.ecrire_csv([ligne_valide(duree_estimee_h=""), ligne_valide(adresse="2 B", duree_estimee_h="0"),
+                                  ligne_valide(adresse="3 C", duree_estimee_h="25")])
+        res = imp.importer(chemin, self.db)
+        self.assertEqual([no for no, _ in res.erreurs], [2, 3, 4])
+        self.assertIn("duree_estimee_h", res.erreurs[0][1][0])
+        self.assertEqual(self.requete("SELECT count(*) FROM chantiers"), [(0,)])
+
+    def test_modalite_un_seul_choix_parmi_cinq(self):
+        for saisi, attendu in (("Comptant", "comptant"), ("chèque", "cheque"), ("INTERAC", "interac"), ("carte", "carte"), ("Autre", "autre")):
+            v, erreurs = noyau.lire_ligne(ligne_valide(modalite_paiement=saisi), {"emondage": "emondage"}, False)
+            self.assertEqual((erreurs, v["modalite_paiement"]), ([], attendu), saisi)
+        for refuse in ("Acompte puis chèque", "chèque + comptant", "3 versements"):
+            _, erreurs = noyau.lire_ligne(ligne_valide(modalite_paiement=refuse), {"emondage": "emondage"}, False)
+            self.assertTrue(any("modalite_paiement" in e for e in erreurs), refuse)
 
     def test_regroupement_des_clients(self):
         chemin = self.ecrire_csv([

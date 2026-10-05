@@ -114,7 +114,7 @@ class TestStatuts(BaseJour):
         base = {"client_nom": "X", "adresse": "1 A", "ville": "V", "type_travaux": "emondage"}
         for saisi, attendu in (("Accepté", "a_planifier"), ("accepte", "a_planifier"), ("Refusé", "annule"), ("À planifier", "a_planifier"),
                                ("En attente", "en_attente"), ("en_attente", "en_attente"), ("Terminé", "termine"), ("Annulé", "annule")):
-            v, erreurs = noyau.lire_ligne({**base, "statut": saisi, "date_prevue": "2026-06-01"}, {"emondage": "emondage"}, False)
+            v, erreurs = noyau.lire_ligne({**base, "statut": saisi, "date_prevue": "2026-06-01", "duree_estimee_h": "2"}, {"emondage": "emondage"}, False)
             self.assertEqual((erreurs, v["statut"]), ([], attendu), saisi)
 
     def test_en_attente_et_a_planifier_n_ont_pas_de_date(self):
@@ -261,7 +261,7 @@ class TestCalendrier(BaseJour):
     def test_journee_chargee_et_a_cloturer(self):
         conn, _ = noyau.ouvrir_base(self.db)
         conn.execute("UPDATE chantiers SET duree_estimee_h = 4 WHERE id = ?", (self.ids["Alpha"],))          # 4 + 3 + 1,5 = 8,5 h
-        conn.execute("UPDATE chantiers SET date_prevue = ?, statut = 'planifie', ordre_jour = 1 WHERE id = ?", (dans(-2), self.ids["Fox"]))
+        conn.execute("UPDATE chantiers SET date_prevue = ?, statut = 'planifie', ordre_jour = 1 WHERE id = ?", (dans(-2), self.ids["Delta"]))
         conn.close()
         demain = datetime.date.fromisoformat(dans(1))
         mois = f"{demain.year}-{demain.month:02d}"
@@ -273,10 +273,24 @@ class TestCalendrier(BaseJour):
         self.assertIn("a-cloturer", page)
         self.assertIn("à clôturer", page)
 
-    def test_puces_vers_le_suivi(self):
+    def test_tableau_de_bord_epure_sans_tuiles(self):
         page = self.get("/")[1]
-        self.assertIn('href="/suivi?vue=aplanifier"', page)
-        self.assertIn('href="/suivi?vue=afacturer"', page)
+        for absent in ('class="puce"', "/suivi?vue=aplanifier", "/suivi?vue=afacturer", "À planifier</span>", "En attente</span>"):
+            self.assertNotIn(absent, page)
+        self.assertIn("cal-grille", page)                                  # le calendrier interactif est là
+        self.assertIn("Aucun chantier planifié", page)                     # et la planification de la journée sélectionnée
+
+    def test_total_monetaire_de_la_journee_sous_le_cumul_du_temps(self):
+        # Alpha 300 $, Bravo 300 $, Charlie 300 $ avant taxes, sans tps/tvq saisies : total du jour = 900 $
+        conn, _ = noyau.ouvrir_base(self.db)
+        conn.execute("UPDATE chantiers SET tps = 15, tvq = 29.93 WHERE id = ?", (self.ids["Alpha"],))
+        conn.close()
+        page = self.get("/", {"date": dans(1)})[1]
+        self.assertIn("Total de la journée", page)
+        self.assertIn("944,93 $", page)                                    # 300 + 15 + 29,93 + 300 + 300
+        self.assertIn("taxes incluses", page)
+        self.assertLess(page.index("durée totale"), page.index("Total de la journée"))
+        self.assertLess(page.index("Total de la journée"), page.index("Heures calculées"))
 
     def test_navigation_principale(self):
         page = self.get("/")[1]

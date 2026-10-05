@@ -12,12 +12,13 @@ soumissions. Téléphones en 555-01xx (réservés à la fiction).
 """
 import argparse
 import datetime
+from decimal import Decimal
 import random
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne,  # noqa: E402
+from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, taxes_pour,  # noqa: E402
                    ouvrir_base, trouver_ou_creer_client)
 
 PRENOMS = ["Marie", "Jean", "Sylvie", "Luc", "Nathalie", "Pierre", "Isabelle", "Marc", "Julie", "André",
@@ -72,7 +73,7 @@ def generer(db, nombre=40, graine=2026):
         ligne = {**c, "type_travaux": travaux, "description": rnd.choice(["", "", "Résidus ramassés.", "Appeler avant de venir."]),
                  "duree_estimee_h": f"{min(duree, 8):g}", "prix_ht": f"{prix:.2f}", "ref_papier": f"Classeur A, fiche {k + 1}"}
         sort = rnd.random()
-        ligne["modalite_paiement"] = rnd.choice(["", "Interac à la fin des travaux", "Chèque à la fin des travaux", "Comptant à la fin des travaux"])
+        ligne["modalite_paiement"] = rnd.choice(["", "interac", "cheque", "comptant", "carte"])
         if sort < 0.55:        # passé : terminé
             realise = aujourdhui - datetime.timedelta(days=rnd.randint(8, 540))
             ligne.update(statut="termine", date_soumission=jour(realise - datetime.timedelta(days=rnd.randint(3, 20))),
@@ -81,7 +82,8 @@ def generer(db, nombre=40, graine=2026):
             etat = rnd.random()
             if etat < 0.70:    # facturé et payé
                 ligne.update(date_facture=jour(realise), numero_facture=f"{realise.year}-{k + 1:03d}")
-                total = round(prix * 1.14975, 2)
+                tps, tvq = taxes_pour(Decimal(str(prix)))
+                total = float(Decimal(str(prix)) + tps + tvq)      # le même total que la base : jamais de solde négatif
                 ligne.update(paiement_date=jour(realise + datetime.timedelta(days=rnd.randint(0, 20))),
                              paiement_montant=f"{total:.2f}", paiement_mode=rnd.choice(MODES))
             elif etat < 0.85:  # facturé, pas payé

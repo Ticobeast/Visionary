@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-"""Convertit une base d'un ancien format (v1, v2 ou v3) vers le format actuel (v4).
+"""Convertit une base d'un ancien format (v1 à v4) vers le format actuel (v5).
 
     python outils/migrer.py data/sylvainculteur.db
+
+Changements v4 -> v5 :
+  * la modalité de paiement devient un choix unique (comptant, chèque, Interac, carte, autre) : l'ancien texte libre est
+    converti d'après les mots qu'il contient (« Interac à la fin » -> Interac ; un texte sans mode, comme un
+    acompte, -> Autre) ;
+  * nouvelles protections dans la base : jamais de solde négatif, chantier « Terminé » verrouillé ;
+  * la vue gagne la colonne archive (chantier terminé et réglé).
 
 Changements v3 -> v4 :
   * nouveaux statuts : « Accepté » devient « À planifier », « Refusé » devient « Annulé » ;
@@ -20,6 +27,7 @@ Fermer l'interface avant de lancer ce script. Bibliothèque standard seulement.
 import argparse
 import datetime
 import os
+import re
 import shutil
 import sqlite3
 import sys
@@ -29,7 +37,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 TABLES = ("clients", "chantiers", "paiements")
-VERSION_SCHEMA = 4
+VERSION_SCHEMA = 5
 
 
 def _sql_chantiers(version):
@@ -40,14 +48,27 @@ def _sql_chantiers(version):
         date = "COALESCE(date_realisee, date_prevue)"
     else:
         description, date = "description", "date_prevue"
-    modalite = "modalite_paiement" if version >= 3 else "NULL"
+    if version >= 3:     # texte libre -> mode de paiement à choix unique
+        m = "lower(modalite_paiement)"
+        modalite = ("CASE WHEN modalite_paiement IS NULL OR trim(modalite_paiement) = '' THEN NULL"
+                    f" WHEN {m} IN ('comptant', 'cheque', 'interac', 'carte', 'autre') THEN {m}"
+                    f" WHEN {m} LIKE '%interac%' THEN 'interac'"
+                    f" WHEN {m} LIKE '%cheque%' OR {m} LIKE '%chèque%' OR modalite_paiement LIKE '%CHÈQUE%' THEN 'cheque'"
+                    f" WHEN {m} LIKE '%comptant%' THEN 'comptant' WHEN {m} LIKE '%carte%' THEN 'carte' ELSE 'autre' END")
+    else:
+        modalite = "NULL"
     statut = "CASE statut WHEN 'accepte' THEN 'a_planifier' WHEN 'refuse' THEN 'annule' ELSE statut END"
+    if version >= 4:
+        ordre = "ordre_jour"
+    else:                # l'ordre de la journée se déduit des anciennes heures prévues
+        ordre = ("CASE WHEN statut2 IN ('planifie', 'termine') THEN ROW_NUMBER() OVER "
+                 "(PARTITION BY date2 ORDER BY COALESCE(heure_prevue, '99:99'), id) END")
     return (
         "INSERT INTO chantiers (id, client_id, description, statut, date_soumission, date_prevue, ordre_jour,"
         " duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, modalite_paiement, numero_facture, date_facture,"
         " dossier_photos, fichier_papier, ref_papier, cree_le)"
         " SELECT id, client_id, description_, statut2, date_soumission, date2,"
-        "  CASE WHEN statut2 IN ('planifie', 'termine') THEN ROW_NUMBER() OVER (PARTITION BY date2 ORDER BY COALESCE(heure_prevue, '99:99'), id) END,"
+        f"  {ordre},"
         "  duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, modalite, numero_facture, date_facture,"
         "  dossier_photos, fichier_papier, ref_papier, cree_le"
         f" FROM (SELECT *, {description} AS description_, {statut} AS statut2, {date} AS date2, {modalite} AS modalite"
@@ -66,14 +87,20 @@ def migrer(db_path):
     ancien.close()
     if version == VERSION_SCHEMA:
         return None
-    if version not in (1, 2, 3) or "sites" in tables:
+    if version not in (1, 2, 3, 4) or "sites" in tables:
         raise SystemExit("Format de base non pris en charge (version %s%s). Garde ce fichier et demande de l'aide."
                          % (version, ", avec une table sites" if "sites" in tables else ""))
 
     dossier_tmp = Path(tempfile.mkdtemp(prefix="migration_", dir=db_path.parent))
     try:
         conn = sqlite3.connect(dossier_tmp / "nouvelle.db", isolation_level=None)
-        conn.executescript(SCHEMA.read_text(encoding="utf-8"))
+        schema = SCHEMA.read_text(encoding="utf-8")
+        conn.executescript(schema)
+        # Les protections (solde négatif, verrou « Terminé ») sont retirées pendant la copie, puis remises : une
+        # donnée ancienne qui les enfreint (trop-payé...) est copiée telle quelle et signalée, jamais perdue.
+        declencheurs = re.findall(r"CREATE TRIGGER .*?\nEND;", schema, re.S)
+        for (nom,) in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'").fetchall():
+            conn.execute(f"DROP TRIGGER {nom}")
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("ATTACH DATABASE ? AS v1", (str(db_path),))
         conn.execute("BEGIN")
@@ -90,6 +117,8 @@ def migrer(db_path):
         conn.execute("INSERT INTO paiements SELECT id, chantier_id, date_paiement, montant, mode, reference, notes, cree_le"
                      " FROM v1.paiements")
         conn.execute("COMMIT")
+        for sql in declencheurs:
+            conn.execute(sql)
         for t in TABLES:
             avant = conn.execute(f"SELECT count(*) FROM v1.{t}").fetchone()[0]
             apres = conn.execute(f"SELECT count(*) FROM main.{t}").fetchone()[0]
@@ -98,6 +127,7 @@ def migrer(db_path):
         if conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or conn.execute("PRAGMA foreign_key_check").fetchall():
             raise SystemExit("Vérification échouée : la nouvelle base est incohérente. Rien n'a été modifié.")
         compte = {t: conn.execute(f"SELECT count(*) FROM main.{t}").fetchone()[0] for t in TABLES}
+        compte["soldes_negatifs"] = conn.execute("SELECT count(*) FROM v_chantiers WHERE solde < 0").fetchone()[0]
         conn.execute("DETACH DATABASE v1")
         conn.close()
 
@@ -116,7 +146,7 @@ def migrer(db_path):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="Convertit une base v1, v2 ou v3 vers le format actuel (v4).")
+    p = argparse.ArgumentParser(description="Convertit une base v1 à v4 vers le format actuel (v5).")
     p.add_argument("db", help="fichier de base à convertir (ex. data/sylvainculteur.db)")
     a = p.parse_args(argv)
     r = migrer(a.db)
@@ -125,6 +155,9 @@ def main(argv=None):
         return 0
     print(f"Base convertie : {r['clients']} clients, {r['chantiers']} chantiers, {r['paiements']} paiements.\n"
           f"Ancienne version conservée : {r['sauvegarde']}")
+    if r["soldes_negatifs"]:
+        print(f"ATTENTION : {r['soldes_negatifs']} chantier(s) ont un solde négatif hérité de l'ancienne base (payé plus que le total). "
+              "Ils ont été copiés tels quels ; corrige leur prix ou leurs paiements (la règle interdit d'en créer de nouveaux).")
     return 0
 
 

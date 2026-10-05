@@ -20,10 +20,11 @@ Il n'y a plus de statut « Refusé » : un client qui refuse = *Annulé*. Les an
 
 La page d'accueil montre un **calendrier du mois**. Chaque jour planifié indique le nombre de chantiers et les heures
 prévues ; un jour de plus de 8 h est en rouge, un jour passé avec des chantiers encore « Planifiés » est signalé
-« à clôturer ». Au-dessus, des pastilles mènent aux files d'attente (À planifier, En attente, À facturer, À recevoir) avec
-le nombre d'urgents.
+« à clôturer ». Le tableau de bord est volontairement épuré : **seulement le calendrier et la journée choisie** (pas de tuiles ni
+de raccourcis ; les files d'attente sont dans le menu *Suivi*).
 
-**Un clic sur une date** affiche le **déroulement de la journée**, juste en dessous, sans changer de page.
+**Un clic sur une date** affiche le **déroulement de la journée**, juste en dessous, sans changer de page. Le résumé indique le nombre
+de chantiers, la **durée totale** et, juste dessous, le **total en dollars de la journée** (taxes incluses).
 
 ### Déroulement d'une journée
 
@@ -49,6 +50,8 @@ partout, y compris sur tablette.)
 | **Encaisser** | enregistre un paiement (montant proposé = le solde, mode proposé d'après la modalité de paiement). Un montant plus petit = acompte. |
 | **Retirer** | remet le chantier dans « À planifier ». |
 
+Un chantier **Terminé** est verrouillé : on ne peut plus changer son statut ni le retirer de la journée (voir §5).
+
 ### Encaissement sur un chantier « Planifié » : confirmation
 
 Quand tu encaisses un paiement sur un chantier **Planifié**, le paiement est enregistré, puis une fenêtre demande :
@@ -60,7 +63,7 @@ Elle fonctionne partout où l'on encaisse : calendrier, suivi, tournées et page
 
 ## 2. Suivi (files d'attente)
 
-Menu **Suivi** (ou les pastilles de l'accueil) : une liste par statut — À planifier, En attente, Soumissions, Planifiés, À facturer,
+Menu **Suivi** : une liste par statut — À planifier, En attente, Soumissions, Planifiés, À facturer,
 À recevoir — avec le **délai d'attente** (nombre de jours depuis la demande ou la soumission, à défaut depuis la création de la
 fiche) :
 
@@ -86,6 +89,25 @@ L'ordre optimal et le trajet sur la carte viendront avec l'étape 2.
 
 ## 4. Fiche client et nouveau chantier simplifié
 
-`Clients` → un client : coordonnées, adresse cliquable, historique. **+ Nouveau chantier** ouvre un formulaire réduit à l'essentiel
-(travaux avec précisions, prix, modalité de paiement, notes). **Nom et adresse sont verrouillés** : le serveur relit toujours la fiche du
-client. Le chantier est créé « À planifier ». Pour corriger un nom ou une adresse : *Modifier le client*.
+`Clients` : une liste épurée avec **seulement Nom, Téléphone et Adresse** (pas de nombre de chantiers ni de montants). La fiche d'un
+client montre ses coordonnées et l'historique de ses chantiers (date, travaux, statut — sans montants). **+ Nouveau chantier** ouvre
+un formulaire réduit à l'essentiel : travaux avec précisions, **date de la demande** (aujourd'hui par défaut), **durée estimée
+(obligatoire)**, prix, **mode de règlement** (un seul choix) et notes. Le chantier est créé « À planifier ».
+
+**Le client n'est modifiable qu'à un seul endroit : sa fiche** (bouton *Modifier le client*). Partout ailleurs — formulaire de
+chantier, page d'un chantier existant, récapitulatif après enregistrement — son nom, son adresse et ses coordonnées sont
+**affichés en lecture seule** (🔒) : le serveur relit toujours le client dans la base et ignore tout ce que le navigateur enverrait.
+
+## 5. Règles d'un chantier
+
+- **Date de la demande** : préremplie avec aujourd'hui (modifiable).
+- **Mode de règlement** : un seul choix parmi Comptant, Chèque, Interac, Carte, Autre.
+- **Jamais de solde négatif** : un paiement (ou un acompte) ne peut pas dépasser ce qu'il reste à payer ; le formulaire indique « au plus … $ ».
+- **Durée estimée obligatoire** à la création, à l'import et à la planification. La **durée réelle** n'apparaît pas à la création ;
+  quand le chantier passe à **Terminé**, elle est préremplie avec la durée estimée (modifiable dans la fenêtre de confirmation).
+- **Terminé = verrouillé** : lecture seule, impossible à rouvrir, modifier ou supprimer. Restent possibles : facturer, encaisser, dupliquer.
+  (Une erreur de saisie sur un chantier terminé se corrige donc en amont : relis avant de passer à « Terminé ».)
+- **Archives** : un chantier **Terminé et payé** quitte la liste *Chantiers* et va dans *Archives*, automatiquement.
+- **Dupliquer le chantier** (page d'un chantier) : nouvelle soumission pour le même client (travaux, durée, prix, mode repris ; dates
+  repartent d'aujourd'hui ; prix et durée ajustables).
+
