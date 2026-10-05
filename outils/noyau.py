@@ -1016,32 +1016,37 @@ def supprimer_chantier(conn, chantier_id):
     return []
 
 
-def obstacles_suppression_client(conn, client_id):
-    """Raisons pour lesquelles un client ne peut pas être supprimé (liste vide : il peut l'être).
+def resume_suppression_client(conn, client_id):
+    """Ce qui disparaîtrait avec le client : (chantiers, dont terminés, paiements)."""
+    n = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ?", (client_id,)).fetchone()[0]
+    termines = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ? AND statut = 'termine'", (client_id,)).fetchone()[0]
+    paiements = conn.execute("SELECT count(*) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id WHERE c.client_id = ?", (client_id,)).fetchone()[0]
+    return n, termines, paiements
 
-    Un chantier terminé est gardé pour toujours (historique), et un chantier qui a des paiements aussi.
-    """
-    obstacles = []
-    n = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ? AND statut = 'termine'", (client_id,)).fetchone()[0]
-    if n:
-        obstacles.append(f"{n} chantier{'s' if n > 1 else ''} terminé{'s' if n > 1 else ''} (l'historique est conservé)")
-    n = conn.execute("SELECT count(DISTINCT p.chantier_id) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id"
-                     " WHERE c.client_id = ? AND c.statut <> 'termine'", (client_id,)).fetchone()[0]
-    if n:
-        obstacles.append(f"{n} chantier{'s' if n > 1 else ''} avec des paiements")
-    return obstacles
+
+# Protections levées le temps d'une suppression de client (puis remises, ou annulées avec la transaction si quelque chose échoue).
+_DECLENCHEURS_SUPPRESSION = ("trg_chantiers_termine_non_supprimable", "trg_travaux_termine_verrouilles_suppr")
 
 
 def supprimer_client(conn, client_id):
-    """Supprime un client créé par erreur, avec ses chantiers non terminés et sans paiement (soumissions, annulés...).
+    """Supprime DÉFINITIVEMENT un client et tout ce qui le concerne : chantiers (même terminés ou archivés), types de
+    travaux et paiements. À appeler dans une transaction (tout ou rien).
 
-    Refusé si le client a un chantier terminé ou un chantier avec des paiements. À appeler dans une transaction.
+    Le verrou « Terminé » protège un chantier contre les modifications et les suppressions isolées ; seule la suppression
+    volontaire d'un client, confirmée par l'utilisateur, l'emporte. Ses déclencheurs de suppression sont retirés puis
+    recréés à l'identique dans la même transaction.
     """
     if conn.execute("SELECT 1 FROM clients WHERE id = ?", (client_id,)).fetchone() is None:
         return [f"client #{client_id} introuvable"]
-    obstacles = obstacles_suppression_client(conn, client_id)
-    if obstacles:
-        return ["Ce client ne peut pas être supprimé : il a " + " et ".join(obstacles) + "."]
-    conn.execute("DELETE FROM chantiers WHERE client_id = ?", (client_id,))      # leurs types de travaux partent avec eux
+    protections = [(nom, sql) for nom in _DECLENCHEURS_SUPPRESSION
+                   for (sql,) in conn.execute("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?", (nom,))]
+    for nom, _ in protections:
+        conn.execute(f"DROP TRIGGER {nom}")
+    ids = "SELECT id FROM chantiers WHERE client_id = ?"
+    conn.execute(f"DELETE FROM paiements WHERE chantier_id IN ({ids})", (client_id,))
+    conn.execute(f"DELETE FROM chantier_travaux WHERE chantier_id IN ({ids})", (client_id,))
+    conn.execute("DELETE FROM chantiers WHERE client_id = ?", (client_id,))
     conn.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    for _, sql in protections:
+        conn.execute(sql)
     return []

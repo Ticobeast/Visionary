@@ -8,7 +8,8 @@ sans retranscription.
 ## Le choix : SQLite + une interface de saisie locale
 
 - **SQLite = la source de vérité.** Un seul fichier (`data/sylvainculteur.db`), aucun serveur, aucun abonnement.
-  Python le lit sans rien installer (`import sqlite3`).
+  Python le lit sans rien installer (`import sqlite3`). Le PDF de la journée est lui aussi fabriqué sans rien installer ;
+  Pillow (`pip install pillow`) est **facultatif** : il sert seulement à réduire les grosses photos dans ce PDF.
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
 - **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**

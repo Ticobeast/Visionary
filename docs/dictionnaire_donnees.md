@@ -69,7 +69,7 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | Colonne | Type | Oblig. | Règle | Exemple |
 |---|---|---|---|---|
 | `id` | entier | auto | | |
-| `client_id` | entier | oui | → `clients.id` ; un client ne peut pas être supprimé s'il a des chantiers | `1` |
+| `client_id` | entier | oui | → `clients.id` ; la base refuse de supprimer un client qui a encore des chantiers (l'interface le supprime avec tout son historique, dans une seule transaction) | `1` |
 | `description` | texte | non | **la** description du chantier (une seule), imprimée sur la feuille de route ; le détail par type est dans `chantier_travaux` | `Résidus ramassés. Prévenir le gardien la veille.` |
 | `statut` | texte | oui, défaut `soumission` | voir ci-dessous | `planifie` |
 | `date_soumission` | date | non | date de la **demande ou de la soumission** : sert à calculer le délai d'attente (à défaut, la date de création de la fiche) | `2026-05-28` |

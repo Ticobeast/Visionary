@@ -68,7 +68,7 @@ td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);
 .type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
 .base{margin-left:auto;font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
 @media (max-width:600px){.type{grid-template-columns:1fr}}
-main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-actions{min-width:110px}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
+main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-actions{min-width:200px}.actions-ligne{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}.actions-ligne form{margin:0}.actions-ligne .bouton,.actions-ligne button{padding:7px 14px;font-size:14px;white-space:nowrap}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
 .attente{display:inline-block;border-radius:6px;padding:2px 8px;font-weight:700;font-size:13px;white-space:nowrap;border:1px solid var(--trait)}
 .a-normale{background:var(--ok-fond);color:var(--accent-fonce);border-color:var(--accent)}
 .a-surveiller{background:#fff1d6;color:#7a4b00;border-color:#e8c675}

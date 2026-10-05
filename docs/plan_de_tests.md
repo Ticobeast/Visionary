@@ -68,8 +68,10 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 24 | Se tromper exprès : téléphone `123`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 25 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
 | 26 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
-| 27 | **Clients** : ouvrir la fiche d'un client créé pour rien, « Supprimer le client » (confirmation) | le client et ses chantiers non terminés disparaissent ; la fiche d'un client avec un chantier terminé ou des paiements refuse (« Impossible ») |
+| 27 | **Clients** : ouvrir la fiche d'un client qui a un chantier annulé, un chantier terminé (avec paiement), « Supprimer le client » (confirmation) | le client est **toujours** supprimable ; la confirmation annonce les chantiers et paiements ; ensuite il n'apparaît plus nulle part (Clients, Chantiers, archives, calendrier) |
 | 28 | **Chantiers** : regarder une ligne et la page d'un chantier | pas de pastille « Nacelle requise » ni « Bois ... » (elles restent dans le tableau de bord et la Journée) |
+| 29 | **Tableau de bord** : choisir un jour avec des chantiers, « Télécharger la journée (PDF) » (en bas) | un fichier `journee-AAAA-MM-JJ.pdf` se télécharge ; il contient, pour chaque chantier : heures, client, téléphone, adresse, accès, travaux avec précisions, description, options, durée, prix et taxes, paiements, reste à encaisser, références papier et, si le dossier de photos existe, les photos en vignettes |
+| 30 | **Journée** : regarder les boutons d'un chantier planifié | **Terminer** et **Retirer** sont côte à côte, sur une même ligne |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

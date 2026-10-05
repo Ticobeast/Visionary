@@ -51,10 +51,24 @@ Un **calendrier du mois**. Dans **chaque case** d'un jour planifié : le **nombr
 - la **durée totale** et, juste dessous, le **montant total** de la journée (taxes incluses) ;
 - à **droite de chaque chantier, sa valeur** (total taxes incluses, prix avant taxes en petit) ;
 - les **options** de la job (« Nacelle requise », « Bois débarrassé » ou « Bois laissé sur place : 16 pouces »), seulement dans le tableau de bord et la Journée, où elles servent à préparer la job ;
-- un seul bouton, **Terminer**, placé **en bas** de chaque chantier (pas de bouton Retirer ici : cela se fait dans la page *Journée*).
+- un seul bouton, **Terminer**, placé **en bas** de chaque chantier (pas de bouton Retirer ici : cela se fait dans la page *Journée*, où **Terminer** et **Retirer** sont côte à côte) ;
+- en bas du panneau : **Gérer cette journée** et **Télécharger la journée (PDF)**.
 
 Il n'y a **ni statut, ni paiement** sur cet écran : seulement le montant du chantier. Rien ne se modifie (ni durée, ni ordre). Le bouton
 **Gérer cette journée** ouvre la page *Journée* sur la même date.
+
+### Télécharger la journée en PDF
+
+Sous le tableau de la journée choisie, le bouton **Télécharger la journée (PDF)** télécharge un fichier `journee-AAAA-MM-JJ.pdf`
+(à imprimer ou à ouvrir sur l'iPad). Première page : le résumé de la journée (nombre de chantiers, heures de début et de fin, total en dollars)
+et une ligne par chantier. Ensuite, **chaque chantier avec tous ses détails** : heures de passage, client (téléphones, courriel, rappels par texto),
+adresse complète et secteur, accès et notes, travaux avec leurs précisions, description, options (nacelle, bois), durées, prix avant taxes, TPS/TVQ,
+total, mode de règlement prévu, paiements déjà reçus et **reste à encaisser**, références du dossier papier, et les **photos** du dossier de photos
+du chantier (JPEG et PNG, 12 au maximum par chantier, en vignettes avec leur nom de fichier).
+
+Photos : le programme ne demande rien d'installer. Si une photo de téléphone est lourde (plus de 1,5 Mo), elle n'est incluse que si **Pillow** est installé
+(`pip install pillow`, facultatif) : il réduit et redresse les photos, et le PDF reste léger (quelques centaines de Ko). Sans Pillow, les photos trop
+lourdes sont seulement **listées par leur nom** dans le PDF (« Non incluses »), rien ne plante. Le PDF ne modifie rien dans la base.
 
 ### Le bouton Terminer et sa fenêtre
 
@@ -151,7 +165,7 @@ d'un client montre ses coordonnées et l'historique de ses chantiers (date, trav
 formulaire réduit à l'essentiel : travaux avec précisions, options, **durée estimée (obligatoire)**, prix, notes ; la **date de la demande**
 (aujourd'hui) et le **mode de règlement** sont dans « Paramètres avancés ». Le chantier est créé « À planifier ».
 
-**Supprimer un client** : au bas de sa fiche, bouton « Supprimer le client » (avec confirmation), pour un client créé par erreur. Ses chantiers non terminés et sans paiement sont supprimés avec lui. Un client qui a un chantier **terminé** ou un chantier **avec paiements** est conservé (historique) : la fiche l'explique.
+**Supprimer un client** : toujours possible. Au bas de sa fiche, le bouton « Supprimer le client » demande une confirmation (qui indique ce qui va disparaître : nombre de chantiers, dont terminés, et de paiements) puis efface le client **et tout ce qui le concerne** : tous ses chantiers (actifs, annulés, terminés, archivés), leurs types de travaux et leurs paiements. Il n'en reste aucune trace, même dans les archives. C'est **définitif** (aucun retour en arrière ; la copie de sauvegarde du jour reste dans `data/sauvegardes`). Le verrou « Terminé » protège toujours un chantier pris seul (il n'a pas de bouton Supprimer) : seule la suppression du client le contourne, volontairement.
 
 **Le client n'est modifiable qu'à un seul endroit : sa fiche** (bouton *Modifier le client*, même principe : l'essentiel d'abord, le reste dans
 « Paramètres avancés »). Partout ailleurs son nom, son adresse et ses coordonnées sont **affichés en lecture seule** : le serveur relit

@@ -8,12 +8,15 @@ import datetime
 import sqlite3
 from urllib.parse import urlencode
 
+from pathlib import Path
+
 from calendrier import panneau_jour
 from composants import (FILTRES_ATTENTE, JOURNEE_H, TRIS, avec_params, cellule_adresse, cellule_client, cellule_montant,
                         lignes_vue, nom_client, retour_valide)
 from noyau import (annuler_chantier, changer_statut, cle, deplacer, jours_attente, planifier_lot, priorite, rouvrir_chantier,
                    terminer_chantier, transaction)
-from vue import badge_attente, esc, gabarit, heures, redirection
+from pdf import journee_pdf
+from vue import _BASE, badge_attente, esc, gabarit, heures, redirection
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +188,18 @@ def _vers_journee(c, q, f, *g):
     return redirection("/journee" + ("?" + urlencode(q) if q else ""))
 
 
+def telecharger_journee(conn, query):
+    """PDF de la journée (tous les détails des chantiers) : téléchargement direct, la base n'est pas modifiée."""
+    try:
+        jour = datetime.date.fromisoformat(query.get("date", "")).isoformat()
+    except ValueError:
+        jour = datetime.date.today().isoformat()
+    corps = journee_pdf(conn, jour, Path(_BASE["db"]).parent if _BASE.get("db") else None)
+    return ("200 OK", [("Content-Type", "application/pdf"), ("Content-Disposition", f'attachment; filename="journee-{jour}.pdf"')], corps)
+
+
 ROUTES_TABLEAU = [
+    ("GET", r"^/journee\.pdf$", lambda c, q, f, *g: telecharger_journee(c, q)),
     ("GET", r"^/journee$", lambda c, q, f, *g: page_journee(c, q)),
     ("POST", r"^/journee/planifier$", lambda c, q, f, *g: action_planifier_lot(c, f)),
     ("GET", r"^/tournee$", _vers_journee),                                   # anciens liens et favoris

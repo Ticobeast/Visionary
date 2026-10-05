@@ -98,13 +98,15 @@ def panneau_jour(conn, jour, retour, gestion=False):
         fleches = (fleche % ("haut", "Monter", "Monter", "disabled" if rang == 0 else "", "&#9650;")
                    + fleche % ("bas", "Descendre", "Descendre", "disabled" if rang == len(chantiers) - 1 else "", "&#9660;"))
         corps += (f'<tr><td class="col-ordre"><div class="fleches">{fleches}</div><div class="doux">n° {rang + 1}</div></td>{base}'
-                  f'<td class="col-actions">{actions}</td><td>{cellule_montant(l)}</td></tr>')
+                  f'<td class="col-actions"><div class="actions-ligne">{actions}</div></td><td>{cellule_montant(l)}</td></tr>')
     if gestion:
         entetes = '<th>Ordre</th><th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th></th><th class="droite">Montant</th>'
     else:
         entetes = '<th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th class="droite">Montant</th>'
     table = (f'<div class="liste-defile"><table class="tableau"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
-    pied = "" if gestion else f'<div class="barre" style="margin-top:12px">{lien_gerer}</div>'
+    lien_pdf = (f'<a class="bouton" href="/journee.pdf?date={jour}" download title="Toute la journée, avec les détails de chaque chantier">'
+                f'Télécharger la journée (PDF)</a>')
+    pied = "" if gestion else f'<div class="barre" style="margin-top:12px">{lien_gerer}{lien_pdf}</div>'
     return f'<div class="carte"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 
 

@@ -8,7 +8,7 @@ import datetime
 import sqlite3
 from urllib.parse import urlencode
 
-from noyau import (COLONNES, obstacles_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
+from noyau import (COLONNES, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (LIBELLES_STATUT, avance, badge, bloc_options_travaux, bloc_types, champ, champ_modalite, client_avance,
@@ -105,18 +105,18 @@ def page_client(conn, client_id, query):
              + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
     actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/chantier/nouveau">+ Nouveau chantier</a>'
                f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a></div>')
-    obstacles = obstacles_suppression_client(conn, client_id)
-    if obstacles:
-        suppression = ('<div class="carte"><h2>Supprimer ce client</h2><p class="doux">Impossible : ce client a '
-                       + esc(" et ".join(obstacles)) + ". Il est conservé.</p></div>")
-    else:
-        n = len(chantiers)
-        avec = f" et ses {n} chantier{'s' if n > 1 else ''}" if n else ""
-        confirmation = f"Supprimer définitivement ce client{avec} ? Cette action est irréversible."
-        reste = f" Ses {n} chantier{'s' if n > 1 else ''} seront supprimés avec lui." if n else ""
-        suppression = (f'<div class="carte"><h2>Supprimer ce client</h2><p class="doux">Pour un client créé par erreur.{reste}</p>'
-                       f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
-                       '<button class="danger" type="submit">Supprimer le client</button></form></div>')
+    n, termines, paiements = resume_suppression_client(conn, client_id)
+    efface = []
+    if n:
+        efface.append(f"{n} chantier{'s' if n > 1 else ''}" + (f" (dont {termines} terminé{'s' if termines > 1 else ''}, archives comprises)" if termines else ""))
+    if paiements:
+        efface.append(f"{paiements} paiement{'s' if paiements > 1 else ''}")
+    detail = " et ".join(efface)
+    confirmation = ("Supprimer définitivement ce client" + (f" avec {detail}" if detail else "") + " ? Tout disparaît, y compris des archives. Cette action est irréversible.")
+    suppression = ('<div class="carte"><h2>Supprimer ce client</h2><p class="doux">Efface le client et tout ce qui le concerne'
+                   + (f" : {esc(detail)}" if detail else "") + ". Définitif, y compris dans les archives.</p>"
+                   f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
+                   '<button class="danger" type="submit">Supprimer le client</button></form></div>')
     return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Chantiers</h2>{historique}{suppression}', query.get("ok"), query.get("err"))
 
 
