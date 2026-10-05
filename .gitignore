@@ -1,0 +1,11 @@
+# Données réelles de l'entreprise : JAMAIS dans Git (privé et local).
+# Le dépôt ne contient que le schéma, les outils, la doc et des exemples fictifs.
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
