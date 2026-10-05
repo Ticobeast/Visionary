@@ -5,7 +5,7 @@
 -- Création :   sqlite3 data/sylvainculteur.db < schema/schema.sql
 --          ou  python3 outils/importer_saisie.py ...   (crée la base si absente)
 --
--- Modèle :  secteurs 1─N clients 1─N chantiers 1─N paiements
+-- Modèle :  clients 1─N chantiers 1─N paiements
 --                         └─N chantier_travaux (un ou plusieurs types de travaux, avec précision)
 --   clients    = la personne / l'entreprise ET son adresse (géocodée UNE fois)
 --   chantiers  = un travail pour un client (statut, date, durée, prix) :
@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 6;
+PRAGMA user_version = 5;
 
 
 -- -----------------------------------------------------------------------------
@@ -51,38 +51,6 @@ INSERT INTO types_travaux (code, libelle) VALUES
 
 
 -- -----------------------------------------------------------------------------
--- Secteurs desservis : liste fermée (liste déroulante dans l'interface), pour qu'une ville s'écrive toujours de
--- la même façon (jamais « Trois Rivieres » / « Trois-Riviere »...) et pour classer / filtrer les clients.
--- Chaque secteur indique la ville inscrite sur l'adresse (ex. « Cap-de-la-Madeleine » -> ville « Trois-Rivières »).
--- Pour en ajouter : page « Secteurs » de l'interface (ou un simple INSERT).
--- -----------------------------------------------------------------------------
-CREATE TABLE secteurs (
-    code    TEXT PRIMARY KEY
-            CONSTRAINT ck_secteurs_code CHECK (code NOT GLOB '*[^a-z0-9_]*' AND code <> ''),
-    libelle TEXT NOT NULL UNIQUE COLLATE NOCASE
-            CONSTRAINT ck_secteurs_libelle CHECK (trim(libelle) <> ''),
-    ville   TEXT NOT NULL
-            CONSTRAINT ck_secteurs_ville CHECK (trim(ville) <> ''),
-    ordre   INTEGER NOT NULL DEFAULT 100
-);
-
-INSERT INTO secteurs (code, libelle, ville, ordre) VALUES
-    ('centre_ville',          'Centre-ville',           'Trois-Rivières',  10),
-    ('trois_rivieres_ouest',  'Trois-Rivières-Ouest',   'Trois-Rivières',  20),
-    ('cap_de_la_madeleine',   'Cap-de-la-Madeleine',    'Trois-Rivières',  30),
-    ('sainte_marthe_du_cap',  'Sainte-Marthe-du-Cap',   'Trois-Rivières',  40),
-    ('pointe_du_lac',         'Pointe-du-Lac',          'Trois-Rivières',  50),
-    ('saint_louis_de_france', 'Saint-Louis-de-France',  'Trois-Rivières',  60),
-    ('becancour',             'Bécancour',              'Bécancour',       70),
-    ('champlain',             'Champlain',              'Champlain',       80),
-    ('yamachiche',            'Yamachiche',             'Yamachiche',      90),
-    ('saint_etienne_des_gres','Saint-Étienne-des-Grès', 'Saint-Étienne-des-Grès', 100),
-    ('shawinigan',            'Shawinigan',             'Shawinigan',     110),
-    ('louiseville',           'Louiseville',            'Louiseville',    120),
-    ('nicolet',               'Nicolet',                'Nicolet',        130);
-
-
--- -----------------------------------------------------------------------------
 -- Clients : une personne ou une entreprise, directement reliée à son adresse.
 -- -----------------------------------------------------------------------------
 CREATE TABLE clients (
@@ -98,9 +66,7 @@ CREATE TABLE clients (
     -- Adresse "à la Postes Canada" : numéro + type + nom de rue, ville officielle.
     -- Google Maps l'accepte telle quelle : voir adresse_maps dans v_chantiers.
     adresse        TEXT NOT NULL,             -- ex. 123 Rue des Érables
-    ville          TEXT NOT NULL,             -- ex. Trois-Rivières (déduite du secteur choisi dans l'interface)
-    secteur        TEXT REFERENCES secteurs(code) ON UPDATE CASCADE ON DELETE RESTRICT,
-                                              -- secteur desservi (liste fermée) ; vide pour d'anciens clients
+    ville          TEXT NOT NULL,             -- ex. Saint-Jérôme
     province       TEXT NOT NULL DEFAULT 'QC',
     code_postal    TEXT,                      -- ex. J7Z 1A1 (facultatif mais recommandé)
 
@@ -175,11 +141,6 @@ CREATE TABLE chantiers (
     duree_estimee_h REAL,     -- heures décimales, temps écoulé sur place
     duree_reelle_h  REAL,     -- idem, mesuré après coup (sert à améliorer les estimés)
 
-    -- Options de la job, à connaître pour préparer le travail
-    nacelle         INTEGER NOT NULL DEFAULT 0,   -- 1 = nacelle requise
-    debarrasser_bois INTEGER NOT NULL DEFAULT 0,  -- 1 = on débarrasse le bois (abattage / élagage)
-    bois_format     TEXT,     -- si le bois reste sur place : '16_pouces' (bûches de 16 po) ou '4_pieds' (longueurs de 4 pi)
-
     prix_ht         REAL,     -- $ CAD avant taxes (estimé tant que non facturé, puis final)
     tps             REAL NOT NULL DEFAULT 0,   -- $ TPS (0 si non inscrit aux taxes)
     tvq             REAL NOT NULL DEFAULT 0,   -- $ TVQ (0 si non inscrit aux taxes)
@@ -197,12 +158,6 @@ CREATE TABLE chantiers (
 
     CONSTRAINT ck_chantiers_modalite
         CHECK (modalite_paiement IS NULL OR modalite_paiement IN ('comptant','cheque','interac','carte','autre')),
-    CONSTRAINT ck_chantiers_nacelle
-        CHECK (typeof(nacelle) = 'integer' AND nacelle IN (0, 1)),
-    CONSTRAINT ck_chantiers_debarrasser_bois
-        CHECK (typeof(debarrasser_bois) = 'integer' AND debarrasser_bois IN (0, 1)),
-    CONSTRAINT ck_chantiers_bois_format
-        CHECK (bois_format IS NULL OR (bois_format IN ('16_pouces', '4_pieds') AND debarrasser_bois = 0)),
     CONSTRAINT ck_chantiers_statut
         CHECK (statut IN ('soumission','en_attente','a_planifier','planifie','termine','annule')),
     CONSTRAINT ck_chantiers_ordre_jour
@@ -326,7 +281,6 @@ WHEN OLD.statut = 'termine' AND (
      OR NEW.date_soumission IS NOT OLD.date_soumission OR NEW.date_prevue IS NOT OLD.date_prevue
      OR NEW.duree_estimee_h IS NOT OLD.duree_estimee_h OR NEW.duree_reelle_h IS NOT OLD.duree_reelle_h
      OR NEW.prix_ht IS NOT OLD.prix_ht OR NEW.tps IS NOT OLD.tps OR NEW.tvq IS NOT OLD.tvq
-     OR NEW.nacelle IS NOT OLD.nacelle OR NEW.debarrasser_bois IS NOT OLD.debarrasser_bois OR NEW.bois_format IS NOT OLD.bois_format
      OR NEW.modalite_paiement IS NOT OLD.modalite_paiement OR NEW.dossier_photos IS NOT OLD.dossier_photos
      OR NEW.fichier_papier IS NOT OLD.fichier_papier OR NEW.ref_papier IS NOT OLD.ref_papier)
 BEGIN
@@ -393,12 +347,9 @@ base AS (
         COALESCE(NULLIF(trim(COALESCE(cl.prenom, '') || ' ' || COALESCE(cl.nom, '')), ''), cl.entreprise) AS client_nom_complet,
         cl.telephone, cl.telephone_2, cl.courriel, cl.sms_ok,
         cl.adresse, cl.ville, cl.province, cl.code_postal,
-        cl.secteur AS secteur_code, sec.libelle AS secteur,
         cl.adresse || ', ' || cl.ville || ', ' || cl.province
             || COALESCE(' ' || cl.code_postal, '') || ', Canada' AS adresse_maps,
         cl.latitude, cl.longitude, cl.geocode_statut, cl.notes_acces,
-
-        c.nacelle, c.debarrasser_bois, c.bois_format,
 
         c.prix_ht, c.tps, c.tvq,
         ROUND(COALESCE(c.prix_ht, 0) + c.tps + c.tvq, 2) AS total_ttc,
@@ -408,7 +359,6 @@ base AS (
         c.dossier_photos, c.fichier_papier, c.ref_papier
     FROM chantiers c
     JOIN clients cl       ON cl.id = c.client_id
-    LEFT JOIN secteurs sec ON sec.code = cl.secteur
     LEFT JOIN recu r      ON r.chantier_id = c.id
 ),
 calcul AS (
@@ -429,7 +379,7 @@ SELECT
     END AS statut_paiement
 FROM calcul
 )
--- archive = 1 : chantier annulé, ou terminé ET réglé (ou gratuit) : il sort de la liste active et va dans les « Archives »
+-- archive = 1 : chantier terminé ET réglé (ou gratuit) : sort de la liste active, il va dans les « Archives »
 SELECT paiement.*,
-       CASE WHEN statut = 'annule' OR (statut = 'termine' AND statut_paiement IN ('paye', 'sans_objet')) THEN 1 ELSE 0 END AS archive
+       CASE WHEN statut = 'termine' AND statut_paiement IN ('paye', 'sans_objet') THEN 1 ELSE 0 END AS archive
 FROM paiement;

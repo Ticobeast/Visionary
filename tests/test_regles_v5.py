@@ -169,9 +169,13 @@ class TestArchive(Base):
         noyau.encaisser(self.conn, i, "100", "carte", "2026-10-03")
         self.assertEqual(self.archive(i), 1)
 
-    def test_annule_n_est_pas_archive(self):
+    def test_annule_est_archive_automatiquement(self):
         i = self.chantier(statut="annule", prix=100)
-        self.assertEqual(self.archive(i), 0)
+        self.assertEqual(self.archive(i), 1)
+        j = self.chantier(statut="planifie", prix=100, date="2026-12-01")
+        self.assertEqual(self.archive(j), 0)
+        noyau.annuler_chantier(self.conn, j)
+        self.assertEqual(self.conn.execute("SELECT statut, ordre_jour, archive FROM v_chantiers WHERE chantier_id = ?", (j,)).fetchone(), ("annule", None, 1))
 
 
 class TestDuplication(Base):

@@ -29,7 +29,9 @@ qu'**une seule date** (prévue, puis réalisée : si le chantier est déplacé, 
 
 Règles appliquées par l'application **et** par la base : le client ne se modifie que depuis sa fiche ; un chantier **Terminé** est
 verrouillé en lecture seule (on peut seulement le facturer, l'encaisser et le dupliquer) ; **jamais de solde négatif** ; un seul mode
-de règlement parmi cinq ; durée estimée obligatoire ; un chantier terminé **et payé** passe seul dans les *Archives*.
+de règlement parmi cinq ; durée estimée obligatoire ; le statut est **automatique** (Journée → Planifié, Retirer → À planifier, Annuler → archivé) ; un
+chantier annulé, ou terminé **et payé**, passe seul dans les *Archives* ; la ville d'un client se choisit dans une **liste de secteurs** (pas de doublons
+d'écriture) ; nacelle et sort du bois sont des options du travail.
 
 ## Contenu
 
@@ -39,13 +41,13 @@ outils/interface.py                     serveur local + saisie complète (nouvea
 outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)
 outils/tableau.py                       page Journée (créer / gérer une journée) et actions rapides (statut, ordre, encaissement)
 outils/composants.py                    cellules (client, adresse, travaux, montant, paiement) et formulaires rapides partagés, fenêtre « Terminé ? »
-outils/pages_clients.py                 liste des clients, fiche client, formulaire simplifié de nouveau chantier
+outils/pages_clients.py                 liste des clients, fiche client, secteurs desservis, formulaire simplifié de nouveau chantier
 outils/pages_chantier.py                page d'un chantier (client en lecture seule, verrou « Terminé », paiements, duplication)
 outils/vue.py                           composants d'affichage partagés
 outils/importer_saisie.py               import d'une feuille CSV (validation, tout ou rien, sauvegarde)
 outils/noyau.py                         règles de validation et d'écriture partagées par les deux
 outils/donnees_test.py                  crée une base d'ESSAI avec de fausses données
-outils/migrer.py                        convertit une base de l'ancien format (v1 à v4) sans rien perdre
+outils/migrer.py                        convertit une base de l'ancien format (v1 à v5) sans rien perdre
 modeles/saisie_papier_*.csv             feuille de saisie CSV : vide + 3 exemples fictifs
 lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
 lancer_essai.bat / .command / .py       double-clic (ou bouton « Exécuter » de VS Code) : base d'ESSAI (fausses données)
@@ -64,7 +66,7 @@ data/                                   TES données (exclu de Git) : base, phot
 python3 -m unittest discover -s tests                  # vérifier l'installation : doit finir par OK
 python3 outils/interface.py --essai                    # base d'ESSAI (fausses données) : data/test.db
 python3 outils/interface.py                            # la VRAIE base (créée au premier lancement)
-python3 outils/migrer.py data/sylvainculteur.db        # seulement si une base créée avant une mise à jour refuse de s'ouvrir (v1 à v4 -> v5)
+python3 outils/migrer.py data/sylvainculteur.db        # seulement si une base créée avant une mise à jour refuse de s'ouvrir (v1 à v5 -> v6)
 ```
 
 **Bouton « Exécuter » de VS Code** : ouvre `lancer_essai.py` (essai) ou `lancer_interface.py` (vraie base) ; ne lance pas

@@ -1,10 +1,10 @@
-# Dictionnaire de données (schéma v5)
+# Dictionnaire de données (schéma v6)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
 
 ```
-clients (personne/entreprise + adresse) 1 ─── N chantiers 1 ─── N paiements
+secteurs 1 ─── N clients (personne/entreprise + adresse) 1 ─── N chantiers 1 ─── N paiements
                                                   │
                                                   └── N chantier_travaux → types_travaux (types + précision)
 ```
@@ -16,6 +16,7 @@ clients (personne/entreprise + adresse) 1 ─── N chantiers 1 ─── N pa
 | `chantier_travaux` | un type de travaux d'un chantier, avec sa précision | un chantier peut combiner plusieurs types (élagage + taille de haie) |
 | `paiements` | une somme reçue | acompte + solde, chèque en deux versements… |
 | `types_travaux` | un type de travaux | on ajoute un type avec un `INSERT`, sans modifier le schéma |
+| `secteurs` | un secteur desservi (liste fermée) : `code`, `libelle`, `ville` (inscrite sur l'adresse), `ordre` | une ville s'écrit toujours de la même façon (liste déroulante) ; sert à classer / filtrer les clients. Se gère dans la page *Secteurs* |
 
 Un client qui possède deux propriétés = **deux fiches clients** (une par adresse), simplement.
 
@@ -44,7 +45,8 @@ Un client qui possède deux propriétés = **deux fiches clients** (une par adre
 | `courriel` | texte | non | forme `x@y.z`, sans espace | `marie.gagnon@example.com` |
 | `sms_ok` | 0/1 | oui, défaut `1` | `0` = ne jamais envoyer de texto à ce client | `1` |
 | `adresse` | texte | **oui** | numéro + type + nom de rue, comme sur une enveloppe | `123 Rue des Érables` |
-| `ville` | texte | **oui** | nom officiel | `Saint-Jérôme` |
+| `ville` | texte | **oui** | nom officiel ; **dans l'interface elle vient du secteur choisi** (jamais saisie à la main) | `Trois-Rivières` |
+| `secteur` | texte | non en base, **obligatoire dans l'interface** | → `secteurs.code` (liste fermée) ; vide pour d'anciens clients (à choisir dans leur fiche). Importé via la colonne `client_secteur` (code ou libellé) | `cap_de_la_madeleine` |
 | `province` | texte | oui, défaut `QC` | 2 lettres majuscules | `QC` |
 | `code_postal` | texte | non (recommandé) | `A1A 1A1` | `J7Z 1A1` |
 | `latitude`, `longitude` | réel | non | les deux ou aucune ; remplies par le script de géocodage (étape 2) ou à la main | `45.6480`, `-74.0920` |
@@ -75,6 +77,9 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `ordre_jour` | entier | auto | rang du chantier dans sa journée (1, 2, 3…), géré par l'application (flèches ▲ ▼) ; vide si le chantier n'est ni planifié ni terminé. **Les heures de passage n'y sont pas stockées : elles sont calculées** (début 7 h 30, dîner 12 h - 12 h 30, d'après l'ordre et `duree_estimee_h`) | `2` |
 | `duree_estimee_h` | réel | **oui (interface et import)** | durée sur place en heures, 0 < d ≤ 24 ; calcule les heures de la journée. Exigée par l'application (formulaires, import CSV, planification) ; la base elle-même accepte `NULL` pour pouvoir lire d'anciennes données | `3.0` |
 | `duree_reelle_h` | réel | non | n'existe pas à la création d'une soumission ; **préremplie avec la durée estimée au passage à « Terminé »** (modifiable à ce moment-là seulement) | `3.5` |
+| `nacelle` | 0/1 | oui, défaut `0` | nacelle requise | `1` |
+| `debarrasser_bois` | 0/1 | oui, défaut `0` | `1` = on débarrasse le bois | `0` |
+| `bois_format` | texte | non | si le bois reste sur place : `16_pouces` ou `4_pieds` (jamais avec `debarrasser_bois = 1`) ; exigé par l'interface pour un abattage / élagage non débarrassé | `16_pouces` |
 | `prix_ht` | réel | non | avant taxes ; estimé tant que non facturé, puis final | `480.00` |
 | `tps` | réel | oui, défaut `0` | montant de TPS (laisser `0` si non inscrit aux taxes) | `24.00` |
 | `tvq` | réel | oui, défaut `0` | montant de TVQ (idem) | `47.88` |
@@ -140,7 +145,7 @@ Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiem
 
 ### Archives — calculées, jamais saisies
 
-`v_chantiers.archive = 1` quand le chantier est **Terminé ET payé** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Le chantier passe tout seul des « Actifs » aux « Archives » (section en bas de la page *Chantiers*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent.
+`v_chantiers.archive = 1` quand le chantier est **Annulé** (archivé aussitôt), ou **Terminé ET payé** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Le chantier passe tout seul des « Actifs » aux « Archives » (section en bas de la page *Chantiers*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent.
 
 ### Dupliquer un chantier
 
@@ -203,8 +208,8 @@ une fiche = un chantier) ; l'import range chaque colonne dans la bonne table :
 
 | Colonnes de la feuille | Destination |
 |---|---|
-| `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes`, `adresse`, `ville`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `clients` |
-| `type_travaux`, `statut`, `description`, `date_*`, `duree_*`, `prix_ht`, `tps`, `tvq`, `modalite_paiement`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
+| `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes`, `adresse`, `ville`, `client_secteur`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `clients` |
+| `type_travaux`, `nacelle`, `debarrasser_bois` (oui/non), `bois_format` (`16 pouces` / `4 pieds`), `statut`, `description`, `date_*`, `duree_*`, `prix_ht`, `tps`, `tvq`, `modalite_paiement`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
 | `paiement_date`, `paiement_montant`, `paiement_mode` | `paiements` (un paiement par ligne ; les acomptes supplémentaires se saisissent dans l'interface) |
 
 L'import est plus souple que la base, puis écrit toujours le format strict :

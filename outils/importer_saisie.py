@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noyau import (COLONNES, COLONNES_REQUISES, DB_DEFAUT, Index, Resultat, alias_types_travaux,  # noqa: E402
+from noyau import (COLONNES, COLONNES_REQUISES, appliquer_secteur, DB_DEFAUT, Index, Resultat, alias_types_travaux,  # noqa: E402
                    creer_chantier, lire_ligne, ouvrir_base, sauvegarder, trouver_ou_creer_client)
 
 
@@ -81,7 +81,10 @@ def importer(csv_path, db_path=DB_DEFAUT, simulation=False, taxes_auto=False):
         if len(cellules) > len(entete):
             res.erreurs.append((no, ["plus de cellules que de colonnes (une virgule dans un texte non entouré de guillemets ?)"]))
             continue
-        v, erreurs = lire_ligne(dict(zip(entete, cellules)), alias_types, taxes_auto)
+        brut = dict(zip(entete, cellules))
+        erreurs_secteur = appliquer_secteur(conn, brut, requis=False)       # la ville vient du secteur choisi
+        v, erreurs = lire_ligne(brut, alias_types, taxes_auto)
+        erreurs = erreurs_secteur + erreurs
         if erreurs:
             res.erreurs.append((no, erreurs))
             continue

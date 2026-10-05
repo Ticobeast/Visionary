@@ -16,7 +16,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 5
+VERSION_SCHEMA = 6
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -34,8 +34,8 @@ TAUX_TVQ = Decimal("0.09975")
 # Ordre des colonnes de la feuille de saisie : les plus utilisées d'abord.
 COLONNES = [
     "client_nom", "client_prenom", "client_entreprise", "client_telephone",
-    "adresse", "ville", "code_postal",
-    "type_travaux", "statut", "description",
+    "adresse", "ville", "client_secteur", "code_postal",
+    "type_travaux", "nacelle", "debarrasser_bois", "bois_format", "statut", "description",
     "date_soumission", "date_prevue",
     "duree_estimee_h", "duree_reelle_h",
     "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
@@ -56,6 +56,13 @@ STATUTS_SANS_DATE = ("soumission", "en_attente", "a_planifier")
 ALIAS_ANCIENS_STATUTS = {"accepte": "a_planifier", "refuse": "annule"}
 MODES = ("comptant", "cheque", "interac", "carte", "autre")
 LIBELLES_MODE = {"comptant": "Comptant", "cheque": "Chèque", "interac": "Interac", "carte": "Carte", "autre": "Autre"}
+# Bois qui reste sur place (abattage / élagage) : format des morceaux.
+FORMATS_BOIS = ("16_pouces", "4_pieds")
+LIBELLES_BOIS = {"16_pouces": "16 pouces", "4_pieds": "4 pieds"}
+TYPES_AVEC_BOIS = ("abattage", "elagage")        # types de travaux où le sort du bois doit être précisé
+# Statuts qu'on choisit à la main (la suite du parcours est automatique : Journée -> Planifié, Retirer -> À planifier,
+# Annuler -> Annulé + archives, Terminer -> Terminé).
+STATUTS_MANUELS = ("soumission", "en_attente", "a_planifier")
 
 RE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 RE_CODE_POSTAL = re.compile(r"^[A-Z]\d[A-Z]\d[A-Z]\d$")
@@ -267,6 +274,7 @@ def _lire_client(L, v):
 
     v["adresse"] = L.requis("adresse")
     v["ville"] = L.requis("ville")
+    v["secteur"] = L.texte("client_secteur")        # code du secteur (résolu par appliquer_secteur)
     prov = L.texte("province")
     v["province"] = prov.upper() if prov else "QC"
     if not re.fullmatch(r"[A-Z]{2}", v["province"]):
@@ -296,6 +304,12 @@ def lire_ligne(brut, alias_types, taxes_auto):
     v["travaux"] = L.travaux("type_travaux", alias_types)
     alias_statuts = {**{cle(c): c for c in STATUTS}, **{cle(l): c for c, l in LIBELLES_STATUT.items()}, **ALIAS_ANCIENS_STATUTS}
     v["statut"] = L.choix("statut", STATUTS, alias_statuts, obligatoire=True)
+    v["nacelle"] = L.booleen("nacelle") or 0
+    v["debarrasser_bois"] = L.booleen("debarrasser_bois") or 0
+    alias_bois = {**{cle(c): c for c in FORMATS_BOIS}, **{cle(l): c for c, l in LIBELLES_BOIS.items()}}
+    v["bois_format"] = L.choix("bois_format", FORMATS_BOIS, alias_bois)
+    if v["bois_format"] and v["debarrasser_bois"]:
+        L.erreurs.append("bois_format n'a de sens que si le bois n'est pas débarrassé (debarrasser_bois = non)")
     v["description"] = L.texte("description", multiligne=True)
     v["date_soumission"] = L.jour("date_soumission")
     v["date_prevue"] = L.jour("date_prevue")
@@ -358,7 +372,7 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (1, 2, 3, 4):
+        if version in (1, 2, 3, 4, 5):
             raise SystemExit(f"La base {db_path} utilise un ancien format (v{version}).\n"
                              f"Convertis-la d'abord (une sauvegarde est faite) :  python outils/migrer.py \"{db_path}\"")
         if version != VERSION_SCHEMA:
@@ -497,12 +511,12 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir, enrichir=True):
                     "nouvelle fiche client (2e propriété ?)")
         cur = conn.execute(
             "INSERT INTO clients (prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok,"
-            " adresse, ville, province, code_postal, latitude, longitude, geocode_statut, notes_acces, notes)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " adresse, ville, secteur, province, code_postal, latitude, longitude, geocode_statut, notes_acces, notes)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (v["client_prenom"], v["client_nom"], v["client_entreprise"], v["client_telephone"],
              v["client_telephone_2"], v["client_courriel"],
              1 if v["client_sms_ok"] is None else v["client_sms_ok"],
-             v["adresse"], v["ville"], v["province"], v["code_postal"], v["latitude"], v["longitude"],
+             v["adresse"], v["ville"], v["secteur"], v["province"], v["code_postal"], v["latitude"], v["longitude"],
              "manuel" if a_coords else "a_faire", v["notes_acces"], v["client_notes"]))
         client_id = cur.lastrowid
         res.clients_crees += 1
@@ -517,7 +531,7 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir, enrichir=True):
             _enrichir(conn, client_id, {
                 "prenom": v["client_prenom"], "nom": v["client_nom"], "entreprise": v["client_entreprise"],
                 "telephone": v["client_telephone"], "telephone_2": v["client_telephone_2"],
-                "courriel": v["client_courriel"], "code_postal": v["code_postal"],
+                "courriel": v["client_courriel"], "code_postal": v["code_postal"], "secteur": v["secteur"],
                 "notes": v["client_notes"], "notes_acces": v["notes_acces"],
             }, {"notes", "notes_acces"}, avertir)
             if v["client_sms_ok"] == 0:  # un refus de textos l'emporte toujours
@@ -559,13 +573,13 @@ def _champs_differents(conn, chantier_id, v):
 
 
 def _valeurs_chantier(v):
-    return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"],
+    return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"], v["nacelle"], v["debarrasser_bois"], v["bois_format"],
             _num(v["duree_estimee_h"]), _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0,
             _num(v["tvq"]) or 0, v["modalite_paiement"], v["numero_facture"], v["date_facture"], v["dossier_photos"],
             v["fichier_papier"], v["ref_papier"])
 
 
-COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue",
+COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue", "nacelle", "debarrasser_bois", "bois_format",
                      "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture",
                      "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
 
@@ -648,7 +662,7 @@ def mettre_a_jour_client(conn, client_id, v):
         "prenom": v["client_prenom"], "nom": v["client_nom"], "entreprise": v["client_entreprise"],
         "telephone": v["client_telephone"], "telephone_2": v["client_telephone_2"],
         "courriel": v["client_courriel"], "sms_ok": 1 if v["client_sms_ok"] is None else v["client_sms_ok"],
-        "adresse": v["adresse"], "ville": v["ville"], "province": v["province"],
+        "adresse": v["adresse"], "ville": v["ville"], "secteur": v["secteur"], "province": v["province"],
         "code_postal": v["code_postal"], "notes_acces": v["notes_acces"], "notes": v["client_notes"],
         **coords,
     }
@@ -677,13 +691,13 @@ def _txt(x, fmt=None):
 
 def valeurs_client(conn, client_id):
     """Fiche d'un client sous forme de textes (clés de la feuille de saisie), ou None."""
-    r = conn.execute("SELECT prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville,"
+    r = conn.execute("SELECT prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville, secteur,"
                      " province, code_postal, latitude, longitude, notes_acces, notes FROM clients WHERE id = ?",
                      (client_id,)).fetchone()
     if r is None:
         return None
     cols = ["client_prenom", "client_nom", "client_entreprise", "client_telephone", "client_telephone_2",
-            "client_courriel", "client_sms_ok", "adresse", "ville", "province", "code_postal", "latitude",
+            "client_courriel", "client_sms_ok", "adresse", "ville", "client_secteur", "province", "code_postal", "latitude",
             "longitude", "notes_acces", "client_notes"]
     return {c: _txt(x, repr if c in ("latitude", "longitude") else None) for c, x in zip(cols, r)}
 
@@ -961,10 +975,11 @@ def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=N
     Le prix peut être ajusté ; les taxes sont alors recalculées (avec_taxes=None : reprend le choix de l'original).
     Retourne (id du nouveau chantier ou None, erreurs).
     """
-    src = conn.execute("SELECT client_id, description, duree_estimee_h, prix_ht, tps, tvq, modalite_paiement FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    src = conn.execute("SELECT client_id, description, duree_estimee_h, prix_ht, tps, tvq, modalite_paiement, nacelle, debarrasser_bois, bois_format"
+                       " FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if src is None:
         return None, [f"chantier #{chantier_id} introuvable"]
-    client_id, desc, duree_src, prix_src, tps_src, tvq_src, modalite = src
+    client_id, desc, duree_src, prix_src, tps_src, tvq_src, modalite, nacelle, bois, format_bois = src
     L = Ligne({"prix_ht": prix_ht if prix_ht is not None else "", "duree_estimee_h": duree if duree is not None else ""})
     prix, h = L.montant("prix_ht"), L.duree("duree_estimee_h")
     if L.erreurs:
@@ -977,13 +992,120 @@ def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=N
         avec_taxes = (tps_src or 0) + (tvq_src or 0) > 0
     tps, tvq = taxes_pour(prix) if (avec_taxes and prix is not None) else (Decimal("0"), Decimal("0"))
     cur = conn.execute(
-        "INSERT INTO chantiers (client_id, description, statut, date_soumission, duree_estimee_h, prix_ht, tps, tvq, modalite_paiement)"
-        " VALUES (?, ?, 'soumission', ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO chantiers (client_id, description, statut, date_soumission, duree_estimee_h, prix_ht, tps, tvq, modalite_paiement,"
+        " nacelle, debarrasser_bois, bois_format) VALUES (?, ?, 'soumission', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (client_id, (description if description is not None else desc), datetime.date.today().isoformat(), duree_finale,
-         _num(prix), float(tps), float(tvq), modalite))
+         _num(prix), float(tps), float(tvq), modalite, nacelle, bois, format_bois))
     conn.execute("INSERT INTO chantier_travaux (chantier_id, type_travaux, precision) "
                  "SELECT ?, type_travaux, precision FROM chantier_travaux WHERE chantier_id = ?", (cur.lastrowid, chantier_id))
     return cur.lastrowid, []
+
+
+# ---------------------------------------------------------------------------
+# Statuts automatiques : la Journée n'offre aucun choix de statut. Planifier = ajouter à une journée (planifier_lot) ;
+# Retirer = retour à « À planifier » ; Annuler = « Annulé » (sort de la journée, va aux archives) ; Terminer = « Terminé ».
+# ---------------------------------------------------------------------------
+def annuler_chantier(conn, chantier_id):
+    """Annule un chantier (il disparaît de sa journée et est archivé). Un chantier terminé ne s'annule pas."""
+    return changer_statut(conn, chantier_id, "annule")
+
+
+def rouvrir_chantier(conn, chantier_id):
+    """Un chantier annulé par erreur redevient « À planifier »."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"chantier #{chantier_id} introuvable"]
+    if r[0] != "annule":
+        return ["seul un chantier annulé peut être rouvert"]
+    return changer_statut(conn, chantier_id, "a_planifier")
+
+
+def terminer_chantier(conn, chantier_id, duree_reelle=None):
+    """Passe un chantier « Planifié » à « Terminé » (durée réelle reprise de l'estimée si non fournie), puis le verrouille."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"chantier #{chantier_id} introuvable"]
+    if r[0] == "termine":
+        return [VERROU]
+    if r[0] != "planifie":
+        return ["seul un chantier planifié (placé dans une journée) peut être terminé"]
+    return changer_statut(conn, chantier_id, "termine", duree_reelle=duree_reelle)
+
+
+# ---------------------------------------------------------------------------
+# Secteurs desservis (liste fermée : jamais de ville écrite à la main)
+# ---------------------------------------------------------------------------
+def lister_secteurs(conn):
+    """[(code, libellé, ville)] dans l'ordre d'affichage."""
+    return conn.execute("SELECT code, libelle, ville FROM secteurs ORDER BY ordre, libelle COLLATE NOCASE").fetchall()
+
+
+def appliquer_secteur(conn, brut, requis):
+    """Résout `client_secteur` (code ou libellé, sans tenir compte des accents ni de la casse) dans une ligne brute.
+
+    La ville de l'adresse est celle du secteur : elle remplace toute ville saisie (aucune variante d'écriture possible).
+    Retourne la liste des erreurs ; requis=False (import CSV) accepte un secteur vide.
+    """
+    valeur = (brut.get("client_secteur") or "").strip()
+    if not valeur:
+        return ["client_secteur est obligatoire (choisis le secteur dans la liste)"] if requis else []
+    for code, libelle, ville in lister_secteurs(conn):
+        if cle(valeur) in (cle(code), cle(libelle)):
+            brut["client_secteur"], brut["ville"] = code, ville
+            return []
+    return [f"client_secteur « {valeur} » inconnu (secteurs : {', '.join(l for _, l, _ in lister_secteurs(conn))})"]
+
+
+def _code_secteur(libelle):
+    return re.sub(r"\s+", "_", cle(libelle))
+
+
+def ajouter_secteur(conn, libelle, ville=None):
+    """Ajoute un secteur. Refuse un doublon (même nom à l'accent, au tiret ou à la casse près). Retourne (code, erreurs)."""
+    libelle = re.sub(r"\s+", " ", (libelle or "").strip())
+    ville = re.sub(r"\s+", " ", (ville or "").strip()) or libelle
+    if not libelle:
+        return None, ["donne un nom au secteur"]
+    existants = lister_secteurs(conn)
+    for code, lib, _ in existants:
+        if cle(lib) == cle(libelle):
+            return None, [f"le secteur « {lib} » existe déjà"]
+    for _, _, vil in existants:           # une ville déjà connue garde son écriture officielle
+        if cle(vil) == cle(ville):
+            ville = vil
+            break
+    code = _code_secteur(libelle)
+    if not code:
+        return None, ["nom de secteur invalide"]
+    base, n = code, 1
+    codes = {c for c, _, _ in existants}
+    while code in codes:
+        n += 1
+        code = f"{base}_{n}"
+    ordre = (conn.execute("SELECT COALESCE(MAX(ordre), 0) FROM secteurs").fetchone()[0] // 10 + 1) * 10
+    conn.execute("INSERT INTO secteurs (code, libelle, ville, ordre) VALUES (?,?,?,?)", (code, libelle, ville, ordre))
+    return code, []
+
+
+def renommer_secteur(conn, code, libelle):
+    libelle = re.sub(r"\s+", " ", (libelle or "").strip())
+    if not libelle:
+        return ["donne un nom au secteur"]
+    if not conn.execute("SELECT 1 FROM secteurs WHERE code = ?", (code,)).fetchone():
+        return ["secteur introuvable"]
+    for c, lib, _ in lister_secteurs(conn):
+        if c != code and cle(lib) == cle(libelle):
+            return [f"le secteur « {lib} » existe déjà"]
+    conn.execute("UPDATE secteurs SET libelle = ? WHERE code = ?", (libelle, code))
+    return []
+
+
+def supprimer_secteur(conn, code):
+    n = conn.execute("SELECT count(*) FROM clients WHERE secteur = ?", (code,)).fetchone()[0]
+    if n:
+        return [f"{n} client{'s' if n > 1 else ''} utilise{'nt' if n > 1 else ''} ce secteur : change d'abord leur secteur"]
+    conn.execute("DELETE FROM secteurs WHERE code = ?", (code,))
+    return []
 
 
 def supprimer_chantier(conn, chantier_id):

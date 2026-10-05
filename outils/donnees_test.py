@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, taxes_pour,  # noqa: E402
+from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, lister_secteurs, taxes_pour,  # noqa: E402
                    ouvrir_base, trouver_ou_creer_client)
 
 PRENOMS = ["Marie", "Jean", "Sylvie", "Luc", "Nathalie", "Pierre", "Isabelle", "Marc", "Julie", "André",
@@ -27,8 +27,7 @@ NOMS = ["Tremblay", "Gagnon", "Roy", "Côté", "Bouchard", "Gauthier", "Morin", 
         "Ouellet", "Pelletier", "Bélanger", "Lévesque", "Bergeron", "Leblanc", "Paquette", "Girard", "Simard", "Boucher"]
 RUES = ["Rue des Érables", "Rue des Pins", "Boulevard du Lac", "Chemin des Cèdres", "Avenue du Parc", "Rue Principale",
         "Rang Saint-Jean", "Rue des Bouleaux", "Montée Sainte-Marie", "Rue des Lilas"]
-VILLES = [("Saint-Jérôme", "J7Z"), ("Blainville", "J7C"), ("Mirabel", "J7J"), ("Sainte-Thérèse", "J7E"),
-          ("Saint-Eustache", "J7R"), ("Prévost", "J0R"), ("Boisbriand", "J7G"), ("Lorraine", "J6Z")]
+CODES_POSTAUX = {"Trois-Rivières": ["G8T", "G8V", "G8W", "G8Y", "G9A", "G9B", "G9C"], "Shawinigan": ["G9N", "G9P"]}   # ailleurs : G0X
 TYPES = {  # code: (prix min, prix max, description)
     "taille_haie": (250, 900, "haie de cèdres, environ {n} m"),
     "emondage": (300, 1500, "{n} arbres matures"),
@@ -49,13 +48,15 @@ def generer(db, nombre=40, graine=2026):
     conn, _ = ouvrir_base(db)
     alias = alias_types_travaux(conn)
     idx, res = Index(conn), Resultat()
+    secteurs = [(code, ville) for code, _, ville in lister_secteurs(conn)]
     clients = []
     for i in range(max(1, nombre * 2 // 3)):
-        ville, prefixe = rnd.choice(VILLES)
+        code_secteur, ville = rnd.choice(secteurs)           # la ville vient du secteur (liste fermée)
+        prefixe = rnd.choice(CODES_POSTAUX.get(ville, ["G0X"]))
         clients.append(dict(
             client_nom=rnd.choice(NOMS), client_prenom=rnd.choice(PRENOMS),
-            client_telephone=f"+1450555{100 + i % 100:04d}",
-            adresse=f"{rnd.randint(2, 1999)} {rnd.choice(RUES)}", ville=ville,
+            client_telephone=f"+1819555{100 + i % 100:04d}",
+            adresse=f"{rnd.randint(2, 1999)} {rnd.choice(RUES)}", ville=ville, client_secteur=code_secteur,
             code_postal=f"{prefixe} {rnd.randint(1, 9)}{rnd.choice('ABCEGHJKLMNPRSTVXY')}{rnd.randint(1, 9)}",
             client_sms_ok="0" if rnd.random() < 0.1 else "1"))
     conn.execute("BEGIN")
@@ -70,8 +71,12 @@ def generer(db, nombre=40, graine=2026):
             autre = rnd.choice([t_ for t_ in TYPES if t_ != type_])
             travaux += f" + {autre}: {TYPES[autre][2].format(n=rnd.randint(2, 20))}"
             prix += round(rnd.randint(TYPES[autre][0], TYPES[autre][1]) / 5) * 5
-        ligne = {**c, "type_travaux": travaux, "description": rnd.choice(["", "", "Résidus ramassés.", "Appeler avant de venir."]),
+        ligne = {**c, "type_travaux": travaux, "nacelle": "oui" if rnd.random() < 0.15 else "non", "description": rnd.choice(["", "", "Résidus ramassés.", "Appeler avant de venir."]),
                  "duree_estimee_h": f"{min(duree, 8):g}", "prix_ht": f"{prix:.2f}", "ref_papier": f"Classeur A, fiche {k + 1}"}
+        if type_ in ("abattage", "elagage") or "abattage" in travaux or "elagage" in travaux:
+            ligne["debarrasser_bois"] = rnd.choice(["oui", "non"])
+            if ligne["debarrasser_bois"] == "non":
+                ligne["bois_format"] = rnd.choice(["16 pouces", "4 pieds"])
         sort = rnd.random()
         ligne["modalite_paiement"] = rnd.choice(["", "interac", "cheque", "comptant", "carte"])
         if sort < 0.55:        # passé : terminé

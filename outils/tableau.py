@@ -11,7 +11,8 @@ from urllib.parse import urlencode
 from calendrier import panneau_jour
 from composants import (FILTRES_ATTENTE, JOURNEE_H, TRIS, avec_params, cellule_adresse, cellule_client, cellule_montant,
                         lignes_vue, nom_client, retour_valide)
-from noyau import changer_statut, cle, deplacer, encaisser, facturer, jours_attente, planifier_lot, priorite, transaction
+from noyau import (annuler_chantier, changer_statut, cle, deplacer, encaisser, jours_attente, planifier_lot, priorite, rouvrir_chantier,
+                   terminer_chantier, transaction)
 from vue import badge_attente, esc, gabarit, heures, redirection
 
 
@@ -42,21 +43,36 @@ def _id(form):
     return int(v) if v.isdigit() else 0
 
 
-def action_statut(conn, form):
-    return _terminer(conn, form, "statut_change", lambda: changer_statut(
-        conn, _id(form), form.get("statut", ""), form.get("date_prevue"), None, form.get("duree_reelle_h")),   # la durée estimée ne se change pas ici
-        extra={"terminer": None})
+def action_terminer(conn, form):
+    """Passe un chantier « Planifié » à « Terminé » (durée réelle reprise de l'estimée si non saisie)."""
+    return _terminer(conn, form, "termine", lambda: terminer_chantier(conn, _id(form), form.get("duree_reelle_h")),
+                     extra={"terminer": None})
 
 
-def action_facturer(conn, form):
-    return _terminer(conn, form, "facture", lambda: facturer(conn, _id(form), form.get("date_facture") or None, form.get("numero_facture")))
+def action_annuler(conn, form):
+    """Annule un chantier : il disparaît de la journée et va dans les archives."""
+    return _terminer(conn, form, "annule", lambda: annuler_chantier(conn, _id(form)), extra={"terminer": None})
+
+
+def action_rouvrir(conn, form):
+    return _terminer(conn, form, "rouvert", lambda: rouvrir_chantier(conn, _id(form)), extra={"terminer": None})
 
 
 def action_encaisser(conn, form):
-    """Enregistre le paiement ; si le chantier est « Planifié », propose ensuite de le passer à « Terminé »."""
-    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (_id(form),)).fetchone()
+    """Encaisse le montant PRÉVU (le solde) : le montant n'est pas modifiable depuis le tableau de bord ni la Journée ;
+    seul le mode de paiement se confirme. Si le chantier est « Planifié », propose ensuite de le passer à « Terminé »."""
+    r = conn.execute("SELECT statut, solde FROM v_chantiers WHERE chantier_id = ?", (_id(form),)).fetchone()
     extra = {"terminer": _id(form)} if r and r[0] == "planifie" else {"terminer": None}
-    return _terminer(conn, form, "encaisse", lambda: encaisser(conn, _id(form), form.get("montant"), form.get("mode")), extra=extra)
+
+    def travail():
+        if r is None:
+            return [f"chantier #{_id(form)} introuvable"]
+        if r[0] not in ("planifie", "termine"):
+            return ["seul un chantier planifié ou terminé peut être encaissé"]
+        if not r[1] or r[1] <= 0:
+            return ["rien à encaisser : le chantier n'a pas de solde"]
+        return encaisser(conn, _id(form), f"{r[1]:.2f}", form.get("mode"))
+    return _terminer(conn, form, "encaisse", travail, extra=extra)
 
 
 def action_retirer(conn, form):
@@ -102,9 +118,9 @@ def page_journee(conn, query):
 
     # --- les chantiers à placer
     candidats = [l for l in toutes if l["statut"] == f_statut and not (l["statut"] == "planifie" and l["date_prevue"] == jour)]
-    secteurs = sorted({l["ville"] for l in candidats}, key=cle)
+    secteurs = sorted({l["secteur_nom"] for l in candidats}, key=cle)
     if f_secteur:
-        candidats = [l for l in candidats if l["ville"] == f_secteur]
+        candidats = [l for l in candidats if l["secteur_nom"] == f_secteur]
     if f_attente:
         candidats = [l for l in candidats if priorite(l["jours"]) == f_attente]
 
@@ -129,9 +145,9 @@ def page_journee(conn, query):
 
     corps, secteur_courant = "", None
     for l in candidats:
-        if tri == "secteur" and l["ville"] != secteur_courant:
-            secteur_courant = l["ville"]
-            dans = [x for x in candidats if x["ville"] == secteur_courant]
+        if tri == "secteur" and l["secteur_nom"] != secteur_courant:
+            secteur_courant = l["secteur_nom"]
+            dans = [x for x in candidats if x["secteur_nom"] == secteur_courant]
             h = sum(x["duree_estimee_h"] or 0 for x in dans)
             corps += (f'<tr><td colspan="6"><b>Secteur : {esc(secteur_courant)}</b> <span class="doux">{len(dans)} chantier{"s" if len(dans) > 1 else ""}'
                       f'{" · " + heures(h) if h else ""}</span></td></tr>')
@@ -188,8 +204,9 @@ ROUTES_TABLEAU = [
     ("POST", r"^/journee/planifier$", lambda c, q, f, *g: action_planifier_lot(c, f)),
     ("GET", r"^/tournee$", _vers_journee),                                   # anciens liens et favoris
     ("GET", r"^/suivi$", lambda c, q, f, *g: redirection("/chantiers")),     # le Suivi n'existe plus : Journée + Chantiers
-    ("POST", r"^/action/statut$", lambda c, q, f, *g: action_statut(c, f)),
-    ("POST", r"^/action/facturer$", lambda c, q, f, *g: action_facturer(c, f)),
+    ("POST", r"^/action/terminer$", lambda c, q, f, *g: action_terminer(c, f)),
+    ("POST", r"^/action/annuler$", lambda c, q, f, *g: action_annuler(c, f)),
+    ("POST", r"^/action/rouvrir$", lambda c, q, f, *g: action_rouvrir(c, f)),
     ("POST", r"^/action/encaisser$", lambda c, q, f, *g: action_encaisser(c, f)),
     ("POST", r"^/action/retirer$", lambda c, q, f, *g: action_retirer(c, f)),
     ("POST", r"^/action/deplacer$", lambda c, q, f, *g: action_deplacer(c, f)),

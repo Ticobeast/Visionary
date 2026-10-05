@@ -57,13 +57,13 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 10 | Se tromper exprès : téléphone `123`, code postal `ZZZ`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 11 | Modifier l'adresse d'un client, puis supprimer un paiement et un chantier de test | tout se passe sans erreur |
 | 12 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
-| 13 | **Tableau de bord** (accueil) | **seulement** un calendrier du mois (pas de tuiles) : les jours planifiés montrent « 3 chantiers · 6 h 30 » ; les jours trop chargés (> 8 h) sont en rouge |
-| 14 | Cliquer sur une **date** du calendrier | le déroulement de la journée s'affiche dessous, **en lecture seule** : durée totale, **puis le total en $** (taxes incluses), chantiers dans l'ordre avec heures, temps de chacun, statut, paiements et **montant à droite** ; ni flèches, ni liste de statut, ni durée modifiable ; seulement « Retirer » et « Gérer cette journée » |
+| 13 | **Tableau de bord** (accueil) | **seulement** un calendrier du mois ; **dans chaque case** d'un jour planifié : « N chantiers », « ⏱ Temps total : X h », « 💰 Montant total : XXX $ » ; les jours trop chargés (> 8 h) sont en rouge |
+| 14 | Cliquer sur une **date** du calendrier | le déroulement de la journée s'affiche dessous : durée totale, **total en $** (taxes incluses), chantiers dans l'ordre avec heures, temps de chacun, options (🏗 nacelle, 🪵 bois), statut, paiements et **montant à droite** ; ni flèches, ni statut, ni durée modifiables ; seulement « Retirer » et « Encaisser » (montant prévu **non modifiable**, on confirme) |
 | 15 | Repérer le **dîner** : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
 | 16 | Page **Journée** : cliquer **▼** sur le 1er chantier, puis **▲** sur le 3e | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités la flèche est grisée |
 | 17 | Sur la page **Journée**, chercher où modifier la **durée** d'un chantier ; l'ouvrir (lien du chantier), changer « Durée estimée » (ex. `1`), enregistrer | aucun champ de durée dans la Journée ni sur le tableau de bord ; sur le chantier, les heures des suivants se décalent |
-| 18 | Changer le **statut** d'un chantier depuis la page **Journée** (« Terminé », puis « À planifier » sur un autre) | « Terminé » reste dans la journée (verrouillé) ; « À planifier » le fait disparaître du calendrier |
-| 19 | **Encaisser** sur un chantier « Planifié » | le paiement est enregistré, puis une fenêtre demande : *Voulez-vous passer ce chantier au statut "Terminé" ?* — « Oui » le passe à Terminé, « Non » le laisse Planifié |
+| 18 | Page **Journée** : chercher où changer le **statut** d'un chantier | il n'y a **aucun** choix de statut : ajouter à la journée = Planifié ; **Retirer** = À planifier ; **Annuler** (confirmation) = disparaît de la journée et va dans les **Archives** |
+| 19 | **Encaisser** (tableau de bord ou Journée) sur un chantier « Planifié » | le montant prévu est affiché sans pouvoir le modifier ; après confirmation le paiement est enregistré, puis une fenêtre demande : *Voulez-vous passer ce chantier au statut "Terminé" ?* — « Oui » le passe à Terminé, « Non » le laisse Planifié |
 | 20 | Même encaissement sur un chantier « Terminé » ou « À planifier » | **aucune** fenêtre |
 | 21 | **Chantiers** : regarder la liste active | délai d'attente en pastille (rouge > 30 j, jaune 7 à 30 j, vert < 7 j) sur les chantiers à planifier ; temps de chaque chantier ; **montant à droite** ; filtres statut / paiement |
 | 22 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
@@ -81,6 +81,14 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 34 | **Dupliquer le chantier** sur un chantier terminé : changer le prix, valider | nouvelle **soumission** du même client : mêmes travaux, date de demande = aujourd'hui, aucun paiement ni facture ; l'original est intact |
 | 35 | Menu du haut | seulement : Tableau de bord, Journée, Chantiers, Clients, + Nouveau (ni Suivi, ni Tournées, ni Archives) ; les archives sont en bas de la page Chantiers |
 | 36 | Ouvrir un chantier existant | résumé + valeur à droite, client en lecture seule, paiements ; le reste (dates, taxes, facture, fichiers, suppression) est dans « Paramètres avancés » (replié) |
+| 37 | **Chantiers** : regarder la colonne de date | c'est la **date de la demande / soumission** (pas la date planifiée, qui n'apparaît que comme « prévu le … ») ; classement du plus récent au plus ancien |
+| 38 | Annuler un chantier (page du chantier, « Paramètres avancés » → « Annuler le chantier », ou « Annuler » dans la Journée) | il quitte les chantiers actifs et la journée, et apparaît dans les **Archives** ; « ↩ Rouvrir » le remet « À planifier » |
+| 39 | Page d'un chantier planifié | le statut et la date sont affichés (« géré automatiquement », « se change dans la page Journée ») ; « ✔ Marquer comme terminé » le termine (durée réelle reprise de l'estimée) |
+| 40 | **+ Nouveau** : regarder « Ville / secteur » | **liste déroulante** obligatoire (pas de champ texte) ; la ville de l'adresse (Google Maps) vient du secteur ; impossible d'écrire « Trois Rivieres » |
+| 41 | **Clients** → « Gérer les secteurs desservis » : ajouter « Cap de la Madeleine » ; ajouter « Nouveau secteur » ; renommer ; supprimer un secteur utilisé | le doublon (accent / tiret / casse près) est refusé ; un secteur utilisé ne se supprime pas ; la liste déroulante suit |
+| 42 | **Clients** et **Chantiers** : filtrer par secteur | seuls les clients / chantiers de ce secteur ; le secteur est écrit sous l'adresse |
+| 43 | Nouveau chantier : cocher « 🏗 Nacelle requise », puis un abattage **sans** cocher « Débarrasser le bois » | refusé tant que le format du bois (16 pouces / 4 pieds) n'est pas précisé ; ces options sont visibles **sans** ouvrir « Paramètres avancés » |
+| 44 | Ouvrir le chantier, la liste *Chantiers*, le tableau de bord, la Journée | 🏗 « Nacelle requise » et 🪵 « Bois débarrassé » / « Bois laissé sur place : 16 pouces » s'affichent partout où le travail apparaît |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

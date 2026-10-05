@@ -4,7 +4,7 @@ import datetime
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from noyau import (MODES, SEUIL_SURVEILLER, SEUIL_URGENT, STATUTS, cle, jours_attente)
-from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, argent, badge, esc, heures, lien_maps)
+from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, argent, badge, esc, heures, lien_maps, puces_options)
 
 JOURNEE_H = 8.0   # repère d'une journée de travail (heures), pour voir ce qu'il reste de place
 
@@ -19,7 +19,7 @@ MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août
 COLONNES_VUE = ["chantier_id", "client_id", "client_nom_complet", "telephone", "adresse", "ville", "code_postal",
                 "adresse_maps", "type_libelle", "travaux_detail", "description", "statut", "statut_paiement", "solde",
                 "total_ttc", "paye", "prix_ht", "date_prevue", "ordre_jour", "duree_estimee_h", "attente_depuis",
-                "modalite_paiement", "date_facture", "secteur_tri"]
+                "modalite_paiement", "date_facture", "secteur", "nacelle", "debarrasser_bois", "bois_format", "secteur_tri"]
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +34,8 @@ def lignes_vue(conn, condition="1=1", params=()):
     lignes = []
     for r in cur.fetchall():
         l = dict(zip(noms, r))
-        l["secteur_tri"] = (cle(l["ville"]), (l["code_postal"] or "").replace(" ", ""))
+        l["secteur_nom"] = l["secteur"] or l["ville"]
+        l["secteur_tri"] = (cle(l["secteur_nom"]), (l["code_postal"] or "").replace(" ", ""))
         lignes.append(l)
     return lignes, aujourdhui
 
@@ -68,32 +69,25 @@ def mode_conseille(modalite):
 VERROUILLE = '<span class="badge b-termine" title="Chantier terminé : verrouillé en lecture seule">🔒 Terminé</span>'
 
 
-def actions_paiement(l, retour):
-    sp, st = l["statut_paiement"], l["statut"]
-    out = []
-    if sp not in ("sans_objet", "a_venir"):
-        out.append(badge(sp, LIBELLES_PAIEMENT[sp]))
-    if l["total_ttc"]:
-        detail = f'Total {argent(l["total_ttc"])}'
-        if l["paye"]:
-            detail += f' · reçu {argent(l["paye"])} · solde <b>{argent(l["solde"])}</b>'
-        out.append(f'<div class="doux">{detail}</div>')
-    if l["modalite_paiement"]:
-        out.append(f'<div class="doux">Règlement prévu : {esc(LIBELLES_MODE.get(l["modalite_paiement"], l["modalite_paiement"]))}</div>')
-    if sp == "non_facture":
-        out.append(f'<form class="mini" method="post" action="/action/facturer"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
-                   f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire">Facturer</button></form>')
-    if sp == "prix_manquant":
-        out.append(f'<div class="doux"><a href="/chantier/{l["chantier_id"]}">Saisir le prix</a></div>')
-    # on n'encaisse que ce qui est fait ou planifié (acompte) ; pas une soumission ni un chantier à planifier
-    if st in ("planifie", "termine") and l["solde"] and l["solde"] > 0 and l["total_ttc"]:
-        mode = mode_conseille(l["modalite_paiement"])
-        options = "".join(f'<option value="{m}"{" selected" if m == mode else ""}>{esc(LIBELLES_MODE[m])}</option>' for m in MODES)
-        out.append(f'<form class="mini" method="post" action="/action/encaisser"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
-                   f'<input type="hidden" name="retour" value="{esc(retour)}"><input class="court" style="width:84px" name="montant" '
-                   f'value="{l["solde"]:.2f}" inputmode="decimal" aria-label="Montant reçu" title="Montant reçu (taxes incluses)">'
-                   f'<select name="mode" aria-label="Mode de paiement">{options}</select><button type="submit">Encaisser</button></form>')
-    return "".join(out)
+def bouton_encaisser(l, retour):
+    """« Encaisser » en un clic : le montant prévu (le solde) est affiché mais NON modifiable ; on confirme seulement.
+
+    Un montant partiel (acompte) s'enregistre sur la page du chantier. Seuls les chantiers planifiés ou terminés s'encaissent.
+    """
+    if l["statut"] not in ("planifie", "termine") or not l["solde"] or l["solde"] <= 0 or not l["total_ttc"]:
+        return ""
+    mode = mode_conseille(l["modalite_paiement"])
+    options = "".join(f'<option value="{m}"{" selected" if m == mode else ""}>{esc(LIBELLES_MODE[m])}</option>' for m in MODES)
+    texte = f"Encaisser {argent(l['solde'])} ?"
+    return (f'<form class="mini encaisser" method="post" action="/action/encaisser" onsubmit="return confirm({esc(repr(texte))})">'
+            f'<input type="hidden" name="chantier_id" value="{l["chantier_id"]}"><input type="hidden" name="retour" value="{esc(retour)}">'
+            f'<span class="doux">Montant prévu :<br><b class="nw">{argent(l["solde"])}</b></span>'
+            f'<select name="mode" aria-label="Mode de paiement">{options}</select><button type="submit">Encaisser</button></form>')
+
+
+def paiement_cellule(l, retour):
+    """État du paiement (lecture seule) + bouton Encaisser."""
+    return paiement_lecture(l) + bouton_encaisser(l, retour)
 
 
 def cellule_client(l):
@@ -103,24 +97,16 @@ def cellule_client(l):
 
 
 def cellule_adresse(l):
-    return (f'{lien_maps(l["adresse_maps"], l["adresse"])}<div class="doux">{esc(l["ville"])}'
+    return (f'{lien_maps(l["adresse_maps"], l["adresse"])}<div class="doux">{esc(l["secteur_nom"])}'
             f'{" · " + esc(l["code_postal"]) if l["code_postal"] else ""}</div>')
 
 
 def cellule_travaux(l):
     duree = f'<span class="total">⏱ {heures(l["duree_estimee_h"])}</span>' if l["duree_estimee_h"] else '<span class="doux">durée à estimer</span>'
     desc = f'<div class="doux">{esc(l["description"])}</div>' if l["description"] else ""
-    return f'<a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a><div>{duree}</div>{desc}'
-
-
-def form_statut_jour(l, retour):
-    """Statut d'un chantier, dans la page Journée (la date et la durée ne se changent pas ici : elles sont celles du chantier)."""
-    if l["statut"] == "termine":
-        return VERROUILLE
-    options = "".join(f'<option value="{s}"{" selected" if s == l["statut"] else ""}>{esc(LIBELLES_STATUT[s])}</option>' for s in STATUTS)
-    return (f'<form class="mini" method="post" action="/action/statut"><input type="hidden" name="chantier_id" value="{l["chantier_id"]}">'
-            f'<input type="hidden" name="retour" value="{esc(retour)}"><input type="hidden" name="date_prevue" value="{esc(l["date_prevue"])}">'
-            f'<select name="statut" aria-label="Statut">{options}</select><button type="submit" class="secondaire">OK</button></form>')
+    options = puces_options(l["nacelle"], l["debarrasser_bois"], l["bois_format"])
+    return (f'<a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a><div>{duree}</div>'
+            f'{f"<div>{options}</div>" if options else ""}{desc}')
 
 
 def cellule_montant(l):
@@ -159,8 +145,8 @@ def fenetre_terminer(conn, chantier_id, chemin, query):
             f'<h2 id="modale-titre">Paiement enregistré</h2><p><b>{esc(r[1])}</b> — {esc(r[2] or r[3])}</p>'
             f'<p class="question">Voulez-vous passer ce chantier au statut &quot;Terminé&quot; ?</p>'
             f'<p class="doux">Une fois terminé, le chantier est verrouillé en lecture seule.</p>'
-            f'<div class="barre"><form method="post" action="/action/statut"><input type="hidden" name="chantier_id" value="{chantier_id}">'
-            f'<input type="hidden" name="statut" value="termine"><input type="hidden" name="retour" value="{esc(retour)}">'
+            f'<div class="barre"><form method="post" action="/action/terminer"><input type="hidden" name="chantier_id" value="{chantier_id}">'
+            f'<input type="hidden" name="retour" value="{esc(retour)}">'
             f'<div style="margin-bottom:12px"><label for="duree_reelle_h">Durée réelle (heures) — reprise de la durée estimée</label>'
             f'<input id="duree_reelle_h" name="duree_reelle_h" value="{r[4] and format(r[4], "g") or ""}" inputmode="decimal"></div>'
             f'<button type="submit">Oui, passer à Terminé</button></form>'

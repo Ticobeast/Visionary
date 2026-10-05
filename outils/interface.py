@@ -22,12 +22,12 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
-from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, jours_attente, ouvrir_base, priorite,  # noqa: E402
-                   sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
+from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, jours_attente, lister_secteurs, ouvrir_base,  # noqa: E402
+                   priorite, sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
 from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, esc, gabarit,  # noqa: E402,F401
-                 heures, redirection)
+                 heures, puces_options, redirection, select_secteur)
 
 # ---------------------------------------------------------------------------
 # Pages
@@ -35,9 +35,10 @@ from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, ba
 LIMITE_ARCHIVES = 50     # archives affichées d'un coup (les plus récentes) ; la recherche couvre tout
 
 
-def _lignes_chantiers(conn, archive, statut, paiement, q, limite):
+def _lignes_chantiers(conn, archive, statut, paiement, secteur, q, limite):
     sql = ("SELECT chantier_id, client_nom_complet, entreprise, adresse, ville, telephone, travaux_detail, description,"
-           " statut, statut_paiement, solde, date_prevue, date_soumission, type_libelle, duree_estimee_h, total_ttc, attente_depuis"
+           " statut, statut_paiement, solde, date_prevue, attente_depuis, type_libelle, duree_estimee_h, total_ttc,"
+           " secteur, nacelle, debarrasser_bois, bois_format"
            " FROM v_chantiers WHERE archive = ?")
     params = [1 if archive else 0]
     if statut in STATUTS:
@@ -48,42 +49,49 @@ def _lignes_chantiers(conn, archive, statut, paiement, q, limite):
     elif paiement in LIBELLES_PAIEMENT:
         sql += " AND statut_paiement = ?"
         params.append(paiement)
-    ordre = "ASC" if statut == "planifie" else "DESC"
-    sql += f" ORDER BY COALESCE(date_prevue, date_soumission, '') {ordre}, chantier_id DESC"
+    if secteur:
+        sql += " AND secteur_code = ?"
+        params.append(secteur)
+    sql += " ORDER BY attente_depuis DESC, chantier_id DESC"          # date principale : celle de la demande / soumission
     lignes = conn.execute(sql, params).fetchall()
     if q:
         mots = cle(q).split()
-        lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in r[1:8] if x)) for m in mots)]
+        lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in (r[1:8] + (r[16],)) if x)) for m in mots)]
     return len(lignes), lignes[:limite]
 
 
 def _table_chantiers(lignes):
     aujourdhui = datetime.date.today()
     corps = ""
-    for (cid, nom, entreprise, adresse, ville, tel, detail, desc, st, stp, solde, dp, ds, type_, duree, total, attente) in lignes:
+    for (cid, nom, entreprise, adresse, ville, tel, detail, desc, st, stp, solde, dp, attente, type_, duree, total,
+         secteur, nacelle, bois, format_bois) in lignes:
         nom_aff = nom if not entreprise or entreprise == nom else f"{nom} · {entreprise}"
-        date_ = esc(dp or ds or "")
+        date_ = esc(attente or "")                                      # la date de la demande, pas la date planifiée
         if st in ("soumission", "en_attente", "a_planifier") and attente:
             jours = jours_attente(attente, aujourdhui)
             date_ += f'<div>{badge_attente(jours, priorite(jours))}</div>'
+        prevu = f'<div class="doux">prévu le {esc(dp)}</div>' if dp and st == "planifie" else ""
         paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""
         if stp in ("non_facture", "a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
         duree_aff = f'<div class="doux">⏱ {esc(heures(duree))}</div>' if duree else ""
         corps += (f'<tr><td>{date_}</td><td><a href="/chantier/{cid}">{esc(nom_aff)}</a></td>'
-                  f'<td>{esc(adresse)}, {esc(ville)}</td><td>{esc(type_)}{duree_aff}</td><td>{badge(st, LIBELLES_STATUT[st])}</td>'
+                  f'<td>{esc(adresse)}<div class="doux">{esc(secteur or ville)}</div></td>'
+                  f'<td>{esc(type_)}{duree_aff}<div>{puces_options(nacelle, bois, format_bois)}</div></td>'
+                  f'<td>{badge(st, LIBELLES_STATUT[st])}{prevu}</td>'
                   f'<td>{paiement}</td><td class="montant">{esc(argent(total)) if total else ""}</td></tr>')
-    return ('<table class="liste"><thead><tr><th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
+    return ('<table class="liste"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
             f'<th>Paiement</th><th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table>')
 
 
 def page_chantiers(conn, query):
-    """Chantiers actifs ; plus bas, les archives (terminés ET payés : déplacés là automatiquement)."""
+    """Chantiers actifs ; plus bas, les archives (annulés, et terminés ET payés : déplacés là automatiquement)."""
     q = query.get("q", "").strip()
     statut = query.get("statut", "")
     paiement = query.get("paiement", "")
-    n_actifs, actifs = _lignes_chantiers(conn, False, statut, paiement, q, 300)
-    n_archives, archives = _lignes_chantiers(conn, True, statut, paiement, q, LIMITE_ARCHIVES)
+    secteur = query.get("secteur", "")
+    n_actifs, actifs = _lignes_chantiers(conn, False, statut, paiement, secteur, q, 300)
+    n_archives, archives = _lignes_chantiers(conn, True, statut, paiement, secteur, q, LIMITE_ARCHIVES)
     total_archives = conn.execute("SELECT count(*) FROM v_chantiers WHERE archive = 1").fetchone()[0]
 
     def puce(href, nombre, texte):
@@ -102,9 +110,10 @@ def page_chantiers(conn, query):
     paiements = [("a_recevoir", "À recevoir (facturé ou partiel)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
     opt_paiement = '<option value="">Tous les paiements</option>' + "".join(
         f'<option value="{k}"{" selected" if k == paiement else ""}>{esc(v)}</option>' for k, v in paiements)
+    select_sect, _ = select_secteur(lister_secteurs(conn), {"secteur": secteur}, nom="secteur", requis=False, tout="Tous les secteurs")
     recherche = (f'<form class="recherche" method="get" action="/chantiers"><input type="search" name="q" value="{esc(q)}" '
-                 f'placeholder="Chercher : nom, téléphone, adresse, ville…"><select name="statut">{opt_statut}</select>'
-                 f'<select name="paiement">{opt_paiement}</select><button type="submit">Chercher</button></form>')
+                 f'placeholder="Chercher : nom, téléphone, adresse, secteur…"><select name="statut">{opt_statut}</select>'
+                 f'<select name="paiement">{opt_paiement}</select>{select_sect}<button type="submit">Chercher</button></form>')
 
     if actifs:
         tableau = _table_chantiers(actifs)
@@ -121,8 +130,9 @@ def page_chantiers(conn, query):
         archives_html = '<div class="carte doux">Aucune archive' + (" ne correspond à cette recherche." if total_archives else " pour l'instant.") + "</div>"
     lien_archives = f' <a class="doux" href="#archives">Archives ({total_archives}) ↓</a>' if total_archives else ""
     section_archives = (f'<h2 id="archives" style="margin-top:32px">📦 Archives <small class="doux">({total_archives})</small></h2>'
-                        '<p class="doux">Chantiers <b>terminés et payés</b>, déplacés ici automatiquement. Ils sont verrouillés en lecture seule ; '
-                        '« Dupliquer » crée une nouvelle soumission pour un travail récurrent.</p>' + archives_html)
+                        '<p class="doux">Chantiers <b>annulés</b>, et chantiers <b>terminés et payés</b> : ils sont déplacés ici automatiquement. '
+                        'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent.</p>'
+                        + archives_html)
     return gabarit("Chantiers", f'<h1>Chantiers{lien_archives}</h1><div class="puces">{puces}</div>{recherche}{tableau}{section_archives}', query.get("ok"))
 
 

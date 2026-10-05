@@ -1,4 +1,4 @@
-"""Tests de la migration d'une ancienne base (v1 à v4) vers le format actuel (v5) : outils/migrer.py."""
+"""Tests de la migration d'une ancienne base (v1 à v4) vers le format actuel (v6) : outils/migrer.py."""
 import sqlite3
 import sys
 import tempfile
@@ -69,7 +69,7 @@ class Base(unittest.TestCase):
             c.close()
 
     def verifier_base_valide(self):
-        self.assertEqual(self.sql("PRAGMA user_version"), [(5,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(6,)])
         self.assertEqual(self.sql("PRAGMA integrity_check"), [("ok",)])
         self.assertEqual(self.sql("PRAGMA foreign_key_check"), [])
 
@@ -129,10 +129,10 @@ class TestMigrationV2V3(Base):
         copie.close()
         self.assertIsNone(migrer.migrer(self.db))            # deuxième passage : rien à faire
 
-    def test_v2_vers_v5(self):
+    def test_v2_vers_v6(self):
         self.verifier("schema_v2.sql", 2)
 
-    def test_v3_vers_v5_convertit_la_modalite_en_choix_unique(self):
+    def test_v3_vers_v6_convertit_la_modalite_en_choix_unique(self):
         self.verifier("schema_v3.sql", 3)
         self.assertEqual(self.sql("SELECT modalite_paiement FROM chantiers WHERE id = 5"), [("interac",)])
 
@@ -147,7 +147,7 @@ class TestMigrationV2V3(Base):
         self.assertEqual(self.sql("SELECT id, modalite_paiement FROM chantiers WHERE id BETWEEN 6 AND 10 ORDER BY id"),
                          [(6, "cheque"), (7, "comptant"), (8, "autre"), (9, None), (10, "carte")])
 
-    def test_v4_vers_v5(self):
+    def test_v4_vers_v6(self):
         c = sqlite3.connect(self.db)
         c.executescript((RACINE / "tests" / "schema_v4.sql").read_text(encoding="utf-8"))
         c.execute("INSERT INTO clients (id, nom, adresse, ville) VALUES (1, 'Roy', '2 Rue B', 'Mirabel')")
@@ -171,6 +171,29 @@ class TestMigrationV2V3(Base):
             with self.assertRaises(sqlite3.IntegrityError, msg=requete):
                 c.execute(requete)
         c.close()
+
+    def test_v5_vers_v6_secteurs_options_et_archive(self):
+        c = sqlite3.connect(self.db)
+        c.executescript((RACINE / "tests" / "schema_v5.sql").read_text(encoding="utf-8"))
+        for i, ville in ((1, "Bécancour"), (2, "Trois Rivieres"), (3, "Blainville"), (4, "centre-ville"), (5, "Trois-Rivières")):
+            c.execute("INSERT INTO clients (id, nom, adresse, ville) VALUES (?, ?, '1 Rue A', ?)", (i, f"C{i}", ville))
+        c.execute("INSERT INTO chantiers (id, client_id, statut, duree_estimee_h, prix_ht) VALUES (1, 1, 'annule', 2, 100)")
+        c.execute("INSERT INTO chantiers (id, client_id, statut, duree_estimee_h, prix_ht) VALUES (2, 2, 'a_planifier', 2, 100)")
+        c.execute("INSERT INTO chantier_travaux VALUES (1, 'abattage', NULL)")
+        c.execute("INSERT INTO chantier_travaux VALUES (2, 'emondage', NULL)")
+        c.commit()
+        c.close()
+        r = migrer.migrer(self.db)
+        self.verifier_base_valide()
+        self.assertEqual((r["clients"], r["chantiers"]), (5, 2))
+        # un secteur est attribué seulement quand la ville désigne UN SEUL secteur ; « Trois-Rivières » en a plusieurs
+        self.assertEqual(self.sql("SELECT id, secteur, ville FROM clients ORDER BY id"),
+                         [(1, "becancour", "Bécancour"), (2, None, "Trois Rivieres"), (3, None, "Blainville"),
+                          (4, "centre_ville", "Trois-Rivières"), (5, None, "Trois-Rivières")])
+        self.assertEqual(r["sans_secteur"], 3)
+        self.assertEqual(self.sql("SELECT nacelle, debarrasser_bois, bois_format FROM chantiers ORDER BY id"), [(0, 0, None), (0, 0, None)])
+        self.assertEqual(self.sql("SELECT chantier_id, archive FROM v_chantiers ORDER BY chantier_id"), [(1, 1), (2, 0)])      # l'annulé est archivé
+        self.assertGreaterEqual(self.sql("SELECT count(*) FROM secteurs")[0][0], 10)
 
     def test_paiement_en_trop_herite_est_signale_sans_perte(self):
         c = sqlite3.connect(self.db)
@@ -199,10 +222,10 @@ class TestMigrationV2V3(Base):
 
 class TestAncienneBaseRefusee(Base):
     def test_refus_avec_instruction(self):
-        for fixture, version in (("schema_v2.sql", "v2"), ("schema_v3.sql", "v3"), ("schema_v4.sql", "v4")):
+        for fixture, version in (("schema_v2.sql", "v2"), ("schema_v3.sql", "v3"), ("schema_v4.sql", "v4"), ("schema_v5.sql", "v5")):
             if self.db.exists():
                 self.db.unlink()
-            if fixture == "schema_v4.sql":
+            if fixture in ("schema_v4.sql", "schema_v5.sql"):
                 c = sqlite3.connect(self.db)
                 c.executescript((RACINE / "tests" / fixture).read_text(encoding="utf-8"))
                 c.close()

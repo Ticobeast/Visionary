@@ -24,7 +24,7 @@ EXEMPLES = RACINE / "modeles" / "saisie_papier_exemples.csv"
 
 def fiche(**perso):
     base = dict(client_nom="Roy", client_prenom="Sylvie", client_telephone="450-555-0111", client_sms_ok="1",
-                adresse="22 Rue des Pins", ville="Mirabel", province="QC", type_emondage="1", statut="soumission", duree_estimee_h="2")
+                adresse="22 Rue des Pins", client_secteur="trois_rivieres_ouest", province="QC", type_emondage="1", statut="soumission", duree_estimee_h="2")
     base.update(perso)
     return base
 
@@ -143,21 +143,22 @@ class TestPages(BaseInterface):
 class TestCreation(BaseInterface):
     def test_creation_complete(self):
         statut, en_tetes, _ = self.post("/nouveau", fiche(
-            date_prevue="2026-10-20", statut="planifie", duree_estimee_h="2,5",
+            statut="a_planifier", duree_estimee_h="2,5", nacelle="1", debarrasser_bois="1",
             prix_ht="300,00", taxes_auto="1", code_postal="j7j1a1", dossier_photos="photos/2026/2026-10-20_roy",
             paiement_date="2026-10-01", paiement_montant="100", paiement_mode="interac"))
         self.assertTrue(statut.startswith("303"))
         self.assertEqual(en_tetes["Location"], "/chantier/4?ok=cree")
-        self.assertEqual(self.sql("SELECT telephone, code_postal, geocode_statut FROM clients WHERE nom = 'Roy'"),
-                         [("+14505550111", "J7J 1A1", "a_faire")])
-        self.assertEqual(self.sql("SELECT statut, date_prevue, ordre_jour, duree_estimee_h, prix_ht, tps, tvq FROM chantiers WHERE id = 4"),
-                         [("planifie", "2026-10-20", 1, 2.5, 300.0, 15.0, 29.93)])
+        self.assertEqual(self.sql("SELECT telephone, code_postal, geocode_statut, secteur, ville FROM clients WHERE nom = 'Roy'"),
+                         [("+14505550111", "J7J 1A1", "a_faire", "trois_rivieres_ouest", "Trois-Rivières")])     # la ville vient du secteur
+        self.assertEqual(self.sql("SELECT statut, date_prevue, ordre_jour, duree_estimee_h, prix_ht, tps, tvq, nacelle, debarrasser_bois, bois_format FROM chantiers WHERE id = 4"),
+                         [("a_planifier", None, None, 2.5, 300.0, 15.0, 29.93, 1, 1, None)])
         self.assertEqual(self.sql("SELECT statut_paiement, solde FROM v_chantiers WHERE chantier_id = 4"), [("partiel", 244.93)])
         self.assertIn("Chantier créé", self.get("/chantier/4?ok=cree")[1])
+        self.assertIn("Nacelle requise", self.get("/chantier/4")[1])
 
     def test_erreurs_gardent_les_valeurs_et_n_ecrivent_rien(self):
-        statut, _, page = self.post("/nouveau", fiche(date_prevue="14/06/2026", client_telephone="123",
-                                                      client_nom="Nom gardé", statut="planifie"))
+        statut, _, page = self.post("/nouveau", fiche(date_soumission="14/06/2026", client_telephone="123",
+                                                      client_nom="Nom gardé"))
         self.assertTrue(statut.startswith("200"))
         self.assertIn("À corriger", page)
         self.assertIn("AAAA-MM-JJ", page)
@@ -171,11 +172,33 @@ class TestCreation(BaseInterface):
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])      # transaction annulée : pas de client orphelin
 
     def test_meme_adresse_reutilise_le_client(self):
-        _, en_tetes, _ = self.post("/nouveau", fiche(client_nom="Gagnon", client_prenom="Marie", adresse="123 rue des erables",
-                                                     ville="Saint-Jerome", type_emondage="", type_elagage="1"))
-        self.assertEqual(en_tetes["Location"], "/chantier/4?ok=cree_reutilise")
-        self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
-        self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id = 4"), [(1,)])
+        self.post("/nouveau", fiche())                                                       # #4 : Sylvie Roy, 22 Rue des Pins, Trois-Rivières-Ouest
+        clients = self.sql("SELECT count(*) FROM clients")
+        _, en_tetes, _ = self.post("/nouveau", fiche(client_nom="Roy", client_prenom="Sylvie", adresse="22 rue des pins",
+                                                     type_emondage="", type_elagage="1", debarrasser_bois="1"))
+        self.assertEqual(en_tetes["Location"], "/chantier/5?ok=cree_reutilise")
+        self.assertEqual(self.sql("SELECT count(*) FROM clients"), clients)
+        self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id = 5"), self.sql("SELECT client_id FROM chantiers WHERE id = 4"))
+
+    def test_le_secteur_est_obligatoire_et_choisi_dans_la_liste(self):
+        for secteur in ("", "n_importe_quoi", "Trois Rivieres"):
+            _, _, page = self.post("/nouveau", fiche(client_secteur=secteur))
+            self.assertIn("client_secteur", page, secteur)
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
+        for saisi, attendu in (("cap_de_la_madeleine", "Cap-de-la-Madeleine"), ("Cap de la Madeleine", "Cap-de-la-Madeleine"),
+                               ("TROIS-RIVIERES-OUEST", "Trois-Rivières-Ouest")):          # code ou libellé, sans accent ni casse
+            self.post("/nouveau", fiche(client_secteur=saisi, adresse=f"{saisi[:3]} 1 Rue Test"))
+            self.assertEqual(self.sql("SELECT s.libelle FROM clients c JOIN secteurs s ON s.code = c.secteur ORDER BY c.id DESC LIMIT 1"), [(attendu,)])
+        self.assertEqual(self.sql("SELECT DISTINCT ville FROM clients WHERE secteur IS NOT NULL"), [("Trois-Rivières",)])    # une seule écriture possible
+
+    def test_la_liste_deroulante_remplace_le_champ_ville(self):
+        page = self.get("/nouveau")[1]
+        self.assertNotIn('name="ville"', page)
+        liste = page[page.index('name="client_secteur"'):]
+        liste = liste[:liste.index("</select>")]
+        for libelle in ("Centre-ville", "Trois-Rivières-Ouest", "Cap-de-la-Madeleine"):
+            self.assertIn(libelle, liste)
+        self.assertIn("<optgroup", liste)
 
 
 class TestModification(BaseInterface):
@@ -203,7 +226,7 @@ class TestModification(BaseInterface):
     def test_le_client_est_en_lecture_seule_sur_la_page_du_chantier(self):
         page = self.get("/chantier/3")[1]
         formulaire = page[page.index('<form method="post" action="/chantier/3">'):page.index("</form>", page.index('<form method="post" action="/chantier/3">'))]
-        for interdit in ("client_nom", "client_prenom", "client_telephone", "client_courriel", "adresse", "ville", "code_postal", "client_sms_ok"):
+        for interdit in ("client_nom", "client_prenom", "client_telephone", "client_courriel", "adresse", "ville", "client_secteur", "code_postal", "client_sms_ok"):
             self.assertNotIn(f'name="{interdit}"', formulaire)
         self.assertIn("Lecture seule", page)
         self.assertIn("850 Boulevard du Lac", page)                                   # mais le client est bien affiché
@@ -213,7 +236,7 @@ class TestModification(BaseInterface):
         avant = self.sql("SELECT * FROM clients ORDER BY id")
         self.post("/chantier/3", {**self.formulaire_de(3), "client_nom": "PIRATE", "client_prenom": "X", "adresse": "1 Rue Fausse",
                                   "ville": "Ailleurs", "client_telephone": "514-555-0199", "code_postal": "H0H 0H0",
-                                  "client_sms_ok": "0", "latitude": "45.5", "longitude": "-73.5", "client_id": "1"})
+                                  "client_sms_ok": "0", "client_secteur": "centre_ville", "latitude": "45.5", "longitude": "-73.5", "client_id": "1"})
         self.assertEqual(self.sql("SELECT * FROM clients ORDER BY id"), avant)
         self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id = 3"), [(3,)])
 
@@ -227,24 +250,28 @@ class TestModification(BaseInterface):
 
     def test_le_client_se_modifie_depuis_sa_fiche_seulement(self):
         self.post("/client/3/modifier", {"client_nom": "Boucher", "client_prenom": "Luc", "client_entreprise": "Syndicat Les Jardins du Lac",
-                                         "client_telephone": "+14505550163", "adresse": "99 Chemin Neuf", "ville": "Blainville",
-                                         "province": "QC", "code_postal": "J7C 2X1"})
+                                         "client_telephone": "+14505550163", "adresse": "99 Chemin Neuf", "client_secteur": "centre_ville",
+                                         "province": "QC", "code_postal": "G8Z 1A1"})
         self.assertIn("99 Chemin Neuf", self.get("/chantier/3")[1])
         self.assertEqual(self.sql("SELECT latitude, longitude, geocode_statut FROM clients WHERE id = 3"), [(None, None, "a_faire")])
 
-    def test_passer_a_termine_exige_la_date(self):
+    def test_le_formulaire_ne_peut_pas_choisir_planifie_ni_termine_ni_annule(self):
         self.post("/nouveau", fiche(statut="a_planifier"))                        # chantier #4, sans date
-        f = {**self.formulaire_de(4), "statut": "termine"}
-        _, _, page = self.post("/chantier/4", f)
-        self.assertIn("date_prevue est obligatoire", page)
-        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 4"), [("a_planifier",)])
-        self.post("/chantier/4", {**f, "date_prevue": "2026-10-14", "duree_reelle_h": "6,5"})
-        self.assertEqual(self.sql("SELECT statut, date_prevue, duree_reelle_h FROM chantiers WHERE id = 4"),
-                         [("termine", "2026-10-14", 6.5)])
+        for statut in ("planifie", "termine", "annule", "bidon"):
+            self.post("/chantier/4", {**self.formulaire_de(4), "statut": statut, "date_prevue": "2026-10-14"})
+            self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 4"), [("a_planifier", None)], statut)
+        self.post("/chantier/4", {**self.formulaire_de(4), "statut": "en_attente"})            # les statuts d'avant la planification, oui
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 4"), [("en_attente",)])
+
+    def test_un_chantier_planifie_garde_son_statut_et_sa_date_quoi_que_le_formulaire_envoie(self):
+        f = self.formulaire_de(3)
+        self.post("/chantier/3", {**f, "statut": "a_planifier", "date_prevue": "2026-12-25"})
+        self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 3"), [("planifie", "2026-10-14")])
 
     def test_duree_reelle_reprend_la_duree_estimee_a_la_cloture(self):
         self.post("/nouveau", fiche(statut="a_planifier", duree_estimee_h="3,5"))
-        self.post("/chantier/4", {**self.formulaire_de(4), "statut": "termine", "date_prevue": "2026-10-14"})   # durée réelle laissée vide
+        self.post("/journee/planifier", {"date": "2026-10-14", "sel_4": "1", "retour": "/journee"})
+        self.post("/action/terminer", {"chantier_id": "4", "retour": "/"})
         self.assertEqual(self.sql("SELECT statut, duree_estimee_h, duree_reelle_h FROM chantiers WHERE id = 4"), [("termine", 3.5, 3.5)])
 
     def test_duree_reelle_cachee_a_la_creation(self):
@@ -261,13 +288,14 @@ class TestModification(BaseInterface):
         self.assertEqual(self.sql("SELECT duree_estimee_h FROM chantiers WHERE id = 3"), [(6.0,)])
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
 
-    def test_une_seule_date_changer_le_jour_met_a_jour_la_date_prevue(self):
-        f = self.formulaire_de(3)
-        self.post("/chantier/3", {**f, "date_prevue": "2026-10-16"})          # le chantier est déplacé
+    def test_la_date_des_travaux_se_change_dans_la_journee(self):
+        page = self.get("/chantier/3")[1]
+        self.assertNotIn('name="date_prevue"', page)                           # pas de champ date sur le chantier
+        self.assertIn("se change dans la page Journée", page)
+        self.post("/journee/planifier", {"date": "2026-10-16", "sel_3": "1", "retour": "/journee"})      # le chantier est déplacé
         self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 3"), [("planifie", "2026-10-16")])
-        self.post("/chantier/3", {**f, "date_prevue": "2026-10-16", "statut": "termine"})   # puis il est fait ce jour-là
+        self.post("/action/terminer", {"chantier_id": "3", "retour": "/"})                               # puis il est fait ce jour-là
         self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 3"), [("termine", "2026-10-16")])
-        self.assertNotIn("Date réalisée", self.get("/chantier/3")[1])
 
     def test_plusieurs_types_avec_precision_et_une_seule_description(self):
         self.post("/chantier/3", {**self.formulaire_de(3), "type_elagage": "1", "precision_elagage": "érable côté garage",
@@ -319,18 +347,20 @@ class TestSimpleParDefaut(BaseInterface):
         page = self.get("/nouveau")[1]
         visible, cache = self.separer(page, '<form method="post" action="/nouveau">')
         champs = {c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))}
-        self.assertEqual(champs, {"client_nom", "client_prenom", "client_telephone", "adresse", "ville", "duree_estimee_h", "prix_ht",
-                                  "taxes_auto", "description"})
+        # essentiel : le client (avec son secteur dans une liste), les travaux et leurs options (nacelle, bois), durée, prix, description
+        self.assertEqual(champs, {"client_nom", "client_prenom", "client_telephone", "adresse", "client_secteur", "nacelle", "debarrasser_bois",
+                                  "bois_format", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
         self.assertIn("Paramètres avancés", page)
-        for avance in ("client_entreprise", "client_courriel", "code_postal", "notes_acces", "latitude", "statut", "date_soumission", "date_prevue",
+        self.assertNotIn("date_prevue", self.noms(cache))                      # la date des travaux vient de la Journée
+        for avance in ("client_entreprise", "client_courriel", "code_postal", "notes_acces", "latitude", "statut", "date_soumission",
                        "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture", "paiement_montant", "dossier_photos", "fichier_papier"):
             self.assertIn(avance, self.noms(cache), avance)
             self.assertNotIn(avance, self.noms(visible), avance)
         self.assertNotIn(" open", page[page.index('<details class="avance"'):][:30])     # replié par défaut
 
     def test_creation_avec_l_essentiel_seulement(self):
-        _, en_tetes, _ = self.post("/nouveau", {"client_nom": "Simon", "client_telephone": "450-555-0188", "adresse": "5 Rue Courte", "ville": "Mirabel",
-                                                "type_elagage": "1", "duree_estimee_h": "2", "prix_ht": "300"})
+        _, en_tetes, _ = self.post("/nouveau", {"client_nom": "Simon", "client_telephone": "450-555-0188", "adresse": "5 Rue Courte", "client_secteur": "pointe_du_lac",
+                                                "type_elagage": "1", "debarrasser_bois": "1", "duree_estimee_h": "2", "prix_ht": "300"})
         self.assertIn("ok=cree", en_tetes["Location"])
         self.assertEqual(self.sql("SELECT statut, duree_estimee_h, prix_ht, date_soumission FROM chantiers WHERE id = 4"),
                          [("soumission", 2.0, 300.0, datetime.date.today().isoformat())])
@@ -341,7 +371,7 @@ class TestSimpleParDefaut(BaseInterface):
         self.assertEqual(self.sql("SELECT courriel, code_postal FROM clients WHERE nom = 'Roy'"), [("s@example.com", "J7J 1A1")])
 
     def test_une_erreur_dans_les_avances_les_ouvre(self):
-        _, _, page = self.post("/nouveau", fiche(date_prevue="14/06/2026"))
+        _, _, page = self.post("/nouveau", fiche(date_soumission="14/06/2026"))
         self.assertIn('<details class="avance" open>', page)
         self.assertIn("AAAA-MM-JJ", page)
 
@@ -349,7 +379,8 @@ class TestSimpleParDefaut(BaseInterface):
         page = self.get("/chantier/3")[1]
         visible, cache = self.separer(page, '<form method="post" action="/chantier/3">')
         champs = {c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))}
-        self.assertEqual(champs, {"statut", "date_prevue", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
+        # planifié : le statut et la date sont affichés (gérés par la Journée), pas des champs
+        self.assertEqual(champs, {"nacelle", "debarrasser_bois", "bois_format", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
         for avance in ("date_soumission", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
                        "ref_papier", "fichier_papier", "dossier_photos"):
             self.assertIn(avance, self.noms(cache), avance)
@@ -384,11 +415,11 @@ class TestSimpleParDefaut(BaseInterface):
         page = self.get("/client/3/chantier/nouveau")[1]
         visible, cache = self.separer(page, '<form method="post" action="/client/3/chantier/nouveau">')
         self.assertEqual({c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))},
-                         {"duree_estimee_h", "prix_ht", "taxes_auto", "description"})
+                         {"nacelle", "debarrasser_bois", "bois_format", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
         self.assertEqual(self.noms(cache), {"date_soumission", "modalite_paiement"})
         page = self.get("/client/3/modifier")[1]
         visible, cache = self.separer(page, '<form method="post" action="/client/3/modifier">')
-        self.assertEqual(self.noms(visible), {"client_nom", "client_prenom", "client_telephone", "adresse", "ville"})
+        self.assertEqual(self.noms(visible), {"client_nom", "client_prenom", "client_telephone", "adresse", "client_secteur"})
         self.assertIn("client_courriel", self.noms(cache))
 
 
@@ -418,9 +449,11 @@ class TestTermineVerrouille(BaseInterface):
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE id = 2"), [(1,)])
 
     def test_actions_rapides_ne_rouvrent_pas_un_termine(self):
-        for statut in ("planifie", "a_planifier", "annule", "soumission"):
-            _, en_tetes, _ = self.post("/action/statut", {"chantier_id": "2", "statut": statut, "date_prevue": "2026-11-01", "retour": "/"})
-            self.assertIn("err=", en_tetes["Location"], statut)
+        for action in ("retirer", "annuler", "rouvrir", "terminer"):
+            _, en_tetes, _ = self.post(f"/action/{action}", {"chantier_id": "2", "retour": "/"})
+            self.assertIn("err=", en_tetes["Location"], action)
+        _, en_tetes, _ = self.post("/journee/planifier", {"date": "2026-11-01", "sel_2": "1", "retour": "/journee"})
+        self.assertIn("err=", en_tetes["Location"])
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 2"), [("termine",)])
 
     def test_la_base_elle_meme_refuse(self):
@@ -471,10 +504,11 @@ class TestPaiementsEtSuppression(BaseInterface):
         self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 2"), [(1,)])
         self.assertEqual(self.sql("SELECT min(solde) FROM v_chantiers"), [(0.0,)])
 
-    def test_action_rapide_encaisser_ne_depasse_pas_le_solde(self):
-        _, en_tetes, _ = self.post("/action/encaisser", {"chantier_id": "3", "montant": "2100", "mode": "interac", "retour": "/"})
-        self.assertIn("err=", en_tetes["Location"])
-        self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 3"), [(1,)])
+    def test_encaisser_rapide_ne_depasse_jamais_le_solde(self):
+        # le montant n'est pas modifiable : on encaisse exactement le solde (2 029,45 $), quoi que le navigateur envoie
+        self.post("/action/encaisser", {"chantier_id": "3", "montant": "9999", "mode": "interac", "retour": "/"})
+        self.assertEqual(self.sql("SELECT sum(montant) FROM paiements WHERE chantier_id = 3"), [(2529.45,)])
+        self.assertEqual(self.sql("SELECT solde FROM v_chantiers WHERE chantier_id = 3"), [(0.0,)])
 
     def test_la_base_refuse_un_solde_negatif(self):
         c = sqlite3.connect(self.db)

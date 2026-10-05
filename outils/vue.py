@@ -15,6 +15,12 @@ MESSAGES = {
     "paiement_supprime": "Paiement supprimé.",
     "supprime": "Chantier supprimé.",
     "statut_change": "Statut mis à jour.",
+    "annule": "Chantier annulé : il a disparu de la journée et il est dans les archives.",
+    "rouvert": "Chantier rouvert : il redevient « À planifier ».",
+    "termine": "Chantier terminé : il est maintenant verrouillé.",
+    "secteur_ajoute": "Secteur ajouté.",
+    "secteur_maj": "Secteur renommé.",
+    "secteur_supprime": "Secteur supprimé.",
     "facture": "Chantier marqué comme facturé.",
     "encaisse": "Paiement enregistré.",
     "planifie_lot": "Chantiers planifiés pour la journée.",
@@ -61,7 +67,7 @@ td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);
 .type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
 .base{margin-left:auto;font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
 @media (max-width:600px){.type{grid-template-columns:1fr}}
-main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-statut{min-width:330px}table.tableau td.col-paiement{min-width:230px}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
+main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-statut{min-width:110px}table.tableau td.col-paiement{min-width:150px}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
 .attente{display:inline-block;border-radius:6px;padding:2px 8px;font-weight:700;font-size:13px;white-space:nowrap;border:1px solid var(--trait)}
 .a-normale{background:var(--ok-fond);color:var(--accent-fonce);border-color:var(--accent)}
 .a-surveiller{background:#fff1d6;color:#7a4b00;border-color:#e8c675}
@@ -77,19 +83,20 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .cal-nav{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.cal-nav h2{margin:0;flex:1;text-align:center;font-size:20px;min-width:140px}
 .cal-grille{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-tete{font-size:13px;color:var(--doux);text-align:center;font-weight:600;padding:4px 0;text-transform:capitalize}
-.cal-jour{min-height:84px;padding:6px 8px;border:1px solid var(--trait);border-radius:8px;text-decoration:none;color:var(--texte);display:flex;flex-direction:column;gap:2px;background:var(--carte)}
+.cal-jour{min-height:124px;padding:6px 8px;border:1px solid var(--trait);border-radius:8px;text-decoration:none;color:var(--texte);display:flex;flex-direction:column;gap:2px;background:var(--carte)}
 .cal-jour:hover{border-color:var(--accent-fonce)}.cal-jour.autre-mois{opacity:.45}.cal-jour.weekend{background:var(--fond)}
 .cal-jour .cal-n{font-weight:700}.cal-jour.aujourdhui .cal-n{background:var(--accent);color:#fff;border-radius:99px;padding:0 7px;align-self:flex-start}
 @media (prefers-color-scheme:dark){.cal-jour.aujourdhui .cal-n{color:#0d1a11}}
 .cal-jour.occupe{border-color:var(--accent);background:var(--ok-fond)}.cal-jour.chargee{border-color:var(--alerte);background:var(--alerte-fond)}
-.cal-jour.selection{outline:3px solid var(--accent-fonce);outline-offset:-1px}.cal-info{font-size:12px;line-height:1.3}.cal-alerte{font-size:11px;color:var(--alerte);font-weight:700}
+.cal-jour.selection{outline:3px solid var(--accent-fonce);outline-offset:-1px}.cal-info{font-size:12px;line-height:1.35}.cal-ligne{display:block}
+form.encaisser{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}form.encaisser select{width:auto;max-width:130px}.cal-alerte{font-size:11px;color:var(--alerte);font-weight:700}
 .col-ordre{width:62px;white-space:nowrap}.col-ordre form{display:inline-block;margin:0 2px 0 0}
 button.fleche{padding:2px 8px;font-size:13px;background:transparent;color:var(--accent-fonce);border:1px solid var(--accent)}button.fleche:disabled{opacity:.3;cursor:default}
 .heures{font-size:16px;white-space:nowrap}tr.diner td{background:var(--fond);color:var(--doux);font-size:13px;text-align:center}
 .modale{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 .modale-carte{background:var(--carte);border-radius:14px;padding:24px;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .modale .question{font-size:19px;font-weight:700;margin:12px 0 18px}
-@media (max-width:700px){.cal-jour{min-height:58px;padding:4px}.cal-info{font-size:10px}}
+@media (max-width:700px){.cal-jour{min-height:96px;padding:4px}.cal-info{font-size:10px}}
 .requis{color:var(--alerte);font-weight:700}
 .verrou-termine{background:var(--ok-fond);border:1px solid var(--accent);border-radius:10px;padding:12px 16px;margin-bottom:16px}
 dl.lecture{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:6px 14px;margin:0}dl.lecture dt{color:var(--doux);font-size:14px}dl.lecture dd{margin:0}
@@ -99,7 +106,9 @@ details summary{cursor:pointer;color:var(--accent-fonce);font-weight:600;margin-
 details.avance{background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:12px 16px;margin-bottom:16px}
 details.avance>summary{margin-bottom:0}details.avance[open]>summary{margin-bottom:14px}
 details.avance .carte{box-shadow:none;border:1px solid var(--trait)}
-.col-travaux{min-width:240px}
+.col-travaux{min-width:200px}.nw{white-space:nowrap}
+label.coche,span.coche{display:inline-flex;align-items:center;gap:6px;color:var(--texte);font-size:16px;margin:0}.options-travaux .barre{gap:8px 22px}
+.puce-opt{display:inline-block;background:var(--ok-fond);border:1px solid var(--trait);border-radius:999px;padding:1px 9px;font-size:13px;margin:2px 6px 0 0;white-space:nowrap}
 .resume-chantier{display:flex;gap:20px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start}.resume-chantier>div:first-child{flex:1 1 320px}.resume-chantier .montant{margin-left:auto}
 .montant{font-size:18px;font-weight:700;text-align:right;white-space:nowrap}.montant small{display:block;font-size:12px;font-weight:400;color:var(--doux)}
 .total-jour .total,.resume-jour .total{font-weight:700}
@@ -112,6 +121,11 @@ _BASE = {"db": None}   # base ouverte par ce serveur (affichée dans l'en-tête 
 
 def esc(x):
     return html.escape("" if x is None else str(x), quote=True)
+
+
+def argent_entier(x):
+    """Montant arrondi au dollar (« 2 564 $ ») : pour les petits espaces, comme les cases du calendrier."""
+    return f"{round(x):,} $".replace(",", " ")
 
 
 def argent(x):
@@ -204,13 +218,62 @@ def bloc_types(types, valeurs):
     return f'<div class="large"><label>Types de travaux : coche un ou plusieurs</label>{lignes}</div>'
 
 
-def client_essentiel(valeurs):
-    """Ce qu'il faut pour retrouver un client : nom, téléphone, adresse des travaux."""
+def select_secteur(secteurs, valeurs, nom="client_secteur", requis=True, tout=None):
+    """Liste déroulante des secteurs desservis, groupés par ville (jamais de ville écrite à la main : pas de doublons)."""
+    choisi = valeurs.get(nom, "")
+    choix = f'<option value="">{esc(tout if tout is not None else "— choisir —")}</option>'
+    groupes = {}
+    for code, libelle, ville in secteurs:
+        groupes.setdefault(ville, []).append((code, libelle))
+    for ville, membres in groupes.items():
+        options = "".join(f'<option value="{esc(c)}"{" selected" if c == choisi else ""}>{esc(l)}</option>' for c, l in membres)
+        choix += f'<optgroup label="{esc(ville)}">{options}</optgroup>' if len(groupes) > 1 else options
+    etoile = ' <span class="requis" title="obligatoire">*</span>' if requis else ""
+    return f'<select id="{nom}" name="{nom}"{" required" if requis else ""}>{choix}</select>', etoile
+
+
+def champ_secteur(secteurs, valeurs):
+    """Ville / secteur du client (liste déroulante obligatoire)."""
+    select, etoile = select_secteur(secteurs, valeurs)
+    ancienne = valeurs.get("ville") if not valeurs.get("client_secteur") and valeurs.get("ville") else ""
+    rappel = f'<div class="doux">Ville actuelle : {esc(ancienne)} — choisis le secteur correspondant.</div>' if ancienne else ""
+    return f'<div><label for="client_secteur">Ville / secteur{etoile}</label>{select}{rappel}</div>'
+
+
+def bloc_options_travaux(valeurs):
+    """Options à connaître pour préparer la job : nacelle, sort du bois (jamais cachées dans les paramètres avancés)."""
+    format_bois = valeurs.get("bois_format", "")
+    options = "".join(f'<option value="{c}"{" selected" if c == format_bois else ""}>{esc(l)}</option>'
+                      for c, l in (("16_pouces", "16 pouces"), ("4_pieds", "4 pieds")))
+    return f"""<div class="large options-travaux"><label>Options du travail</label>
+<div class="barre"><label class="coche"><input type="checkbox" name="nacelle" value="1"{" checked" if valeurs.get("nacelle") == "1" else ""}>🏗 Nacelle requise</label>
+<label class="coche"><input type="checkbox" name="debarrasser_bois" id="debarrasser_bois" value="1"{" checked" if valeurs.get("debarrasser_bois") == "1" else ""}>🪵 Débarrasser le bois</label>
+<span id="bois-format" class="coche">Bois laissé sur place, format :
+<select name="bois_format" aria-label="Format du bois laissé sur place"><option value="">—</option>{options}</select></span></div>
+<p class="doux" style="margin:4px 0 0">Abattage / élagage : si le bois n'est pas débarrassé, précise son format (16 pouces ou 4 pieds).</p>
+<script>(function(){{var c=document.getElementById('debarrasser_bois'),b=document.getElementById('bois-format');
+function m(){{b.style.display=c.checked?'none':'';}}c.addEventListener('change',m);m();}})();</script></div>"""
+
+
+def puces_options(nacelle, debarrasser_bois, bois_format):
+    """Options de la job, bien visibles : nacelle, sort du bois (vide si rien de particulier)."""
+    puces = []
+    if nacelle:
+        puces.append("🏗 Nacelle requise")
+    if debarrasser_bois:
+        puces.append("🪵 Bois débarrassé")
+    elif bois_format:
+        puces.append("🪵 Bois laissé sur place : " + {"16_pouces": "16 pouces", "4_pieds": "4 pieds"}.get(bois_format, bois_format))
+    return "".join(f'<span class="puce-opt">{esc(p)}</span>' for p in puces)
+
+
+def client_essentiel(valeurs, secteurs):
+    """Ce qu'il faut pour retrouver un client : nom, téléphone, adresse des travaux, ville / secteur (liste)."""
     return f"""<div class="carte"><h2>Client</h2><div class="grille">
 {champ("client_nom", "Nom", valeurs, autocomplete="off")}{champ("client_prenom", "Prénom", valeurs, autocomplete="off")}
 {champ("client_telephone", "Téléphone", valeurs, "tel", placeholder="450-555-0142")}
 {champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, required=True, placeholder="123 Rue des Érables")}
-{champ("ville", "Ville", valeurs, required=True)}</div></div>"""
+{champ_secteur(secteurs, valeurs)}</div></div>"""
 
 
 def client_avance(valeurs):

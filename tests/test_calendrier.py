@@ -64,7 +64,8 @@ class BaseJour(unittest.TestCase):
             ("Alpha", "Blainville", "planifie", dans(1), 2.0), ("Bravo", "Mirabel", "planifie", dans(1), 3.0),
             ("Charlie", "Mirabel", "planifie", dans(1), 1.5), ("Delta", "Blainville", "a_planifier", None, 2.0),
             ("Echo", "Blainville", "en_attente", None, 1.0), ("Fox", "Mirabel", "termine", dans(-3), 2.0)]:
-            conn.execute("INSERT INTO clients (nom, adresse, ville, telephone) VALUES (?, ?, ?, '+14505550100')", (nom, f"1 Rue {nom}", ville))
+            conn.execute("INSERT INTO clients (nom, adresse, ville, secteur, telephone) VALUES (?, ?, ?, ?, '+14505550100')",
+                         (nom, f"1 Rue {nom}", ville, {"Blainville": "cap_de_la_madeleine", "Mirabel": "trois_rivieres_ouest"}[ville]))
             cid = conn.execute("SELECT max(id) FROM clients").fetchone()[0]
             conn.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, prix_ht) VALUES (?,?,?,?,300)", (cid, statut, jour, duree))
             chid = conn.execute("SELECT max(id) FROM chantiers").fetchone()[0]
@@ -105,10 +106,14 @@ class TestStatuts(BaseJour):
         self.assertEqual(noyau.STATUTS, ("soumission", "en_attente", "a_planifier", "planifie", "termine", "annule"))
         self.assertEqual([noyau.LIBELLES_STATUT[s] for s in noyau.STATUTS],
                          ["Soumission", "En attente", "À planifier", "Planifié", "Terminé", "Annulé"])
-        page = self.get("/chantier/%d" % self.ids["Alpha"])[1]
-        options = re.findall(r'<option value="([a-z_]+)"[^>]*>([^<]+)</option>', page[page.index('name="statut"'):page.index('name="statut"') + 700])
-        self.assertEqual([c for c, _ in options], list(noyau.STATUTS))
+        # le statut se choisit seulement avant la planification : « À planifier » propose les trois statuts d'avant ; « Planifié » n'en propose aucun
+        page = self.get("/chantier/%d" % self.ids["Delta"])[1]
+        options = re.findall(r'<option value="([a-z_]+)"[^>]*>([^<]+)</option>', page[page.index('name="statut"'):page.index('name="statut"') + 400])
+        self.assertEqual([c for c, _ in options], list(noyau.STATUTS_MANUELS))
         self.assertNotIn("Refusé", page)
+        planifie = self.get("/chantier/%d" % self.ids["Alpha"])[1]
+        self.assertNotIn('name="statut"', planifie)
+        self.assertIn("géré automatiquement", planifie)
 
     def test_anciens_noms_toujours_compris_a_l_import(self):
         base = {"client_nom": "X", "adresse": "1 A", "ville": "V", "type_travaux": "emondage"}
@@ -145,16 +150,26 @@ class TestPageJournee(BaseJour):
 
     def test_outils_de_gestion(self):
         page = self.get("/journee", {"date": dans(1)})[1]
-        for attendu in ('action="/action/deplacer"', 'action="/action/statut"', 'action="/action/encaisser"', 'action="/action/retirer"',
+        for attendu in ('action="/action/deplacer"', 'action="/action/encaisser"', 'action="/action/retirer"', 'action="/action/annuler"',
                         "Total de la journée", "durée totale", "Chantiers à placer"):
             self.assertIn(attendu, page, attendu)
+        self.assertNotIn('name="statut"', page.split("Chantiers à placer")[0])   # le statut n'est jamais modifiable à la main
+        self.assertNotIn('action="/action/statut"', page)
         self.assertNotIn('name="duree_estimee_h"', page)                   # le temps d'un travail ne se modifie pas directement
         self.assertNotIn('name="date_prevue"', page.split("Chantiers à placer")[0].replace('type="hidden" name="date_prevue"', ""))
 
-    def test_changer_le_statut_ne_touche_pas_a_la_duree(self):
-        i = self.ids["Bravo"]                                                  # 3 h
-        self.post("/action/statut", {"chantier_id": str(i), "statut": "termine", "date_prevue": dans(1), "duree_estimee_h": "99", "retour": "/journee"})
-        self.assertEqual(self.sql("SELECT statut, duree_estimee_h, duree_reelle_h FROM chantiers WHERE id = ?", (i,)), [("termine", 3.0, 3.0)])
+    def test_aucun_moyen_de_choisir_le_statut_ni_la_duree(self):
+        i = self.ids["Bravo"]                                                  # 3 h, planifié
+        statut, _, _ = self.post("/action/statut", {"chantier_id": str(i), "statut": "termine", "date_prevue": dans(1), "duree_estimee_h": "99", "retour": "/journee"})
+        self.assertTrue(statut.startswith("404"))
+        self.assertEqual(self.sql("SELECT statut, duree_estimee_h FROM chantiers WHERE id = ?", (i,)), [("planifie", 3.0)])
+
+    def test_annuler_depuis_la_journee_archive_et_retire_de_la_journee(self):
+        i = self.ids["Bravo"]
+        self.post("/action/annuler", {"chantier_id": str(i), "retour": "/journee"})
+        self.assertEqual(self.sql("SELECT statut, ordre_jour FROM chantiers WHERE id = ?", (i,)), [("annule", None)])
+        self.assertNotIn("Bravo", re.findall(r'<a href="/client/\d+">([^<]+)</a>', self.get("/journee", {"date": dans(1)})[1]))
+        self.assertEqual(self.sql("SELECT archive FROM v_chantiers WHERE chantier_id = ?", (i,)), [(1,)])
 
     def test_navigation_tournee_devenue_journee(self):
         page = self.get("/journee", {"date": dans(1)})[1]
@@ -235,9 +250,14 @@ class TestOrdreDeLaJournee(BaseJour):
         self.assertEqual(self.sql("SELECT statut, date_prevue, ordre_jour FROM chantiers WHERE id = ?", (self.ids["Bravo"],)), [("a_planifier", None, None)])
 
     def test_creation_depuis_le_formulaire_complet_obtient_un_rang(self):
-        form = {"client_nom": "Nouveau", "adresse": "9 Rue N", "ville": "Mirabel", "client_sms_ok": "1", "type_emondage": "1",
+        # un nouveau chantier ne se planifie pas à la création (statut et date envoyés ignorés) : on l'ajoute à une journée ensuite
+        form = {"client_nom": "Nouveau", "adresse": "9 Rue N", "client_secteur": "trois_rivieres_ouest", "client_sms_ok": "1", "type_emondage": "1",
                 "statut": "planifie", "date_prevue": dans(1), "duree_estimee_h": "1"}
         self.post("/nouveau", form)
+        self.assertEqual(self.ordre(), ["Alpha", "Bravo", "Charlie"])
+        nouveau = self.sql("SELECT id, statut, date_prevue FROM chantiers WHERE description IS NULL ORDER BY id DESC LIMIT 1")[0]
+        self.assertEqual(nouveau[1:], ("soumission", None))
+        self.post("/journee/planifier", {"date": dans(1), f"sel_{nouveau[0]}": "1", "retour": "/journee"})
         self.assertEqual(self.ordre()[-1], "Nouveau")
 
 
@@ -253,8 +273,9 @@ class TestCalendrier(BaseJour):
         lien = re.search(rf'<a class="([^"]*)" href="(/\?date={dans(1)}[^"]*)"[^>]*>(.*?)</a>', page)
         self.assertIsNotNone(lien)
         self.assertIn("occupe", lien.group(1))
-        self.assertIn("<b>3</b> chantiers", lien.group(3))
-        self.assertIn("6 h 30", lien.group(3))
+        self.assertIn("<b>3 chantiers</b>", lien.group(3))                       # directement dans la case : nombre, temps, montant
+        self.assertIn("⏱ Temps total : 6 h 30", lien.group(3))
+        self.assertIn("💰 Montant total : <span class=\"nw\">900 $</span>", lien.group(3))                # arrondi au dollar : tient dans la case
 
     def test_cliquer_une_date_affiche_le_deroulement(self):
         page = self.get("/", {"date": dans(1)})[1]
@@ -269,10 +290,12 @@ class TestCalendrier(BaseJour):
     def test_le_tableau_de_bord_est_en_lecture_seule(self):
         page = self.get("/", {"date": dans(1)})[1]
         jour = page[page.index("Total de la journée") - 400:]
-        for interdit in ('action="/action/deplacer"', 'action="/action/statut"', 'action="/action/encaisser"', 'action="/action/facturer"',
-                         'name="duree_estimee_h"', 'name="date_prevue"', 'class="fleche"', "<select"):
+        for interdit in ('action="/action/deplacer"', 'action="/action/statut"', 'action="/action/annuler"', 'action="/action/facturer"',
+                         'name="duree_estimee_h"', 'name="date_prevue"', 'name="statut"', 'name="montant"', 'class="fleche"'):
             self.assertNotIn(interdit, jour, interdit)
         self.assertIn('action="/action/retirer"', jour)                    # retirer une entrée reste possible
+        self.assertIn('action="/action/encaisser"', jour)                  # encaisser aussi : le montant prévu est affiché, non modifiable
+        self.assertIn("Montant prévu :", jour)
         self.assertIn("Planifié", jour)                                    # le statut est visible
         self.assertIn("Paiement", jour)                                    # ainsi que les paiements
 
@@ -377,8 +400,8 @@ class TestConfirmationTermine(BaseJour):
         self.encaisser("Bravo")
         page = self.get("/", {"date": dans(1), "terminer": str(self.ids["Bravo"])})[1]
         formulaire = page[page.index('class="modale"'):]
-        self.assertIn('name="statut" value="termine"', formulaire)
-        _, en_tetes, _ = self.post("/action/statut", {"chantier_id": str(self.ids["Bravo"]), "statut": "termine", "retour": f"/?date={dans(1)}&terminer={self.ids['Bravo']}"})
+        self.assertIn('action="/action/terminer"', formulaire)
+        _, en_tetes, _ = self.post("/action/terminer", {"chantier_id": str(self.ids["Bravo"]), "retour": f"/?date={dans(1)}&terminer={self.ids['Bravo']}"})
         self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = ?", (self.ids["Bravo"],)), [("termine", dans(1))])
         self.assertNotIn("terminer=", en_tetes["Location"])                     # la fenêtre ne revient pas
 
