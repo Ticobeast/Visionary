@@ -74,8 +74,12 @@ class TestSchema(unittest.TestCase):
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
-        for d in ("2026-02-30", "2026-13-01", "14/06/2026", "2026-6-1", "2026-06-14 10:00"):
+        for d in ("2026-02-30", "2026-02-29", "2026-04-31", "2026-13-01", "14/06/2026", "2026-6-1", "2026-06-14 10:00"):
             self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut, date_prevue) VALUES (1,'emondage','accepte',?)", (d,))
+
+    def test_dates_valides_acceptees(self):
+        for d in ("2028-02-29", "2026-02-28", "2026-12-31", "2026-04-30"):   # 2028 est bissextile
+            self.c.execute("INSERT INTO chantiers (client_id, type_travaux, statut, date_prevue) VALUES (1,'emondage','accepte',?)", (d,))
 
     def test_coherence_statut(self):
         self.refuse("INSERT INTO chantiers (client_id, type_travaux, statut) VALUES (1,'emondage','planifie')")

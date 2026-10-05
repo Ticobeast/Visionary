@@ -67,7 +67,8 @@ avant chaque import CSV (`data/sauvegardes/`).
 
 ## Prérequis
 
-Python 3 (testé avec 3.11, bibliothèque standard seulement : rien à installer). Testé avec SQLite 3.45. Le
-schéma évite volontairement `STRICT`, les colonnes générées et les autres nouveautés récentes de SQLite, pour
-qu'un outil plus ancien (DB Browser…) puisse ouvrir le fichier ; ce point n'a pas été testé sur d'anciennes
-versions. Les lanceurs `.bat` et `.command` n'ont pas été testés sur Windows ni sur Mac.
+Python 3 (testé avec 3.11, bibliothèque standard seulement : rien à installer). La suite de tests passe avec
+SQLite 3.40, 3.43, 3.45 et 3.51. Le schéma évite volontairement `STRICT`, les colonnes générées et les autres
+nouveautés récentes de SQLite, pour qu'un outil plus ancien (DB Browser…) puisse ouvrir le fichier ; ce point
+n'a pas été testé sur des versions antérieures à 3.40. Les lanceurs `.bat` et `.command` n'ont pas été testés
+sur Windows ni sur Mac.

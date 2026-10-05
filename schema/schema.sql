@@ -151,11 +151,11 @@ CREATE TABLE chantiers (
     CONSTRAINT ck_chantiers_statut
         CHECK (statut IN ('soumission','refuse','accepte','planifie','termine','annule')),
 
-    -- Dates : `date(x) IS x` rejette 2026-02-30, 2026-13-01, 14/06/2026, "2026-06-14 10:00".
-    CONSTRAINT ck_chantiers_date_soumission CHECK (date_soumission IS NULL OR date(date_soumission) IS date_soumission),
-    CONSTRAINT ck_chantiers_date_prevue     CHECK (date_prevue     IS NULL OR date(date_prevue)     IS date_prevue),
-    CONSTRAINT ck_chantiers_date_realisee   CHECK (date_realisee   IS NULL OR date(date_realisee)   IS date_realisee),
-    CONSTRAINT ck_chantiers_date_facture    CHECK (date_facture    IS NULL OR date(date_facture)    IS date_facture),
+    -- Dates : `date(x, '+0 days') IS x` rejette 2026-02-30, 2026-13-01, 14/06/2026, "2026-06-14 10:00".
+    CONSTRAINT ck_chantiers_date_soumission CHECK (date_soumission IS NULL OR date(date_soumission, '+0 days') IS date_soumission),
+    CONSTRAINT ck_chantiers_date_prevue     CHECK (date_prevue     IS NULL OR date(date_prevue, '+0 days')     IS date_prevue),
+    CONSTRAINT ck_chantiers_date_realisee   CHECK (date_realisee   IS NULL OR date(date_realisee, '+0 days')   IS date_realisee),
+    CONSTRAINT ck_chantiers_date_facture    CHECK (date_facture    IS NULL OR date(date_facture, '+0 days')    IS date_facture),
     CONSTRAINT ck_chantiers_heure_prevue
         CHECK (heure_prevue IS NULL OR (time(heure_prevue) IS heure_prevue || ':00' AND heure_prevue < '24:00')),
 
@@ -216,7 +216,7 @@ CREATE TABLE paiements (
     notes         TEXT,
     cree_le       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
-    CONSTRAINT ck_paiements_date    CHECK (date(date_paiement) IS date_paiement),
+    CONSTRAINT ck_paiements_date    CHECK (date(date_paiement, '+0 days') IS date_paiement),
     CONSTRAINT ck_paiements_montant CHECK (typeof(montant) IN ('real','integer') AND montant > 0 AND montant = ROUND(montant, 2)),
     CONSTRAINT ck_paiements_mode    CHECK (mode IN ('comptant','cheque','interac','carte','autre'))
 );
