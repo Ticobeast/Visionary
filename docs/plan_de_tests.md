@@ -57,14 +57,20 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 10 | Se tromper exprès : téléphone `123`, code postal `ZZZ`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 11 | Modifier l'adresse d'un client, puis supprimer un paiement et un chantier de test | tout se passe sans erreur |
 | 12 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
-| 13 | **Tableau de bord**, onglet « À planifier » | chantiers regroupés « Urgent (> 30 j) », « À surveiller », « Normal (< 7 j) », avec pastilles rouge / jaune / verte |
-| 14 | Filtrer par **délai** (« Urgents »), par **secteur**, puis trier par secteur | seuls les chantiers voulus ; avec le tri secteur, regroupés par ville |
-| 15 | Cliquer sur une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
-| 16 | Dans une ligne « À planifier » : statut « Planifié » + une date + `2,5` + OK | le chantier quitte l'onglet et apparaît dans « Planifiés » (2 h 30) |
-| 17 | Onglet « À facturer » : **Facturer** ; puis dans « À recevoir » : **Encaisser** un acompte, puis le solde | passe à « Facturé », « Partiel », puis « Payé » sans ouvrir de fiche |
-| 18 | **Clients** → un client → **+ Nouveau chantier** | nom et adresse **affichés mais non modifiables** ; seulement travaux, prix, modalité de paiement, notes ; le chantier arrive « À planifier » |
-| 19 | **Tournées** : choisir demain, filtrer par secteur, cocher 3 chantiers, ajuster une durée, « Ajouter à la journée » | le total d'heures se met à jour en cochant ; la journée affiche les 3 chantiers et ce qu'il reste de place sur 8 h |
-| 20 | Dans la journée : **Retirer** un chantier | il redevient « À planifier » (sans date) |
+| 13 | **Tableau de bord** (accueil) | un **calendrier du mois** : les jours planifiés montrent « 3 chantiers · 6 h 30 » ; les jours trop chargés (> 8 h) sont en rouge |
+| 14 | Cliquer sur une **date** du calendrier | le **déroulement de la journée** s'affiche dessous : chantiers dans l'ordre, avec heures de début → fin (le premier à 7 h 30) |
+| 15 | Repérer le **dîner** : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
+| 16 | Cliquer **▼** sur le 1er chantier, puis **▲** sur le 3e | l'ordre change et **toutes les heures sont recalculées** tout de suite ; aux extrémités la flèche est grisée |
+| 17 | Changer la **durée** d'un chantier de la journée (ex. `1`) + OK | les heures de début et de fin des suivants se décalent |
+| 18 | Changer le **statut** d'un chantier depuis la journée (« Terminé », puis « À planifier ») | « Terminé » reste dans la journée ; « À planifier » le fait disparaître du calendrier |
+| 19 | **Encaisser** sur un chantier « Planifié » | le paiement est enregistré, puis une fenêtre demande : *Voulez-vous passer ce chantier au statut "Terminé" ?* — « Oui » le passe à Terminé, « Non » le laisse Planifié |
+| 20 | Même encaissement sur un chantier « Terminé » ou « À planifier » | **aucune** fenêtre |
+| 21 | Page **Suivi** : onglets À planifier / En attente / Soumissions / À facturer / À recevoir | chantiers regroupés par délai (rouge > 30 j, jaune 7 à 30 j, vert < 7 j) ; filtres délai / secteur / tri |
+| 22 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
+| 23 | **Facturer** (onglet « À facturer »), puis **Encaisser** un acompte et le solde (« À recevoir ») | « Facturé », « Partiel », « Payé » sans ouvrir de fiche |
+| 24 | **Clients** → un client → **+ Nouveau chantier** | nom et adresse **verrouillés** ; seulement travaux, prix, modalité de paiement, notes ; le chantier arrive « À planifier » |
+| 25 | **Tournées** : choisir demain, filtrer par secteur, cocher 3 chantiers, ajuster une durée, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché ; le total d'heures se met à jour en cochant |
+| 26 | Dans la journée : **Retirer** un chantier | il redevient « À planifier » (sans date) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

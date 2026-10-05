@@ -11,8 +11,8 @@ sans retranscription.
   Python le lit sans rien installer (`import sqlite3`).
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
-- **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **tableau de bord**
-  (délais d'attente, actions rapides), les **tournées** de la semaine, les fiches clients, la saisie avec validation immédiate. Elle écoute
+- **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**
+  des journées planifiées (heures de passage calculées, ordre modifiable), un **suivi** par délai d'attente, les **tournées**, les fiches clients, la saisie avec validation immédiate. Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 - Un **import CSV** reste disponible pour saisir en rafale dans un tableur (de préférence LibreOffice Calc).
 
@@ -32,7 +32,9 @@ qu'**une seule date** (prévue, puis réalisée : si le chantier est déplacé, 
 ```
 schema/schema.sql                       schéma SQLite prêt à exécuter (tables, règles, vue v_chantiers)
 outils/interface.py                     serveur local + saisie complète (nouveau client, modification d'un chantier)
-outils/tableau.py                       tableau de bord, actions rapides, tournées
+outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée (heures, ordre)
+outils/tableau.py                       suivi par statut et délai d'attente, actions rapides, tournées
+outils/composants.py                    cellules et formulaires rapides partagés, fenêtre « Terminé ? »
 outils/pages_clients.py                 fiche client, formulaire simplifié de nouveau chantier
 outils/vue.py                           composants d'affichage partagés
 outils/importer_saisie.py               import d'une feuille CSV (validation, tout ou rien, sauvegarde)
@@ -43,7 +45,7 @@ modeles/saisie_papier_*.csv             feuille de saisie CSV : vide + 3 exemple
 lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
 lancer_essai.bat / .command / .py       double-clic (ou bouton « Exécuter » de VS Code) : base d'ESSAI (fausses données)
 lancer_interface.py                     idem, sur la VRAIE base
-docs/tableau_de_bord.md                 guide : tableau de bord, fiche client, tournées
+docs/tableau_de_bord.md                 guide : calendrier, journée, suivi, tournées, fiche client
 docs/dictionnaire_donnees.md            toutes les colonnes : type, format, règle, exemple
 docs/transition_papier.md               méthode pour numériser les dossiers papier
 docs/plan_de_tests.md                   plan de mise en route et de tests, phase par phase
@@ -57,7 +59,7 @@ data/                                   TES données (exclu de Git) : base, phot
 python3 -m unittest discover -s tests                  # vérifier l'installation : doit finir par OK
 python3 outils/interface.py --essai                    # base d'ESSAI (fausses données) : data/test.db
 python3 outils/interface.py                            # la VRAIE base (créée au premier lancement)
-python3 outils/migrer.py data/sylvainculteur.db        # seulement si une base créée avant une mise à jour refuse de s'ouvrir (v1 ou v2 -> v3)
+python3 outils/migrer.py data/sylvainculteur.db        # seulement si une base créée avant une mise à jour refuse de s'ouvrir (v1, v2 ou v3 -> v4)
 ```
 
 **Bouton « Exécuter » de VS Code** : ouvre `lancer_essai.py` (essai) ou `lancer_interface.py` (vraie base) ; ne lance pas

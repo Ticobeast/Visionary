@@ -90,12 +90,12 @@ def generer(db, nombre=40, graine=2026):
         elif sort < 0.72:      # à venir : planifié, parfois avec acompte
             prevu = aujourdhui + datetime.timedelta(days=rnd.randint(1, 25))
             ligne.update(statut="planifie", date_soumission=jour(prevu - datetime.timedelta(days=rnd.randint(5, 20))),
-                         date_prevue=jour(prevu), heure_prevue=rnd.choice(["", "08:00", "09:30", "13:00"]))
+                         date_prevue=jour(prevu))
             if rnd.random() < 0.3:
                 ligne.update(paiement_date=jour(aujourdhui), paiement_montant="100.00", paiement_mode="interac")
         else:                  # soumissions, acceptés, refusés, annulés
             # surtout des chantiers acceptés qui attendent d'être planifiés, avec des délais d'attente variés
-            ligne.update(statut=rnd.choice(["accepte"] * 5 + ["soumission"] * 2 + ["refuse", "annule"]),
+            ligne.update(statut=rnd.choice(["a_planifier"] * 5 + ["en_attente"] * 2 + ["soumission", "annule"]),
                          date_soumission=jour(aujourdhui - datetime.timedelta(days=rnd.choice([1, 2, 4, 6, 9, 14, 20, 28, 33, 41, 55]))))
         v, erreurs = lire_ligne(ligne, alias, taxes_auto=True)
         assert not erreurs, (ligne, erreurs)

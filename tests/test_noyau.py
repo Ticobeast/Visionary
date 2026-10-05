@@ -70,21 +70,27 @@ class TestSchema(unittest.TestCase):
             self.c.execute(sql, args)
 
     def test_version_et_integrite(self):
-        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 3)
+        self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], 4)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
         for d in ("2026-02-30", "2026-02-29", "2026-04-31", "2026-13-01", "14/06/2026", "2026-6-1", "2026-06-14 10:00"):
-            self.refuse("INSERT INTO chantiers (client_id, statut, date_prevue) VALUES (1,'accepte',?)", (d,))
+            self.refuse("INSERT INTO chantiers (client_id, statut, date_prevue) VALUES (1,'a_planifier',?)", (d,))
 
     def test_dates_valides_acceptees(self):
         for d in ("2028-02-29", "2026-02-28", "2026-12-31", "2026-04-30"):   # 2028 est bissextile
-            self.c.execute("INSERT INTO chantiers (client_id, statut, date_prevue) VALUES (1,'accepte',?)", (d,))
+            self.c.execute("INSERT INTO chantiers (client_id, statut, date_prevue) VALUES (1,'a_planifier',?)", (d,))
 
     def test_coherence_statut(self):
         self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'planifie')")
         self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'termine')")
         self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'fini')")
+        # anciens statuts supprimés : « Refusé » n'existe plus (on utilise « Annulé »), « Accepté » devient « À planifier »
+        self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'refuse')")
+        self.refuse("INSERT INTO chantiers (client_id, statut) VALUES (1,'accepte')")
+        for statut in ("soumission", "en_attente", "a_planifier", "annule"):
+            self.c.execute("INSERT INTO chantiers (client_id, statut) VALUES (1, ?)", (statut,))
+        self.refuse("INSERT INTO chantiers (client_id, statut, ordre_jour) VALUES (1, 'soumission', 0)")
 
     def test_argent_et_durees(self):
         for prix in (450.123, -1, "abc"):
@@ -130,7 +136,7 @@ class TestSchema(unittest.TestCase):
 
     def test_statuts_de_paiement_calcules(self):
         self.assertEqual(self.statut(statut="soumission", prix_ht=100)[0], "sans_objet")
-        self.assertEqual(self.statut(statut="accepte", prix_ht=100)[0], "a_venir")
+        self.assertEqual(self.statut(statut="a_planifier", prix_ht=100)[0], "a_venir")
         self.assertEqual(self.statut(statut="termine", date_prevue="2026-06-01")[0], "prix_manquant")
         r = self.statut(statut="termine", date_prevue="2026-06-01", prix_ht=100, tps=5, tvq=9.98)
         self.assertEqual(r, ("non_facture", 114.98, 0, 114.98))
@@ -193,7 +199,7 @@ class TestImportExemples(BaseTest):
 
     def test_ligne_modifiee_deja_importee_est_signalee_pas_avalee(self):
         imp.importer(self.ecrire_csv([ligne_valide(prix_ht="100.00")]), self.db)
-        modifiee = ligne_valide(prix_ht="100.00", statut="accepte", date_facture="2026-06-14",
+        modifiee = ligne_valide(prix_ht="100.00", statut="a_planifier", date_facture="2026-06-14",
                                 paiement_date="2026-06-14", paiement_montant="50", paiement_mode="interac")
         res = imp.importer(self.ecrire_csv([modifiee]), self.db)
         self.assertEqual((res.chantiers, res.doublons, res.erreurs), (0, 1, []))
@@ -221,7 +227,7 @@ class TestImportSouple(BaseTest):
         chemin = self.ecrire_csv([ligne_valide(
             client_nom="Côté", client_telephone="(450) 555-0142", code_postal="j7z1a1", adresse="5 Rue Éléonore",
             type_travaux="Taille de haie", statut="Terminé", prix_ht="1 250,00 $",
-            tps="62,50", tvq="124,69", duree_estimee_h="2,5", heure_prevue="8h30", date_prevue="2026-06-14",
+            tps="62,50", tvq="124,69", duree_estimee_h="2,5", date_prevue="2026-06-14",
             paiement_date="2026-06-14", paiement_montant="1437,19", paiement_mode="Chèque")],
             delimiteur=";", encodage="cp1252")
         res = imp.importer(chemin, self.db)
@@ -229,8 +235,8 @@ class TestImportSouple(BaseTest):
         self.assertIn("Windows-1252", " ".join(res.avertissements))
         self.assertEqual(self.requete("SELECT nom, telephone FROM clients"), [("Côté", "+14505550142")])
         self.assertEqual(self.requete("SELECT code_postal FROM clients"), [("J7Z 1A1",)])
-        self.assertEqual(self.requete("SELECT statut, prix_ht, duree_estimee_h, heure_prevue FROM chantiers"),
-                         [("termine", 1250.0, 2.5, "08:30")])
+        self.assertEqual(self.requete("SELECT statut, prix_ht, duree_estimee_h FROM chantiers"),
+                         [("termine", 1250.0, 2.5)])
         self.assertEqual(self.requete("SELECT type_travaux, precision FROM chantier_travaux"), [("taille_haie", None)])
         self.assertEqual(self.requete("SELECT statut_paiement FROM v_chantiers"), [("paye",)])
 

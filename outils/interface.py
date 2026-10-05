@@ -55,7 +55,6 @@ def formulaire(conn, valeurs, action, erreurs=(), client_id=None, nouveau=True, 
 {liste("statut", "Statut", [(s, LIBELLES_STATUT[s]) for s in STATUTS], valeurs, required=True)}
 {zone("description", "Description (imprimée sur la feuille de route)", valeurs)}
 {champ("date_soumission", "Date de la demande ou de la soumission", valeurs, "date")}{champ("date_prevue", "Date des travaux (prévue, puis réalisée)", valeurs, "date")}
-{champ("heure_prevue", "Heure prévue (rendez-vous fixe)", valeurs, "time")}
 {champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5")}
 {champ("duree_reelle_h", "Durée réelle (heures)", valeurs, inputmode="decimal")}</div>
 <p class="doux">Durée = temps passé sur place, en heures décimales (2,5 = 2 h 30). Statuts « Planifié » et « Terminé » : la date des travaux est obligatoire. Si le chantier change de jour, modifie simplement cette date.</p></div>
@@ -78,7 +77,7 @@ def valeurs_vides():
 
 
 def valeurs_chantier(conn, chantier_id):
-    cols = ["client_id", "description", "statut", "date_soumission", "date_prevue", "heure_prevue",
+    cols = ["client_id", "description", "statut", "date_soumission", "date_prevue",
             "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
             "dossier_photos", "fichier_papier", "ref_papier"]
     r = conn.execute(f"SELECT {', '.join(cols)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
@@ -276,10 +275,13 @@ def ajouter_paiement(conn, chantier_id, form):
         L.erreurs.append("paiement_montant doit être supérieur à 0")
     if not L.erreurs:
         try:
+            avant = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
             with transaction(conn):
                 conn.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode, reference) VALUES (?,?,?,?,?)",
                              (chantier_id, d, float(m), mode, L.texte("paiement_reference")))
-            return redirection(f"/chantier/{chantier_id}?ok=paiement")
+            # chantier « Planifié » : on propose ensuite de le passer à « Terminé » (fenêtre de confirmation)
+            proposer = f"&terminer={chantier_id}" if avant and avant[0] == "planifie" else ""
+            return redirection(f"/chantier/{chantier_id}?ok=paiement{proposer}")
         except sqlite3.IntegrityError as e:
             L.erreurs.append(f"Refusé par la base : {e}")
     return page_chantier(conn, chantier_id, {}, erreur_paiement=(L.erreurs, brut))
@@ -313,8 +315,11 @@ def supprimer_chantier(conn, chantier_id):
 # ---------------------------------------------------------------------------
 from pages_clients import ROUTES_CLIENTS  # noqa: E402
 from tableau import ROUTES_TABLEAU  # noqa: E402
+from calendrier import page_calendrier  # noqa: E402
+from composants import fenetre_terminer  # noqa: E402
 
 ROUTES = ROUTES_TABLEAU + ROUTES_CLIENTS + [
+    ("GET", r"^/$", lambda c, q, f, *g: page_calendrier(c, q)),
     ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
     ("POST", r"^/nouveau$", lambda c, q, f, *g: creer(c, f)),
@@ -347,6 +352,9 @@ def repondre(db_path, methode, chemin, query=None, form=None):
         else:
             page, code = resultat
         statut = {200: "200 OK", 404: "404 Not Found"}[code]
+        if methode == "GET" and code == 200 and query.get("terminer", "").isdigit():
+            # après un encaissement sur un chantier « Planifié » : fenêtre « Voulez-vous passer ce chantier à Terminé ? »
+            page = page.replace("</main>", fenetre_terminer(conn, int(query["terminer"]), chemin, query) + "</main>", 1)
         return statut, [("Content-Type", "text/html; charset=utf-8")], page.encode("utf-8")
     except sqlite3.OperationalError as e:
         page = gabarit("Base occupée", f"<h1>La base est occupée</h1><p>{esc(e)}</p><p>Ferme les autres programmes qui l'utilisent "

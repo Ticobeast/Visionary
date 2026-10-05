@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v3)
+# Dictionnaire de données (schéma v4)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -24,7 +24,6 @@ Un client qui possède deux propriétés = **deux fiches clients** (une par adre
 | Donnée | Format | Exemple | Refusé |
 |---|---|---|---|
 | Date | `AAAA-MM-JJ` | `2026-06-14` | `14/06/2026`, `2026-6-1`, `2026-02-30` |
-| Heure | `HH:MM` (24 h) | `08:30` | `8:30`, `24:00` |
 | Durée | heures décimales, temps **écoulé sur place** (pas heures-personne), 0 < d ≤ 24 | `2.5` (= 2 h 30) | `2h30`, `0` |
 | Argent | dollars CAD, 2 décimales max, sans `$` | `480.00` | `480.123`, `-5` |
 | Téléphone | `+1` + 10 chiffres (E.164) | `+14505550142` | `450-555-0142` en base (l'import le convertit pour toi) |
@@ -73,7 +72,7 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `statut` | texte | oui, défaut `soumission` | voir ci-dessous | `planifie` |
 | `date_soumission` | date | non | date de la **demande ou de la soumission** : sert à calculer le délai d'attente (à défaut, la date de création de la fiche) | `2026-05-28` |
 | `date_prevue` | date | **si `planifie` ou `termine`** | **la** date des travaux : prévue d'abord, puis réalisée. Si le chantier change de jour, on la met simplement à jour. C'est elle que le script d'itinéraire filtre | `2026-10-14` |
-| `heure_prevue` | heure | non | seulement pour un rendez-vous fixe | `08:00` |
+| `ordre_jour` | entier | auto | rang du chantier dans sa journée (1, 2, 3…), géré par l'application (flèches ▲ ▼) ; vide si le chantier n'est ni planifié ni terminé. **Les heures de passage n'y sont pas stockées : elles sont calculées** (début 7 h 30, dîner 12 h - 12 h 30, d'après l'ordre et `duree_estimee_h`) | `2` |
 | `duree_estimee_h` | réel | non | pour l'itinéraire et la feuille de route | `3.0` |
 | `duree_reelle_h` | réel | non | mesurée après coup, pour affiner les estimés | `3.5` |
 | `prix_ht` | réel | non | avant taxes ; estimé tant que non facturé, puis final | `480.00` |
@@ -106,12 +105,15 @@ Au moins un type est exigé par l'interface et par l'import. Dans `v_chantiers` 
 
 | `statut` | Signification | Contrainte |
 |---|---|---|
-| `soumission` | estimé donné, réponse du client attendue | |
-| `refuse` | le client a dit non | |
-| `accepte` | accepté, pas encore de date | |
-| `planifie` | date fixée | `date_prevue` obligatoire |
-| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) |
-| `annule` | annulé après acceptation | |
+| `soumission` | estimé à donner ou en préparation | |
+| `en_attente` | soumission remise, **on attend la réponse du client** | date effacée |
+| `a_planifier` | accepté, pas encore de date (file d'attente classée par délai) | date effacée |
+| `planifie` | date fixée, rang dans la journée | `date_prevue` obligatoire |
+| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) ; garde son rang dans la journée |
+| `annule` | abandonné : refus du client, annulation… (il n'existe plus de statut « Refusé ») | |
+
+Parcours normal : *Soumission → En attente → À planifier → Planifié → Terminé* ; *Annulé* à tout moment. Anciens noms
+encore compris à l'import : « Accepté » = À planifier, « Refusé » = Annulé.
 
 Un travail de plusieurs jours = un chantier par journée.
 
@@ -127,8 +129,8 @@ travaux, de `date_facture` et de la somme des `paiements`. Il ne peut donc jamai
 | `a_payer` | facture émise, rien reçu | **à relancer** |
 | `partiel` | une partie reçue (acompte…), solde > 0 | |
 | `paye` | somme reçue ≥ total | |
-| `a_venir` | `accepte` / `planifie`, pas encore fait | |
-| `sans_objet` | `soumission`, `refuse`, `annule`, ou travail gratuit | |
+| `a_venir` | `a_planifier` / `planifie`, pas encore fait | |
+| `sans_objet` | `soumission`, `en_attente`, `annule`, ou travail gratuit | |
 
 Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiements`, `solde = total_ttc − paye`.
 
@@ -190,13 +192,13 @@ une fiche = un chantier) ; l'import range chaque colonne dans la bonne table :
 | Colonnes de la feuille | Destination |
 |---|---|
 | `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes`, `adresse`, `ville`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `clients` |
-| `type_travaux`, `statut`, `description`, `date_*`, `heure_prevue`, `duree_*`, `prix_ht`, `tps`, `tvq`, `modalite_paiement`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
+| `type_travaux`, `statut`, `description`, `date_*`, `duree_*`, `prix_ht`, `tps`, `tvq`, `modalite_paiement`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
 | `paiement_date`, `paiement_montant`, `paiement_mode` | `paiements` (un paiement par ligne ; les acomptes supplémentaires se saisissent dans l'interface) |
 
 L'import est plus souple que la base, puis écrit toujours le format strict :
 
 - téléphone `450-555-0142` ou `(450) 555-0142` → `+14505550142` ; code postal `j7z1a1` → `J7Z 1A1`
-- `1 250,00 $` ou `1250,00` → `1250.00` ; heure `8h30` → `08:30`
+- `1 250,00 $` ou `1250,00` → `1250.00`
 - `type_travaux` accepte un ou plusieurs types séparés par `+`, chacun avec une précision facultative après `:`
   (`elagage: érable côté garage + taille_haie: cèdres, 35 m`) ; le code ou le libellé (`taille_haie`, `Taille de haie`) ; `statut` et `paiement_mode`
   acceptent accents et majuscules (`Terminé`, `Chèque`)

@@ -3,10 +3,8 @@ import html
 from pathlib import Path
 from urllib.parse import quote
 
-from noyau import DB_DEFAUT
+from noyau import DB_DEFAUT, LIBELLES_STATUT  # noqa: F401  (réexporté pour les pages)
 
-LIBELLES_STATUT = {"soumission": "Soumission", "refuse": "Refusé", "accepte": "Accepté",
-                   "planifie": "Planifié", "termine": "Terminé", "annule": "Annulé"}
 LIBELLES_PAIEMENT = {"non_facture": "À facturer", "a_payer": "Facturé, à recevoir", "partiel": "Partiel",
                      "paye": "Payé", "a_venir": "À venir", "sans_objet": "—", "prix_manquant": "Prix manquant"}
 LIBELLES_MODE = {"comptant": "Comptant", "cheque": "Chèque", "interac": "Interac", "carte": "Carte", "autre": "Autre"}
@@ -21,7 +19,8 @@ MESSAGES = {
     "facture": "Chantier marqué comme facturé.",
     "encaisse": "Paiement enregistré.",
     "planifie_lot": "Chantiers planifiés pour la journée.",
-    "retire": "Chantier retiré de la journée : il redevient « à planifier ».",
+    "retire": "Chantier retiré de la journée : il redevient « À planifier ».",
+    "deplace": "Ordre de passage mis à jour : les heures sont recalculées.",
     "client_maj": "Fiche client enregistrée.",
     "client_cree": "Chantier créé pour ce client.",
 }
@@ -79,6 +78,22 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}@media (prefers-color-scheme:dark){.onglet.actif{color:#0d1a11}}
 .verrou{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}.verrou b{font-size:17px}
 .verrou .doux::before{content:"\1F512  "}.total{font-weight:700}.sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
+.cal-nav{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.cal-nav h2{margin:0;flex:1;text-align:center;font-size:20px;min-width:140px}
+.cal-grille{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal-tete{font-size:13px;color:var(--doux);text-align:center;font-weight:600;padding:4px 0;text-transform:capitalize}
+.cal-jour{min-height:84px;padding:6px 8px;border:1px solid var(--trait);border-radius:8px;text-decoration:none;color:var(--texte);display:flex;flex-direction:column;gap:2px;background:var(--carte)}
+.cal-jour:hover{border-color:var(--accent-fonce)}.cal-jour.autre-mois{opacity:.45}.cal-jour.weekend{background:var(--fond)}
+.cal-jour .cal-n{font-weight:700}.cal-jour.aujourdhui .cal-n{background:var(--accent);color:#fff;border-radius:99px;padding:0 7px;align-self:flex-start}
+@media (prefers-color-scheme:dark){.cal-jour.aujourdhui .cal-n{color:#0d1a11}}
+.cal-jour.occupe{border-color:var(--accent);background:var(--ok-fond)}.cal-jour.chargee{border-color:var(--alerte);background:var(--alerte-fond)}
+.cal-jour.selection{outline:3px solid var(--accent-fonce);outline-offset:-1px}.cal-info{font-size:12px;line-height:1.3}.cal-alerte{font-size:11px;color:var(--alerte);font-weight:700}
+.col-ordre{width:62px;white-space:nowrap}.col-ordre form{display:inline-block;margin:0 2px 0 0}
+button.fleche{padding:2px 8px;font-size:13px;background:transparent;color:var(--accent-fonce);border:1px solid var(--accent)}button.fleche:disabled{opacity:.3;cursor:default}
+.heures{font-size:16px;white-space:nowrap}tr.diner td{background:var(--fond);color:var(--doux);font-size:13px;text-align:center}
+.modale{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modale-carte{background:var(--carte);border-radius:14px;padding:24px;max-width:480px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.modale .question{font-size:19px;font-weight:700;margin:12px 0 18px}
+@media (max-width:700px){.cal-jour{min-height:58px;padding:4px}.cal-info{font-size:10px}}
 details summary{cursor:pointer;color:var(--accent-fonce);font-weight:600;margin-bottom:10px}
 @media (max-width:700px){table.liste th:nth-child(n+5),table.liste td:nth-child(n+5){display:none}}
 """

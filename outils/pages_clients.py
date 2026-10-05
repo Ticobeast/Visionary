@@ -155,7 +155,7 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
 {champ_modalite(valeurs)}</div></div>
 <div class="carte"><h2>Notes</h2><div class="grille">{zone("description", "Notes (description du chantier, imprimée sur la feuille de route)", valeurs)}</div></div>
 <div class="barre"><button type="submit">Créer le chantier</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>
-<p class="doux">Le chantier est créé « Accepté » (à planifier). La date, la durée et le statut se règlent ensuite depuis le tableau de bord ou les tournées.</p>"""
+<p class="doux">Le chantier est créé « À planifier ». La date, la durée et le statut se règlent ensuite depuis le tableau de bord ou les tournées.</p>"""
 
 
 def page_chantier_nouveau(conn, client_id):
@@ -174,7 +174,7 @@ def chantier_creer(conn, client_id, form):
     brut = {c: "" for c in COLONNES}
     brut.update(valeurs_client(conn, client_id))
     brut.update({c: saisie[c] for c in ("prix_ht", "modalite_paiement", "description")})
-    brut.update(statut="accepte", type_travaux=travaux)
+    brut.update(statut="a_planifier", type_travaux=travaux)
     v, erreurs = lire_ligne(brut, alias_types_travaux(conn), taxes_auto=bool(saisie["taxes_auto"]))
     if not erreurs:
         try:

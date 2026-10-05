@@ -1,4 +1,4 @@
-"""Tests de la migration d'une base v1 vers v2 (outils/migrer.py)."""
+"""Tests de la migration d'une ancienne base (v1, v2 ou v3) vers le format actuel (v4) : outils/migrer.py."""
 import sqlite3
 import sys
 import tempfile
@@ -24,17 +24,39 @@ def base_v1(chemin):
               " VALUES (11, 7, 'taille_haie', 'Haie de cèdres', 'Chien dans la cour', 'termine', '2026-06-10', '2026-06-14', 480, 24, 47.88, '2026-06-14')")
     c.execute("INSERT INTO chantiers (id, client_id, type_travaux, notes, statut, date_prevue) VALUES (12, 8, 'haubanage', 'Appeler avant', 'planifie', '2026-10-20')")
     c.execute("INSERT INTO chantiers (id, client_id, type_travaux, statut) VALUES (13, 8, 'emondage', 'soumission')")
+    c.execute("INSERT INTO chantiers (id, client_id, type_travaux, statut) VALUES (14, 8, 'emondage', 'accepte')")
+    c.execute("INSERT INTO chantiers (id, client_id, type_travaux, statut) VALUES (15, 8, 'emondage', 'refuse')")
     c.execute("INSERT INTO paiements (id, chantier_id, date_paiement, montant, mode, reference) VALUES (5, 11, '2026-06-14', 551.88, 'interac', 'ref1')")
     c.commit()
     c.close()
 
 
-class TestMigration(unittest.TestCase):
+def base_v2_ou_v3(chemin, fixture):
+    c = sqlite3.connect(chemin)
+    c.executescript((RACINE / "tests" / fixture).read_text(encoding="utf-8"))
+    c.execute("PRAGMA foreign_keys = ON")
+    c.execute("INSERT INTO clients (id, nom, adresse, ville) VALUES (1, 'Roy', '2 Rue B', 'Mirabel')")
+    c.execute("INSERT INTO chantiers (id, client_id, description, statut, date_soumission, date_prevue, prix_ht)"
+              " VALUES (5, 1, 'Haie', 'termine', '2026-05-01', '2026-05-10', 300)")
+    # trois chantiers le même jour, avec des heures prévues dans le désordre : l'ordre doit suivre les heures
+    for i, heure in ((6, "13:00"), (7, "08:00"), (8, None)):
+        c.execute("INSERT INTO chantiers (id, client_id, statut, date_prevue, heure_prevue) VALUES (?, 1, 'planifie', '2026-10-20', ?)", (i, heure))
+    c.execute("INSERT INTO chantiers (id, client_id, statut) VALUES (9, 1, 'accepte')")
+    c.execute("INSERT INTO chantiers (id, client_id, statut) VALUES (10, 1, 'refuse')")
+    for i in range(5, 11):
+        c.execute("INSERT INTO chantier_travaux VALUES (?, 'taille_haie', ?)", (i, "cèdres" if i == 5 else None))
+    c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (5, '2026-05-10', 300, 'comptant')")
+    if fixture == "schema_v3.sql":
+        c.execute("UPDATE chantiers SET modalite_paiement = 'Interac à la fin' WHERE id = 5")
+    c.commit()
+    c.close()
+
+
+class Base(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.db = Path(self._tmp.name) / "data" / "s.db"
         self.db.parent.mkdir()
-        base_v1(self.db)
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -46,43 +68,38 @@ class TestMigration(unittest.TestCase):
         finally:
             c.close()
 
-    def test_migration_complete(self):
-        r = migrer.migrer(self.db)
-        self.assertEqual((r["clients"], r["chantiers"], r["paiements"]), (2, 3, 1))
-        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
+    def verifier_base_valide(self):
+        self.assertEqual(self.sql("PRAGMA user_version"), [(4,)])
         self.assertEqual(self.sql("PRAGMA integrity_check"), [("ok",)])
         self.assertEqual(self.sql("PRAGMA foreign_key_check"), [])
-        # clients : identifiants, coordonnées et notes conservés
+
+
+class TestMigrationV1(Base):
+    def test_migration_complete(self):
+        base_v1(self.db)
+        r = migrer.migrer(self.db)
+        self.assertEqual((r["clients"], r["chantiers"], r["paiements"]), (2, 5, 1))
+        self.verifier_base_valide()
         self.assertEqual(self.sql("SELECT id, telephone, latitude, geocode_statut, notes FROM clients WHERE id = 7"),
                          [(7, "+14505550142", 45.7, "manuel", "Préfère le matin")])
-        # une seule date : la date réalisée l'emporte ; notes fusionnées dans la description
-        self.assertEqual(self.sql("SELECT id, statut, date_prevue, description FROM chantiers ORDER BY id"),
-                         [(11, "termine", "2026-06-14", "Haie de cèdres\nChien dans la cour"),
-                          (12, "planifie", "2026-10-20", "Appeler avant"),
-                          (13, "soumission", None, None)])
-        # l'ancien type devient un type sans précision (y compris un type ajouté par l'utilisateur)
+        # une seule date (la réalisée l'emporte), notes fusionnées, statuts convertis, ordre du jour attribué
+        self.assertEqual(self.sql("SELECT id, statut, date_prevue, ordre_jour, description FROM chantiers ORDER BY id"),
+                         [(11, "termine", "2026-06-14", 1, "Haie de cèdres\nChien dans la cour"),
+                          (12, "planifie", "2026-10-20", 1, "Appeler avant"),
+                          (13, "soumission", None, None, None),
+                          (14, "a_planifier", None, None, None),      # Accepté -> À planifier
+                          (15, "annule", None, None, None)])          # Refusé -> Annulé
         self.assertEqual(self.sql("SELECT chantier_id, type_travaux, precision FROM chantier_travaux ORDER BY chantier_id"),
-                         [(11, "taille_haie", None), (12, "haubanage", None), (13, "emondage", None)])
+                         [(11, "taille_haie", None), (12, "haubanage", None), (13, "emondage", None), (14, "emondage", None), (15, "emondage", None)])
         self.assertEqual(self.sql("SELECT libelle FROM types_travaux WHERE code = 'haubanage'"), [("Haubanage",)])
-        # finances intactes
         self.assertEqual(self.sql("SELECT statut_paiement, solde FROM v_chantiers WHERE chantier_id = 11"), [("paye", 0.0)])
-        # l'ancienne base est conservée, intacte
         copie = sqlite3.connect(r["sauvegarde"])
         self.assertEqual(copie.execute("PRAGMA user_version").fetchone()[0], 1)
         self.assertEqual(copie.execute("SELECT date_realisee FROM chantiers WHERE id = 11").fetchone()[0], "2026-06-14")
         copie.close()
 
-    def test_deuxieme_passage_ne_fait_rien(self):
-        migrer.migrer(self.db)
-        self.assertIsNone(migrer.migrer(self.db))
-
-    def test_ancienne_base_est_refusee_avec_instruction(self):
-        with self.assertRaises(SystemExit) as e:
-            noyau.ouvrir_base(self.db)
-        self.assertIn("migrer.py", str(e.exception))
-        self.assertIn("v1", str(e.exception))
-
     def test_base_avec_table_sites_non_prise_en_charge(self):
+        base_v1(self.db)
         c = sqlite3.connect(self.db)
         c.execute("CREATE TABLE sites (id INTEGER PRIMARY KEY)")
         c.commit()
@@ -92,70 +109,55 @@ class TestMigration(unittest.TestCase):
         self.assertEqual(self.sql("PRAGMA user_version"), [(1,)])      # rien n'a été touché
 
 
-def base_v2(chemin):
-    c = sqlite3.connect(chemin)
-    c.executescript((RACINE / "tests" / "schema_v2.sql").read_text(encoding="utf-8"))
-    c.execute("PRAGMA foreign_keys = ON")
-    c.execute("INSERT INTO clients (id, nom, adresse, ville) VALUES (1, 'Roy', '2 Rue B', 'Mirabel')")
-    c.execute("INSERT INTO chantiers (id, client_id, description, statut, date_soumission, date_prevue, prix_ht)"
-              " VALUES (5, 1, 'Haie', 'termine', '2026-05-01', '2026-05-10', 300)")
-    c.execute("INSERT INTO chantiers (id, client_id, statut) VALUES (6, 1, 'accepte')")
-    c.execute("INSERT INTO chantier_travaux VALUES (5, 'taille_haie', 'cèdres')")
-    c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (5, '2026-05-10', 300, 'comptant')")
-    c.commit()
-    c.close()
-
-
-class TestMigrationV2(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.db = Path(self._tmp.name) / "data" / "s.db"
-        self.db.parent.mkdir()
-        base_v2(self.db)
-
-    def tearDown(self):
-        self._tmp.cleanup()
-
-    def sql(self, requete):
-        c = sqlite3.connect(self.db)
-        try:
-            return c.execute(requete).fetchall()
-        finally:
-            c.close()
-
-    def test_v2_vers_v3_conserve_tout(self):
+class TestMigrationV2V3(Base):
+    def verifier(self, fixture, version):
+        base_v2_ou_v3(self.db, fixture)
         r = migrer.migrer(self.db)
-        self.assertEqual((r["clients"], r["chantiers"], r["paiements"]), (1, 2, 1))
-        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
-        self.assertEqual(self.sql("PRAGMA integrity_check"), [("ok",)])
-        self.assertEqual(self.sql("SELECT id, description, date_prevue, modalite_paiement FROM chantiers ORDER BY id"),
-                         [(5, "Haie", "2026-05-10", None), (6, None, None, None)])
-        self.assertEqual(self.sql("SELECT type_travaux, precision FROM chantier_travaux"), [("taille_haie", "cèdres")])
-        # la nouvelle vue fonctionne : attente depuis la soumission, sinon depuis la création de la fiche
-        vue = dict(self.sql("SELECT chantier_id, attente_depuis FROM v_chantiers"))
-        self.assertEqual(vue[5], "2026-05-01")
-        self.assertRegex(vue[6], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertEqual((r["clients"], r["chantiers"], r["paiements"]), (1, 6, 1))
+        self.verifier_base_valide()
+        self.assertEqual(self.sql("SELECT id, statut, date_prevue, ordre_jour FROM chantiers ORDER BY id"),
+                         [(5, "termine", "2026-05-10", 1),
+                          (6, "planifie", "2026-10-20", 2),            # 13:00 : après 08:00
+                          (7, "planifie", "2026-10-20", 1),            # 08:00 : premier
+                          (8, "planifie", "2026-10-20", 3),            # sans heure : à la fin
+                          (9, "a_planifier", None, None),
+                          (10, "annule", None, None)])
+        self.assertEqual(self.sql("SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = 5"), [("taille_haie", "cèdres")])
         self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = 5"), [("paye",)])
         copie = sqlite3.connect(r["sauvegarde"])
-        self.assertEqual(copie.execute("PRAGMA user_version").fetchone()[0], 2)
+        self.assertEqual(copie.execute("PRAGMA user_version").fetchone()[0], version)
         copie.close()
         self.assertIsNone(migrer.migrer(self.db))            # deuxième passage : rien à faire
 
+    def test_v2_vers_v4(self):
+        self.verifier("schema_v2.sql", 2)
+
+    def test_v3_vers_v4_conserve_la_modalite(self):
+        self.verifier("schema_v3.sql", 3)
+        self.assertEqual(self.sql("SELECT modalite_paiement FROM chantiers WHERE id = 5"), [("Interac à la fin",)])
+
     def test_la_base_migree_est_identique_a_une_base_neuve(self):
+        base_v2_ou_v3(self.db, "schema_v3.sql")
         migrer.migrer(self.db)
         neuve = sqlite3.connect(":memory:")
         neuve.executescript((RACINE / "schema" / "schema.sql").read_text(encoding="utf-8"))
-        colonnes = lambda c: [(r[1], r[2], r[3]) for r in c.execute("PRAGMA table_info(chantiers)")]
         migree = sqlite3.connect(self.db)
-        self.assertEqual(sorted(colonnes(migree)), sorted(colonnes(neuve)))
-        self.assertEqual([r[1] for r in migree.execute("PRAGMA table_info(v_chantiers)")],
-                         [r[1] for r in neuve.execute("PRAGMA table_info(v_chantiers)")])
+        for table in ("clients", "chantiers", "paiements", "chantier_travaux", "types_travaux", "v_chantiers"):
+            colonnes = lambda c: [(r[1], r[2], r[3]) for r in c.execute(f"PRAGMA table_info({table})")]
+            self.assertEqual(colonnes(migree), colonnes(neuve), table)
         migree.close()
 
-    def test_ancienne_base_v2_refusee_avec_instruction(self):
-        with self.assertRaises(SystemExit) as e:
-            noyau.ouvrir_base(self.db)
-        self.assertIn("migrer.py", str(e.exception))
+
+class TestAncienneBaseRefusee(Base):
+    def test_refus_avec_instruction(self):
+        for fixture, version in (("schema_v2.sql", "v2"), ("schema_v3.sql", "v3")):
+            if self.db.exists():
+                self.db.unlink()
+            base_v2_ou_v3(self.db, fixture)
+            with self.assertRaises(SystemExit) as e:
+                noyau.ouvrir_base(self.db)
+            self.assertIn("migrer.py", str(e.exception))
+            self.assertIn(version, str(e.exception))
 
 
 if __name__ == "__main__":

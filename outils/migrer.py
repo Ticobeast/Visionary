@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
-"""Convertit une base d'un ancien format (v1 ou v2) vers le format actuel (v3).
+"""Convertit une base d'un ancien format (v1, v2 ou v3) vers le format actuel (v4).
 
     python outils/migrer.py data/sylvainculteur.db
 
-Changements v2 -> v3 :
-  * nouvelle colonne chantiers.modalite_paiement (comment le client paiera) ;
-  * la vue v_chantiers gagne attente_depuis et modalite_paiement.
+Changements v3 -> v4 :
+  * nouveaux statuts : « Accepté » devient « À planifier », « Refusé » devient « Annulé » ;
+    « En attente » est nouveau (soumission remise, réponse du client attendue) ;
+  * l'heure prévue saisie à la main disparaît : les heures de passage sont calculées d'après l'ordre
+    de la journée (nouvelle colonne ordre_jour, déduite de l'ancien ordre des heures).
 
-Changements v1 -> v2 (appliqués en même temps si la base est en v1) :
-  * un chantier peut avoir plusieurs types de travaux, chacun avec sa précision
-    (table chantier_travaux) : l'ancien type devient un type sans précision ;
-  * une seule date des travaux : date_prevue reprend date_realisee quand elle existe ;
-  * les notes de chantier sont ajoutées à la fin de la description.
+Changements v2 -> v3 : colonne modalite_paiement ; la vue gagne attente_depuis.
+Changements v1 -> v2 : plusieurs types de travaux par chantier (table chantier_travaux), une seule date
+des travaux (date_realisee prime sur date_prevue), notes de chantier ajoutées à la description.
 
-Rien n'est perdu : l'ancienne base est conservée dans data/sauvegardes/ avant tout
-changement, et la nouvelle est vérifiée (nombre de lignes, intégrité) avant de la
-mettre en place. Fermer l'interface avant de lancer ce script.
-Bibliothèque standard seulement.
+Rien n'est perdu : l'ancienne base est conservée dans data/sauvegardes/ avant tout changement,
+et la nouvelle est vérifiée (nombre de lignes, intégrité) avant de la mettre en place.
+Fermer l'interface avant de lancer ce script. Bibliothèque standard seulement.
 """
 import argparse
 import datetime
@@ -30,37 +29,34 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 TABLES = ("clients", "chantiers", "paiements")
-VERSION_SCHEMA = 3
+VERSION_SCHEMA = 4
 
 
-def _migrer_v2(db_path):
-    """v2 -> v3 sur place : ajout d'une colonne et nouvelle vue (aucune ligne n'est recopiée)."""
-    sauvegardes = db_path.parent / "sauvegardes"
-    sauvegardes.mkdir(exist_ok=True)
-    copie = sauvegardes / f"{datetime.datetime.now():%Y-%m-%d_%H%M%S}_avant_migration_v2.db"
-    shutil.copy2(db_path, copie)
-    schema = SCHEMA.read_text(encoding="utf-8")
-    vue = schema[schema.index("CREATE VIEW v_chantiers AS"):]
-    conn = sqlite3.connect(db_path, isolation_level=None)
-    try:
-        conn.execute("BEGIN")
-        conn.execute("ALTER TABLE chantiers ADD COLUMN modalite_paiement TEXT")
-        conn.execute("DROP VIEW v_chantiers")
-        conn.execute(vue.rstrip().rstrip(";"))
-        conn.execute(f"PRAGMA user_version = {VERSION_SCHEMA}")
-        conn.execute("COMMIT")
-    except sqlite3.OperationalError as e:
-        conn.execute("ROLLBACK")
-        raise SystemExit(f"Migration impossible ({e}). Rien n'a été modifié (base de départ intacte).")
-    compte = {t: conn.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in TABLES}
-    if conn.execute("SELECT count(*) FROM v_chantiers").fetchone()[0] != compte["chantiers"] \
-            or conn.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-        raise SystemExit(f"Vérification échouée après migration. Ta copie intacte : {copie}")
-    conn.close()
-    return {"sauvegarde": copie, **compte}
+def _sql_chantiers(version):
+    """INSERT ... SELECT des chantiers de l'ancienne base (schéma v<version>) vers le schéma actuel."""
+    if version == 1:
+        description = ("NULLIF(trim(COALESCE(description, '') || CASE WHEN trim(COALESCE(notes, '')) <> '' "
+                       "THEN char(10) || notes ELSE '' END, char(10) || ' '), '')")
+        date = "COALESCE(date_realisee, date_prevue)"
+    else:
+        description, date = "description", "date_prevue"
+    modalite = "modalite_paiement" if version >= 3 else "NULL"
+    statut = "CASE statut WHEN 'accepte' THEN 'a_planifier' WHEN 'refuse' THEN 'annule' ELSE statut END"
+    return (
+        "INSERT INTO chantiers (id, client_id, description, statut, date_soumission, date_prevue, ordre_jour,"
+        " duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, modalite_paiement, numero_facture, date_facture,"
+        " dossier_photos, fichier_papier, ref_papier, cree_le)"
+        " SELECT id, client_id, description_, statut2, date_soumission, date2,"
+        "  CASE WHEN statut2 IN ('planifie', 'termine') THEN ROW_NUMBER() OVER (PARTITION BY date2 ORDER BY COALESCE(heure_prevue, '99:99'), id) END,"
+        "  duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, modalite, numero_facture, date_facture,"
+        "  dossier_photos, fichier_papier, ref_papier, cree_le"
+        f" FROM (SELECT *, {description} AS description_, {statut} AS statut2, {date} AS date2, {modalite} AS modalite"
+        "       FROM v1.chantiers)"
+    )
 
 
 def migrer(db_path):
+    """Convertit la base. Retourne None si elle est déjà à jour, sinon un dict (sauvegarde, comptes)."""
     db_path = Path(db_path)
     if not db_path.exists():
         raise SystemExit(f"Base introuvable : {db_path}")
@@ -69,17 +65,14 @@ def migrer(db_path):
     tables = {r[0] for r in ancien.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     ancien.close()
     if version == VERSION_SCHEMA:
-        return None  # déjà à jour
-    if version == 2:
-        return _migrer_v2(db_path)
-    if version != 1 or "sites" in tables:
+        return None
+    if version not in (1, 2, 3) or "sites" in tables:
         raise SystemExit("Format de base non pris en charge (version %s%s). Garde ce fichier et demande de l'aide."
                          % (version, ", avec une table sites" if "sites" in tables else ""))
 
     dossier_tmp = Path(tempfile.mkdtemp(prefix="migration_", dir=db_path.parent))
-    nouveau_chemin = dossier_tmp / "nouvelle.db"
     try:
-        conn = sqlite3.connect(nouveau_chemin, isolation_level=None)
+        conn = sqlite3.connect(dossier_tmp / "nouvelle.db", isolation_level=None)
         conn.executescript(SCHEMA.read_text(encoding="utf-8"))
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("ATTACH DATABASE ? AS v1", (str(db_path),))
@@ -88,17 +81,12 @@ def migrer(db_path):
         conn.execute("INSERT INTO clients SELECT id, prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok,"
                      " adresse, ville, province, code_postal, latitude, longitude, geocode_statut, notes_acces, notes, cree_le"
                      " FROM v1.clients")
-        conn.execute(
-            "INSERT INTO chantiers (id, client_id, description, statut, date_soumission, date_prevue, heure_prevue,"
-            " duree_estimee_h, duree_reelle_h, prix_ht, tps, tvq, numero_facture, date_facture, dossier_photos,"
-            " fichier_papier, ref_papier, cree_le)"
-            " SELECT id, client_id,"
-            "  NULLIF(trim(COALESCE(description, '') || CASE WHEN trim(COALESCE(notes, '')) <> '' THEN char(10) || notes ELSE '' END, char(10) || ' '), ''),"
-            "  statut, date_soumission, COALESCE(date_realisee, date_prevue), heure_prevue, duree_estimee_h, duree_reelle_h,"
-            "  prix_ht, tps, tvq, numero_facture, date_facture, dossier_photos, fichier_papier, ref_papier, cree_le"
-            " FROM v1.chantiers")
-        conn.execute("INSERT INTO chantier_travaux (chantier_id, type_travaux, precision)"
-                     " SELECT id, type_travaux, NULL FROM v1.chantiers")
+        conn.execute(_sql_chantiers(version))
+        if version == 1:
+            conn.execute("INSERT INTO chantier_travaux (chantier_id, type_travaux, precision)"
+                         " SELECT id, type_travaux, NULL FROM v1.chantiers")
+        else:
+            conn.execute("INSERT INTO chantier_travaux SELECT chantier_id, type_travaux, precision FROM v1.chantier_travaux")
         conn.execute("INSERT INTO paiements SELECT id, chantier_id, date_paiement, montant, mode, reference, notes, cree_le"
                      " FROM v1.paiements")
         conn.execute("COMMIT")
@@ -118,7 +106,7 @@ def migrer(db_path):
         copie = sauvegardes / f"{datetime.datetime.now():%Y-%m-%d_%H%M%S}_avant_migration_v{version}.db"
         shutil.copy2(db_path, copie)
         try:
-            os.replace(nouveau_chemin, db_path)
+            os.replace(dossier_tmp / "nouvelle.db", db_path)
         except PermissionError:
             raise SystemExit("Impossible de remplacer la base : un autre programme l'utilise. "
                              "Ferme l'interface (et DB Browser) puis relance.")
@@ -128,7 +116,7 @@ def migrer(db_path):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="Convertit une base v1 ou v2 vers le format actuel (v3).")
+    p = argparse.ArgumentParser(description="Convertit une base v1, v2 ou v3 vers le format actuel (v4).")
     p.add_argument("db", help="fichier de base à convertir (ex. data/sylvainculteur.db)")
     a = p.parse_args(argv)
     r = migrer(a.db)

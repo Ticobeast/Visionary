@@ -1,97 +1,91 @@
-# Tableau de bord, fiche client et tournées
+# Calendrier, journée, suivi, tournées et fiche client
 
-Trois outils pour piloter le travail au quotidien, sans ouvrir la fiche complète d'un chantier.
+## Les statuts d'un chantier
 
-## 1. Tableau de bord (page d'accueil)
+Liste officielle, dans l'ordre du parcours :
 
-Cinq onglets, avec le nombre de chantiers (et d'urgents) dans chacun :
-
-| Onglet | Contenu | Classement par défaut |
+| # | Statut | Signification |
 |---|---|---|
-| **À planifier** | chantiers acceptés, sans date | par délai d'attente (le plus long d'abord) |
-| **Soumissions** | estimés donnés, réponse du client attendue | par délai d'attente |
-| **Planifiés** | chantiers avec une date, regroupés par jour (nombre de chantiers et heures totales) | par jour, puis heure |
-| **À facturer** | travaux terminés, pas encore facturés | par ancienneté |
-| **À recevoir** | facturés ou partiellement payés | par délai |
+| 1 | **Soumission** | estimé à donner ou en préparation |
+| 2 | **En attente** | soumission remise, on attend la réponse du client |
+| 3 | **À planifier** | accepté, pas encore de date |
+| 4 | **Planifié** | date fixée, place dans une journée |
+| 5 | **Terminé** | travaux faits |
+| 6 | **Annulé** | abandonné (refus du client, annulation…) |
 
-### Délai d'attente et priorité
+Il n'y a plus de statut « Refusé » : un client qui refuse = *Annulé*. Les anciens « Accepté » deviennent « À planifier »
+(la migration le fait toute seule).
 
-Le délai d'attente = nombre de jours depuis la **date de la demande ou de la soumission** (à défaut, depuis la
-création de la fiche). Pour « À facturer » et « À recevoir », on compte depuis la date des travaux, puis depuis
-la facture.
+## 1. Le tableau de bord : un calendrier
+
+La page d'accueil montre un **calendrier du mois**. Chaque jour planifié indique le nombre de chantiers et les heures
+prévues ; un jour de plus de 8 h est en rouge, un jour passé avec des chantiers encore « Planifiés » est signalé
+« à clôturer ». Au-dessus, des pastilles mènent aux files d'attente (À planifier, En attente, À facturer, À recevoir) avec
+le nombre d'urgents.
+
+**Un clic sur une date** affiche le **déroulement de la journée**, juste en dessous, sans changer de page.
+
+### Déroulement d'une journée
+
+Les chantiers sont dans leur **ordre de passage**, avec leurs **heures de début et de fin calculées automatiquement** :
+
+- la première intervention commence à **7 h 30** ;
+- une **pause dîner fixe de 12 h 00 à 12 h 30** est intégrée : un chantier qui chevauche midi est prolongé de 30 minutes
+  (« dîner inclus »), et un chantier qui se terminerait à 12 h 00 pile est suivi d'une ligne « Dîner » ;
+- chaque heure de fin vient de la **durée estimée** du chantier. Les trajets ne sont pas comptés (étape 2). Un chantier sans
+  durée est signalé : les heures sont alors approximatives.
+
+Exemple : 2 h, 2 h, 1 h, 1 h 30 → 7 h 30-9 h 30, 9 h 30-11 h 30, 11 h 30-**13 h 00** (dîner inclus), 13 h 00-14 h 30.
+
+**Réorganiser** : les boutons **▲ / ▼** montent ou descendent un chantier ; toutes les heures sont recalculées aussitôt. La
+flèche est grisée au début et à la fin de la liste. (Le glisser-déposer n'est pas offert : les flèches suffisent et fonctionnent
+partout, y compris sur tablette.)
+
+**Sans quitter la journée** :
+
+| Action | Ce qu'elle fait |
+|---|---|
+| **Statut** + durée + OK | change le statut ; la durée modifiée recalcule les heures. « À planifier », « En attente » et « Soumission » retirent le chantier de la journée. « Terminé » le garde dans la journée. |
+| **Encaisser** | enregistre un paiement (montant proposé = le solde, mode proposé d'après la modalité de paiement). Un montant plus petit = acompte. |
+| **Retirer** | remet le chantier dans « À planifier ». |
+
+### Encaissement sur un chantier « Planifié » : confirmation
+
+Quand tu encaisses un paiement sur un chantier **Planifié**, le paiement est enregistré, puis une fenêtre demande :
+
+> Voulez-vous passer ce chantier au statut "Terminé" ?  —  **Oui, passer à Terminé** / **Non, laisser Planifié**
+
+« Oui » change le statut ; « Non » ferme la fenêtre. Elle n'apparaît **pas** pour un chantier déjà Terminé ou À planifier.
+Elle fonctionne partout où l'on encaisse : calendrier, suivi, tournées et page du chantier.
+
+## 2. Suivi (files d'attente)
+
+Menu **Suivi** (ou les pastilles de l'accueil) : une liste par statut — À planifier, En attente, Soumissions, Planifiés, À facturer,
+À recevoir — avec le **délai d'attente** (nombre de jours depuis la demande ou la soumission, à défaut depuis la création de la
+fiche) :
 
 | Délai | Priorité | Affichage |
 |---|---|---|
 | moins de 7 jours | normale | pastille verte |
-| 7 à 30 jours | à surveiller | pastille jaune, barre jaune à gauche |
-| plus de 30 jours | **urgente** | pastille rouge, barre rouge à gauche |
+| 7 à 30 jours | à surveiller | pastille jaune, barre jaune |
+| plus de 30 jours | **urgente** | pastille rouge, barre rouge |
 
-Les seuils sont `SEUIL_SURVEILLER` et `SEUIL_URGENT` dans `outils/noyau.py`.
+Filtres : texte, délai, **secteur** (ville) ; tris : délai, secteur (ville puis code postal), durée. Chaque ligne a ses actions rapides
+(statut, **Facturer**, **Encaisser**) et une adresse cliquable vers Google Maps. Seuils : `SEUIL_SURVEILLER` et `SEUIL_URGENT` dans
+`outils/noyau.py`.
 
-### Filtrer et trier
+## 3. Tournées (bâtir une journée)
 
-Barre de filtres : recherche texte, **délai** (urgents / à surveiller / normaux), **secteur** (la ville) et **tri**
-(délai d'attente, secteur = ville puis code postal, durée). Avec le tri « secteur », les chantiers sont regroupés par
-ville : c'est la façon la plus rapide de repérer ceux qui se font dans le même coin.
+Menu **Tournées** : on choisit la journée (◀ ▶, calendrier, « Demain ») et on voit son déroulement (comme ci-dessus). En dessous, les
+**chantiers à placer** : filtres statut (À planifier / En attente / Soumissions / Planifiés un autre jour pour les déplacer),
+délai, secteur, tri. On **coche** des chantiers, on ajuste leur durée (le total d'heures de la journée se met à jour en direct), puis
+**Ajouter à la journée** : ils sont ajoutés **à la fin**, dans l'ordre où ils sont affichés (avec le tri « secteur », les chantiers du
+même coin se suivent). Ensuite, ▲ / ▼ pour ajuster. Tout est planifié d'un coup, ou rien.
 
-### Ce qui est visible sur chaque ligne
+L'ordre optimal et le trajet sur la carte viendront avec l'étape 2.
 
-- le **délai d'attente** et depuis quelle date ;
-- le client (lien vers sa fiche) et son téléphone ;
-- l'**adresse cliquable** : un clic ouvre Google Maps (nouvel onglet) ;
-- les travaux avec leurs précisions et la **durée planifiée** (⏱ 2 h 30) ;
-- le prix total, ce qui est déjà reçu, le solde et la modalité de paiement.
+## 4. Fiche client et nouveau chantier simplifié
 
-### Actions rapides (sans ouvrir la fiche)
-
-| Action | Ce qu'elle fait |
-|---|---|
-| **Statut** + date + durée + OK | change le statut. Voir les règles ci-dessous. |
-| **Facturer** | marque un chantier *terminé* comme facturé (date de la facture = aujourd'hui). Refusé si le prix est manquant. |
-| **Encaisser** | enregistre un paiement (le montant proposé est le solde ; le mode proposé suit la modalité de paiement). Un montant plus petit = acompte. |
-
-Règles du changement de statut :
-
-- **Planifié** et **Terminé** exigent une date (celle déjà inscrite est conservée si tu n'en donnes pas).
-- **Soumission** et **Accepté** = « à planifier » : la date est effacée.
-- **Refusé** et **Annulé** ne touchent pas à la date.
-- La durée saisie est la durée **estimée**, en heures décimales (`2,5` = 2 h 30).
-
-L'**état du paiement** n'est pas un champ qu'on modifie : il est calculé (*à facturer*, *facturé*, *partiel*, *payé*…).
-« Facturer » et « Encaisser » créent les données qui le font changer ; une fois la page rechargée, la ligne passe
-d'elle-même dans le bon onglet. Après chaque action, tu reviens à la même page, avec les mêmes filtres.
-
-## 2. Fiche client et nouveau chantier simplifié
-
-`Clients` → un client → fiche avec ses coordonnées, l'adresse cliquable et tout son historique.
-
-**+ Nouveau chantier** (depuis la fiche) ouvre un formulaire réduit à l'essentiel :
-
-1. **Travaux à faire** : un ou plusieurs types, chacun avec sa précision ;
-2. **Prix** avant taxes (case pour ajouter TPS/TVQ) et **modalité de paiement** (« Interac à la fin », « 50 % d'acompte »…
-   des suggestions sont proposées ; le texte est libre) ;
-3. **Notes** : la description du chantier, imprimée plus tard sur la feuille de route.
-
-Le **nom et l'adresse sont verrouillés** : affichés, mais non modifiables. Même un navigateur qui enverrait d'autres valeurs
-n'y change rien (le serveur relit toujours la fiche du client). Pour corriger un nom ou une adresse : *Modifier le client*
-(la modification vaut pour tous les chantiers du client).
-
-Le chantier est créé **« Accepté »** (à planifier) : il apparaît aussitôt dans l'onglet « À planifier » du tableau de bord, où
-l'on fixe la date et la durée.
-
-## 3. Tournées (organiser les journées)
-
-Page **Tournées** : on bâtit une journée en quelques clics.
-
-1. Choisis la **journée** (◀ ▶, calendrier, bouton « Demain »). En haut : ce qui est déjà planifié ce jour-là, la durée totale
-   et **ce qu'il reste de place** sur une journée de 8 h (`JOURNEE_H` dans `outils/tableau.py`). Un chantier planifié se
-   retire d'un clic (il redevient « à planifier »).
-2. **Filtre** les chantiers à placer : statut (à planifier / soumissions / planifiés un autre jour pour les déplacer),
-   **délai d'attente**, **secteur** (ville), **tri** (délai, secteur, durée). Avec le tri par secteur, ils sont regroupés
-   par ville avec les heures de chaque secteur.
-3. **Coche** les chantiers voulus, ajuste leur **durée** au besoin (le total de la journée se met à jour en direct), puis
-   « Ajouter à la journée ». Tout est planifié d'un coup, ou rien (si un chantier ne peut pas l'être, l'erreur est affichée et
-   rien n'est modifié).
-
-L'ordre de passage optimal et le trajet sur la carte viendront avec l'étape 2 (itinéraire) ; ici, on choisit *quoi* faire
-*quel jour*, en regroupant par secteur.
+`Clients` → un client : coordonnées, adresse cliquable, historique. **+ Nouveau chantier** ouvre un formulaire réduit à l'essentiel
+(travaux avec précisions, prix, modalité de paiement, notes). **Nom et adresse sont verrouillés** : le serveur relit toujours la fiche du
+client. Le chantier est créé « À planifier ». Pour corriger un nom ou une adresse : *Modifier le client*.

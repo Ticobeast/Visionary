@@ -87,7 +87,7 @@ class TestFormulaireSimplifie(BaseClients):
             "description": "Appeler avant de venir."})
         self.assertEqual(en_tetes["Location"], "/chantier/4?ok=client_cree")
         self.assertEqual(self.sql("SELECT client_id, statut, date_prevue, prix_ht, tps, tvq, modalite_paiement, description FROM chantiers WHERE id = 4"),
-                         [(1, "accepte", None, 600.0, 30.0, 59.85, "Interac à la fin des travaux", "Appeler avant de venir.")])
+                         [(1, "a_planifier", None, 600.0, 30.0, 59.85, "Interac à la fin des travaux", "Appeler avant de venir.")])
         self.assertEqual(self.sql("SELECT type_travaux, precision FROM chantier_travaux WHERE chantier_id = 4 ORDER BY 1"),
                          [("elagage", "érable côté garage"), ("taille_haie", "cèdres, 35 m")])
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])                # aucun doublon
@@ -102,7 +102,7 @@ class TestFormulaireSimplifie(BaseClients):
             "client_telephone": "514-555-0199", "code_postal": "H0H 0H0", "latitude": "45.5", "longitude": "-73.5",
             "statut": "termine", "date_prevue": "2020-01-01", "client_id": "2"})
         self.assertEqual(self.sql("SELECT * FROM clients ORDER BY id"), avant)             # client intact
-        self.assertEqual(self.sql("SELECT client_id, statut, date_prevue FROM chantiers WHERE id = 4"), [(1, "accepte", None)])
+        self.assertEqual(self.sql("SELECT client_id, statut, date_prevue FROM chantiers WHERE id = 4"), [(1, "a_planifier", None)])
 
     def test_erreurs_gardent_les_valeurs(self):
         statut, _, page = self.post("/client/1/chantier/nouveau", {"prix_ht": "12,345", "modalite_paiement": "Chèque", "description": "Mon texte"})

@@ -14,7 +14,7 @@
 --   Un client avec deux propriétés = deux fiches clients (une par adresse).
 --
 -- Conventions strictes (toutes vérifiées par la base elle-même) :
---   dates          AAAA-MM-JJ        heures de passage : calculées (voir ordre_jour)
+--   dates          AAAA-MM-JJ        heures        HH:MM (24 h)
 --   durées         heures décimales  (2.5 = 2 h 30), temps écoulé sur place
 --   argent         dollars CAD, 2 décimales max (450.00), jamais de symbole $
 --   téléphone      +1XXXXXXXXXX (E.164)
@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 4;
+PRAGMA user_version = 3;
 
 
 -- -----------------------------------------------------------------------------
@@ -122,21 +122,16 @@ CREATE TABLE chantiers (
     description     TEXT,     -- description générale (imprimée sur la feuille de route) ;
                               -- le détail par type de travaux est dans chantier_travaux
 
-    -- Statuts (dans l'ordre du parcours d'un chantier) :
-    --   soumission  = estimé à donner / en préparation
-    --   en_attente  = soumission remise, on attend la réponse du client
-    --   a_planifier = accepté, pas encore de date
-    --   planifie    = date fixée
-    --   termine     = fait
-    --   annule      = abandonné (refus du client, annulation...)
+    -- soumission = estimé donné, réponse attendue     refuse  = client a dit non
+    -- accepte    = accepté, pas encore de date         planifie = date fixée
+    -- termine    = fait                                annule  = annulé après acceptation
     statut          TEXT NOT NULL DEFAULT 'soumission',
 
     date_soumission TEXT,     -- AAAA-MM-JJ
     date_prevue     TEXT,     -- AAAA-MM-JJ : UNE seule date des travaux. Prévue tant que non fait ;
                               -- si le chantier change de jour, on met simplement cette date à jour.
                               -- Obligatoire si statut = planifie ou termine.
-    ordre_jour      INTEGER,  -- rang du chantier dans sa journée (1, 2, 3...) ; sert à calculer les heures de
-                              -- passage (début 7 h 30, dîner 12 h - 12 h 30). NULL si le chantier n'est pas planifié.
+    heure_prevue    TEXT,     -- HH:MM       (facultatif : rendez-vous fixe)
 
     duree_estimee_h REAL,     -- heures décimales, temps écoulé sur place
     duree_reelle_h  REAL,     -- idem, mesuré après coup (sert à améliorer les estimés)
@@ -157,14 +152,14 @@ CREATE TABLE chantiers (
     cree_le         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
     CONSTRAINT ck_chantiers_statut
-        CHECK (statut IN ('soumission','en_attente','a_planifier','planifie','termine','annule')),
-    CONSTRAINT ck_chantiers_ordre_jour
-        CHECK (ordre_jour IS NULL OR (typeof(ordre_jour) = 'integer' AND ordre_jour >= 1)),
+        CHECK (statut IN ('soumission','refuse','accepte','planifie','termine','annule')),
 
     -- Dates : `date(x, '+0 days') IS x` rejette 2026-02-30, 2026-13-01, 14/06/2026, "2026-06-14 10:00".
     CONSTRAINT ck_chantiers_date_soumission CHECK (date_soumission IS NULL OR date(date_soumission, '+0 days') IS date_soumission),
     CONSTRAINT ck_chantiers_date_prevue     CHECK (date_prevue     IS NULL OR date(date_prevue, '+0 days')     IS date_prevue),
     CONSTRAINT ck_chantiers_date_facture    CHECK (date_facture    IS NULL OR date(date_facture, '+0 days')    IS date_facture),
+    CONSTRAINT ck_chantiers_heure_prevue
+        CHECK (heure_prevue IS NULL OR (time(heure_prevue) IS heure_prevue || ':00' AND heure_prevue < '24:00')),
 
     CONSTRAINT ck_chantiers_duree_estimee
         CHECK (duree_estimee_h IS NULL OR (typeof(duree_estimee_h) IN ('real','integer')
@@ -250,10 +245,10 @@ CREATE INDEX idx_paiements_chantier ON paiements(chantier_id);
 --   prix_manquant  travaux faits mais prix_ht vide (fiche à compléter)
 --   paye           somme reçue >= total
 --   partiel        une partie reçue (acompte...), solde > 0
---   sans_objet     soumission / en attente / annulé, ou travail gratuit
+--   sans_objet     soumission / refusé / annulé, ou travail gratuit
 --   non_facture    travaux faits, aucune facture émise   ← à facturer
 --   a_payer        facture émise, rien reçu              ← à relancer
---   a_venir        à planifier / planifié, pas encore fait
+--   a_venir        accepté / planifié, pas encore fait
 -- -----------------------------------------------------------------------------
 CREATE VIEW v_chantiers AS
 WITH recu AS (
@@ -274,7 +269,7 @@ base AS (
             FROM chantier_travaux ct JOIN types_travaux t ON t.code = ct.type_travaux
             WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS travaux_detail,
         c.description,
-        c.date_soumission, c.date_prevue, c.ordre_jour,
+        c.date_soumission, c.date_prevue, c.heure_prevue,
         -- Depuis quand le client attend : date de la demande/soumission, à défaut date de création de la fiche
         COALESCE(c.date_soumission, date(c.cree_le)) AS attente_depuis,
         c.duree_estimee_h, c.duree_reelle_h,
@@ -306,7 +301,7 @@ SELECT
         WHEN statut = 'termine' AND prix_ht IS NULL        THEN 'prix_manquant'
         WHEN paye > 0 AND solde <= 0                        THEN 'paye'
         WHEN paye > 0                                       THEN 'partiel'
-        WHEN statut IN ('soumission', 'en_attente', 'annule') THEN 'sans_objet'
+        WHEN statut IN ('soumission', 'refuse', 'annule')   THEN 'sans_objet'
         WHEN statut = 'termine' AND total_ttc = 0           THEN 'sans_objet'
         WHEN statut = 'termine' AND date_facture IS NULL    THEN 'non_facture'
         WHEN date_facture IS NOT NULL                       THEN 'a_payer'

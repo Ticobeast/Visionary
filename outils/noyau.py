@@ -16,7 +16,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 3
+VERSION_SCHEMA = 4
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -36,7 +36,7 @@ COLONNES = [
     "client_nom", "client_prenom", "client_entreprise", "client_telephone",
     "adresse", "ville", "code_postal",
     "type_travaux", "statut", "description",
-    "date_soumission", "date_prevue", "heure_prevue",
+    "date_soumission", "date_prevue",
     "duree_estimee_h", "duree_reelle_h",
     "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture", "date_facture",
     "paiement_date", "paiement_montant", "paiement_mode",
@@ -46,11 +46,17 @@ COLONNES = [
 ]
 COLONNES_REQUISES = ("adresse", "ville", "type_travaux", "statut")
 
-STATUTS = ("soumission", "refuse", "accepte", "planifie", "termine", "annule")
+# Statuts officiels, dans l'ordre du parcours d'un chantier.
+STATUTS = ("soumission", "en_attente", "a_planifier", "planifie", "termine", "annule")
+LIBELLES_STATUT = {"soumission": "Soumission", "en_attente": "En attente", "a_planifier": "À planifier",
+                   "planifie": "Planifié", "termine": "Terminé", "annule": "Annulé"}
+# Statuts sans date : le chantier n'est pas (encore) placé dans une journée.
+STATUTS_SANS_DATE = ("soumission", "en_attente", "a_planifier")
+# Anciens noms toujours compris (vieilles feuilles CSV) : Accepté -> À planifier, Refusé -> Annulé.
+ALIAS_ANCIENS_STATUTS = {"accepte": "a_planifier", "refuse": "annule"}
 MODES = ("comptant", "cheque", "interac", "carte", "autre")
 
 RE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-RE_HEURE = re.compile(r"^(\d{1,2})[:hH](\d{2})(?::\d{2})?$")
 RE_CODE_POSTAL = re.compile(r"^[A-Z]\d[A-Z]\d[A-Z]\d$")
 
 
@@ -108,16 +114,6 @@ class Ligne:
             f"{col} « {v} » invalide (format attendu AAAA-MM-JJ, ex. 2026-06-14 ; "
             "dans le tableur, formater la colonne en « Texte »)"
         )
-        return None
-
-    def heure(self, col):
-        v = self._cellule(col)
-        if v is None:
-            return None
-        m = RE_HEURE.match(v)
-        if m and int(m.group(1)) < 24 and int(m.group(2)) < 60:
-            return f"{int(m.group(1)):02d}:{m.group(2)}"
-        self.erreurs.append(f"{col} « {v} » invalide (format attendu HH:MM, ex. 08:30)")
         return None
 
     def decimal(self, col):
@@ -291,11 +287,11 @@ def lire_ligne(brut, alias_types, taxes_auto):
     _lire_client(L, v)
 
     v["travaux"] = L.travaux("type_travaux", alias_types)
-    v["statut"] = L.choix("statut", STATUTS, obligatoire=True)
+    alias_statuts = {**{cle(c): c for c in STATUTS}, **{cle(l): c for c, l in LIBELLES_STATUT.items()}, **ALIAS_ANCIENS_STATUTS}
+    v["statut"] = L.choix("statut", STATUTS, alias_statuts, obligatoire=True)
     v["description"] = L.texte("description", multiligne=True)
     v["date_soumission"] = L.jour("date_soumission")
     v["date_prevue"] = L.jour("date_prevue")
-    v["heure_prevue"] = L.heure("heure_prevue")
     v["duree_estimee_h"] = L.duree("duree_estimee_h")
     v["duree_reelle_h"] = L.duree("duree_reelle_h")
 
@@ -353,7 +349,7 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (1, 2):
+        if version in (1, 2, 3):
             raise SystemExit(f"La base {db_path} utilise un ancien format (v{version}).\n"
                              f"Convertis-la d'abord (une sauvegarde est faite) :  python outils/migrer.py \"{db_path}\"")
         if version != VERSION_SCHEMA:
@@ -529,7 +525,7 @@ def trouver_ou_creer_client(conn, idx, v, res, avertir):
 
 def _champs_differents(conn, chantier_id, v):
     """Champs de la ligne qui contredisent un chantier déjà présent (pour avertir, jamais pour écrire)."""
-    colonnes = ["statut", "heure_prevue", "duree_estimee_h", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture",
+    colonnes = ["statut", "duree_estimee_h", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "numero_facture",
                 "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
     actuel = dict(zip(colonnes, conn.execute(
         f"SELECT {', '.join(colonnes)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()))
@@ -549,13 +545,13 @@ def _champs_differents(conn, chantier_id, v):
 
 
 def _valeurs_chantier(v):
-    return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"], v["heure_prevue"],
+    return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"],
             _num(v["duree_estimee_h"]), _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0,
             _num(v["tvq"]) or 0, v["modalite_paiement"], v["numero_facture"], v["date_facture"], v["dossier_photos"],
             v["fichier_papier"], v["ref_papier"])
 
 
-COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue", "heure_prevue",
+COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue",
                      "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement", "numero_facture",
                      "date_facture", "dossier_photos", "fichier_papier", "ref_papier"]
 
@@ -588,6 +584,7 @@ def creer_chantier(conn, client_id, v, res, avertir, verifier_doublon=True):
         f"INSERT INTO chantiers (client_id, {', '.join(COLONNES_CHANTIER)}) VALUES (?{',?' * len(COLONNES_CHANTIER)})",
         (client_id, *_valeurs_chantier(v)))
     _ecrire_travaux(conn, cur.lastrowid, v["travaux"])
+    ajuster_ordre(conn, cur.lastrowid)
     res.chantiers += 1
     if v["paiement_montant"] is not None:
         conn.execute(
@@ -599,11 +596,12 @@ def creer_chantier(conn, client_id, v, res, avertir, verifier_doublon=True):
 
 def mettre_a_jour_fiche(conn, chantier_id, v):
     """Corrige un chantier ET la fiche de son client avec les valeurs de v (les champs vides effacent)."""
-    client_id, = conn.execute("SELECT client_id FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    client_id, ancienne_date = conn.execute("SELECT client_id, date_prevue FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     mettre_a_jour_client(conn, client_id, v)
     conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in COLONNES_CHANTIER)} WHERE id = ?",
                  (*_valeurs_chantier(v), chantier_id))
     _ecrire_travaux(conn, chantier_id, v["travaux"])
+    ajuster_ordre(conn, chantier_id, ancienne_date)
 
 
 def mettre_a_jour_client(conn, client_id, v):
@@ -708,9 +706,9 @@ def priorite(jours):
 def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None):
     """Change le statut d'un chantier.
 
-    « soumission » / « accepte » : le chantier est à planifier, sa date est effacée.
-    « planifie » / « termine »   : une date des travaux est obligatoire (celle déjà en base si rien n'est fourni).
-    « refuse » / « annule »      : la date n'est pas touchée.
+    « soumission » / « en_attente » / « a_planifier » : pas encore placé dans une journée, la date est effacée.
+    « planifie » / « termine » : une date des travaux est obligatoire (celle déjà en base si rien n'est fourni).
+    « annule » : la date n'est pas touchée.
     La durée, si fournie, est la durée ESTIMÉE (heures).
     """
     L = Ligne({"date_prevue": date_prevue or "", "duree_estimee_h": duree or ""})
@@ -722,21 +720,21 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None):
         L.erreurs.append(f"chantier #{chantier_id} introuvable")
     if L.erreurs:
         return L.erreurs
+    ancienne_date = actuel[0]
     if statut in ("planifie", "termine"):
-        d = d or actuel[0]
+        d = d or ancienne_date
         if not d:
-            return [f"la date des travaux est obligatoire pour le statut « {statut} »"]
-    elif statut in ("soumission", "accepte"):
+            return [f"la date des travaux est obligatoire pour le statut « {LIBELLES_STATUT[statut]} »"]
+    elif statut in STATUTS_SANS_DATE:
         d = None
     else:
-        d = actuel[0]
+        d = ancienne_date
     colonnes = {"statut": statut, "date_prevue": d}
-    if statut in ("soumission", "accepte"):
-        colonnes["heure_prevue"] = None
     if h is not None:
         colonnes["duree_estimee_h"] = float(h)
     conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in colonnes)} WHERE id = ?",
                  (*colonnes.values(), chantier_id))
+    ajuster_ordre(conn, chantier_id, ancienne_date)
     return []
 
 
@@ -792,7 +790,7 @@ def planifier_lot(conn, ids, date_prevue, durees=None):
     a_ecrire = []
     for i in ids:
         r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (i,)).fetchone()
-        if r is None or r[0] not in ("soumission", "accepte", "planifie"):
+        if r is None or r[0] not in ("soumission", "en_attente", "a_planifier", "planifie"):
             L.erreurs.append(f"chantier #{i} : ne peut pas être planifié (statut {r[0] if r else 'introuvable'})")
             continue
         Lh = Ligne({"duree_estimee_h": durees.get(i, "")})
@@ -801,10 +799,93 @@ def planifier_lot(conn, ids, date_prevue, durees=None):
         a_ecrire.append((i, h))
     if L.erreurs:
         return L.erreurs
-    for i, h in a_ecrire:
+    for i, h in a_ecrire:      # dans l'ordre reçu : les chantiers sont ajoutés à la fin de la journée dans cet ordre
+        ancienne_date = conn.execute("SELECT date_prevue FROM chantiers WHERE id = ?", (i,)).fetchone()[0]
         if h is None:
             conn.execute("UPDATE chantiers SET statut = 'planifie', date_prevue = ? WHERE id = ?", (d, i))
         else:
             conn.execute("UPDATE chantiers SET statut = 'planifie', date_prevue = ?, duree_estimee_h = ? WHERE id = ?",
                          (d, float(h), i))
+        ajuster_ordre(conn, i, ancienne_date)
     return []
+
+
+# ---------------------------------------------------------------------------
+# Ordre de passage dans une journée et heures calculées
+# ---------------------------------------------------------------------------
+DEBUT_JOURNEE = 7 * 60 + 30            # 7 h 30 : début de la première intervention (minutes depuis minuit)
+DINER_DEBUT, DINER_FIN = 12 * 60, 12 * 60 + 30   # pause dîner fixe, 12 h 00 - 12 h 30
+
+
+def heure_texte(minutes):
+    """450 -> « 7 h 30 »."""
+    return f"{minutes // 60} h {minutes % 60:02d}"
+
+
+# Un chantier « planifié » ou « terminé » a sa place dans la journée de sa date (un chantier terminé garde son rang).
+def ids_de_la_journee(conn, jour):
+    """Identifiants des chantiers de ce jour-là (planifiés ou terminés), dans leur ordre de passage."""
+    return [r[0] for r in conn.execute(
+        "SELECT id FROM chantiers WHERE statut IN ('planifie', 'termine') AND date_prevue = ?"
+        " ORDER BY COALESCE(ordre_jour, 1000000), id", (jour,))]
+
+
+def ajuster_ordre(conn, chantier_id, ancienne_date=None):
+    """Garde ordre_jour cohérent : NULL hors « planifié » / « terminé », sinon rang dans la journée (ajouté à la fin
+    si nouveau ou si le chantier vient de changer de jour)."""
+    statut, jour, ordre = conn.execute("SELECT statut, date_prevue, ordre_jour FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if statut not in ("planifie", "termine"):
+        if ordre is not None:
+            conn.execute("UPDATE chantiers SET ordre_jour = NULL WHERE id = ?", (chantier_id,))
+        return
+    if ordre is None or (ancienne_date is not None and ancienne_date != jour):
+        suivant = conn.execute("SELECT COALESCE(MAX(ordre_jour), 0) + 1 FROM chantiers WHERE statut IN ('planifie', 'termine') "
+                               "AND date_prevue = ? AND id <> ?", (jour, chantier_id)).fetchone()[0]
+        conn.execute("UPDATE chantiers SET ordre_jour = ? WHERE id = ?", (suivant, chantier_id))
+
+
+def deplacer(conn, chantier_id, sens):
+    """Monte (« haut ») ou descend (« bas ») un chantier dans l'ordre de passage de sa journée.
+
+    Les rangs de la journée sont renumérotés 1, 2, 3... Au début ou à la fin de la liste, rien ne bouge.
+    """
+    if sens not in ("haut", "bas"):
+        return [f"sens « {sens} » inconnu"]
+    r = conn.execute("SELECT statut, date_prevue FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"chantier #{chantier_id} introuvable"]
+    if r[0] not in ("planifie", "termine"):
+        return ["seul un chantier planifié ou terminé a un ordre de passage"]
+    ids = ids_de_la_journee(conn, r[1])
+    i = ids.index(chantier_id)
+    j = i - 1 if sens == "haut" else i + 1
+    if 0 <= j < len(ids):
+        ids[i], ids[j] = ids[j], ids[i]
+    for rang, x in enumerate(ids, 1):
+        conn.execute("UPDATE chantiers SET ordre_jour = ? WHERE id = ? AND ordre_jour IS NOT ?", (rang, x, rang))
+    return []
+
+
+def calculer_horaire(durees_h):
+    """Heures de passage d'une journée, d'après l'ordre et les durées estimées (en heures, None si inconnue).
+
+    Début à 7 h 30, dîner fixe de 12 h 00 à 12 h 30 : un chantier qui commencerait pendant le dîner commence à
+    12 h 30 ; un chantier qui chevauche 12 h 00 est prolongé de 30 minutes (le dîner est pris au milieu).
+    Les trajets ne sont pas comptés. Retourne une liste de dicts : debut, fin (minutes depuis minuit),
+    diner_dans (le dîner tombe pendant ce chantier), diner_avant (le dîner a eu lieu juste avant ce chantier),
+    duree_inconnue.
+    """
+    t, precedent_fin, resultat = DEBUT_JOURNEE, None, []
+    for h in durees_h:
+        minutes = round(h * 60) if h else 0
+        if DINER_DEBUT <= t < DINER_FIN:
+            t = DINER_FIN
+        debut, fin, diner_dans = t, t + minutes, False
+        if debut < DINER_DEBUT < fin:
+            fin += DINER_FIN - DINER_DEBUT
+            diner_dans = True
+        diner_avant = precedent_fin is not None and precedent_fin <= DINER_DEBUT and debut >= DINER_FIN
+        resultat.append({"debut": debut, "fin": fin, "diner_dans": diner_dans, "diner_avant": diner_avant,
+                         "duree_inconnue": not h})
+        t = precedent_fin = fin
+    return resultat

@@ -98,15 +98,15 @@ class TestPages(BaseInterface):
 class TestCreation(BaseInterface):
     def test_creation_complete(self):
         statut, en_tetes, _ = self.post("/nouveau", fiche(
-            date_prevue="2026-10-20", statut="planifie", heure_prevue="08:30", duree_estimee_h="2,5",
+            date_prevue="2026-10-20", statut="planifie", duree_estimee_h="2,5",
             prix_ht="300,00", taxes_auto="1", code_postal="j7j1a1", dossier_photos="photos/2026/2026-10-20_roy",
             paiement_date="2026-10-01", paiement_montant="100", paiement_mode="interac"))
         self.assertTrue(statut.startswith("303"))
         self.assertEqual(en_tetes["Location"], "/chantier/4?ok=cree")
         self.assertEqual(self.sql("SELECT telephone, code_postal, geocode_statut FROM clients WHERE nom = 'Roy'"),
                          [("+14505550111", "J7J 1A1", "a_faire")])
-        self.assertEqual(self.sql("SELECT statut, date_prevue, heure_prevue, duree_estimee_h, prix_ht, tps, tvq FROM chantiers WHERE id = 4"),
-                         [("planifie", "2026-10-20", "08:30", 2.5, 300.0, 15.0, 29.93)])
+        self.assertEqual(self.sql("SELECT statut, date_prevue, ordre_jour, duree_estimee_h, prix_ht, tps, tvq FROM chantiers WHERE id = 4"),
+                         [("planifie", "2026-10-20", 1, 2.5, 300.0, 15.0, 29.93)])
         self.assertEqual(self.sql("SELECT statut_paiement, solde FROM v_chantiers WHERE chantier_id = 4"), [("partiel", 244.93)])
         self.assertIn("Chantier créé", self.get("/chantier/4?ok=cree")[1])
 
@@ -152,11 +152,11 @@ class TestModification(BaseInterface):
         self.assertEqual(self.sql("SELECT * FROM clients ORDER BY id") + self.sql("SELECT * FROM chantiers ORDER BY id"), avant)
 
     def test_passer_a_termine_exige_la_date(self):
-        self.post("/nouveau", fiche(statut="accepte"))                        # chantier #4, sans date
+        self.post("/nouveau", fiche(statut="a_planifier"))                        # chantier #4, sans date
         f = {**self.formulaire_de(4), "statut": "termine", "client_sms_ok": "1"}
         _, _, page = self.post("/chantier/4", f)
         self.assertIn("date_prevue est obligatoire", page)
-        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 4"), [("accepte",)])
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 4"), [("a_planifier",)])
         self.post("/chantier/4", {**f, "date_prevue": "2026-10-14", "duree_reelle_h": "6,5"})
         self.assertEqual(self.sql("SELECT statut, date_prevue, duree_reelle_h FROM chantiers WHERE id = 4"),
                          [("termine", "2026-10-14", 6.5)])
