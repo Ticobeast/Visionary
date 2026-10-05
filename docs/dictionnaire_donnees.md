@@ -4,18 +4,19 @@ Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
 
 ```
-clients 1 ─── N sites 1 ─── N chantiers 1 ─── N paiements
-                                  │
-                                  └── type_travaux → types_travaux (table de référence)
+clients (personne/entreprise + adresse) 1 ─── N chantiers 1 ─── N paiements
+                                                  │
+                                                  └── type_travaux → types_travaux (table de référence)
 ```
 
 | Table | Une ligne = | Pourquoi une table à part |
 |---|---|---|
-| `clients` | une personne ou une entreprise | un client revient : on ne retape pas son téléphone à chaque chantier |
-| `sites` | une adresse de travaux | géocodée **une seule fois** ; l'adresse des travaux n'est pas toujours celle du client |
-| `chantiers` | un travail sur un site | c'est l'unité que l'itinéraire, la feuille de route et la facturation manipulent |
+| `clients` | une personne ou une entreprise, **avec son adresse** | un client revient : on ne retape ni son téléphone ni son adresse ; l'adresse est géocodée une seule fois |
+| `chantiers` | un travail pour un client (environ 2 h : plusieurs par journée) | c'est l'unité que l'itinéraire, la feuille de route et la facturation manipulent ; garder les chantiers séparés conserve l'historique d'un client récurrent |
 | `paiements` | une somme reçue | acompte + solde, chèque en deux versements… |
 | `types_travaux` | un type de travaux | on ajoute un type avec un `INSERT`, sans modifier le schéma |
+
+Un client qui possède deux propriétés = **deux fiches clients** (une par adresse), simplement.
 
 ## Formats stricts (valables partout)
 
@@ -30,7 +31,7 @@ clients 1 ─── N sites 1 ─── N chantiers 1 ─── N paiements
 | Chemin de fichier | relatif au dossier `data/`, séparateur `/`, pas de `/` au début ni à la fin, pas de `..` | `photos/2026/2026-06-14_gagnon` | `/home/…`, `C:\…`, `photos/` |
 | Coordonnées | degrés décimaux, **longitude négative** au Québec | `45.6480`, `-74.0920` | `45.6480`, `74.0920` |
 
-## `clients`
+## `clients` (la personne et son adresse)
 
 | Colonne | Type | Oblig. | Règle | Exemple |
 |---|---|---|---|---|
@@ -42,25 +43,15 @@ clients 1 ─── N sites 1 ─── N chantiers 1 ─── N paiements
 | `telephone_2` | texte | non | idem | |
 | `courriel` | texte | non | forme `x@y.z`, sans espace | `marie.gagnon@example.com` |
 | `sms_ok` | 0/1 | oui, défaut `1` | `0` = ne jamais envoyer de texto à ce client | `1` |
-| `notes` | texte | non | préférences, historique utile | `Préfère être appelé après 17 h` |
-| `cree_le` | texte | auto | date-heure locale de création | `2026-10-05 14:02:11` |
-
-## `sites` (adresses de travaux)
-
-| Colonne | Type | Oblig. | Règle | Exemple |
-|---|---|---|---|---|
-| `id` | entier | auto | | |
-| `client_id` | entier | oui | → `clients.id` ; un client ne peut pas être supprimé s'il a des sites | `1` |
-| `adresse` | texte | oui | numéro + type + nom de rue, comme sur une enveloppe | `123 Rue des Érables` |
-| `ville` | texte | oui | nom officiel | `Saint-Jérôme` |
+| `adresse` | texte | **oui** | numéro + type + nom de rue, comme sur une enveloppe | `123 Rue des Érables` |
+| `ville` | texte | **oui** | nom officiel | `Saint-Jérôme` |
 | `province` | texte | oui, défaut `QC` | 2 lettres majuscules | `QC` |
 | `code_postal` | texte | non (recommandé) | `A1A 1A1` | `J7Z 1A1` |
 | `latitude`, `longitude` | réel | non | les deux ou aucune ; remplies par le script de géocodage (étape 2) ou à la main | `45.6480`, `-74.0920` |
 | `geocode_statut` | texte | oui, défaut `a_faire` | `a_faire`, `ok`, `approximatif`, `echec`, `manuel` ; **cohérent avec les coordonnées** (`a_faire`/`echec` ⇒ pas de coordonnées ; les autres ⇒ coordonnées présentes) | `manuel` |
 | `notes_acces` | texte | non | barrière, chien, où stationner, où est l'arbre | `Stationner près de la grange` |
-| `cree_le` | texte | auto | | |
-
-Unicité : un même client ne peut pas avoir deux fois la même (`adresse`, `ville`).
+| `notes` | texte | non | préférences, historique utile | `Préfère être appelé après 17 h` |
+| `cree_le` | texte | auto | date-heure locale de création | `2026-10-05 14:02:11` |
 
 **Écrire une adresse que Google Maps comprend.** Le format ci-dessus suffit : la vue `v_chantiers`
 fabrique la chaîne `123 Rue des Érables, Saint-Jérôme, QC J7Z 1A1, Canada` (colonne `adresse_maps`),
@@ -68,12 +59,15 @@ prête pour le géocodage ou un lien Maps. Pour un lot sans numéro civique (« 
 Ruisseau »), Google risque de ne pas le trouver : dans Google Maps, clic droit sur l'emplacement →
 copier les coordonnées → les mettre dans `latitude`/`longitude` (statut `manuel`).
 
+**Changer l'adresse d'un client** (dans l'interface) efface ses coordonnées si elles étaient celles de
+l'ancienne adresse : elles seront recalculées au prochain géocodage.
+
 ## `chantiers`
 
 | Colonne | Type | Oblig. | Règle | Exemple |
 |---|---|---|---|---|
 | `id` | entier | auto | | |
-| `site_id` | entier | oui | → `sites.id` | `1` |
+| `client_id` | entier | oui | → `clients.id` ; un client ne peut pas être supprimé s'il a des chantiers | `1` |
 | `type_travaux` | texte | oui | un `code` de `types_travaux` : `emondage`, `elagage`, `taille_haie`, `abattage`, `essouchement`, `autre` | `taille_haie` |
 | `description` | texte | non | ce qu'il y a à faire — **sera imprimé sur la feuille de route** | `Haie de cèdres, 35 m, hauteur 2 m` |
 | `notes` | texte | non | remarques propres à ce chantier | `Prévenir le gardien la veille` |
@@ -166,20 +160,24 @@ SELECT date_realisee, client_nom_complet, total_ttc FROM v_chantiers WHERE statu
 -- Argent à recevoir
 SELECT client_nom_complet, solde FROM v_chantiers WHERE statut_paiement IN ('a_payer', 'partiel');
 -- Adresses à géocoder
-SELECT id, adresse, ville FROM sites WHERE geocode_statut = 'a_faire';
+SELECT id, adresse, ville FROM clients WHERE geocode_statut = 'a_faire';
 ```
 
-## La feuille de saisie (CSV) ↔ la base
+## Les deux façons de saisir
 
-La feuille de saisie est « à plat » (une ligne = une fiche papier = un chantier) parce que c'est ce qu'on
-tape le plus vite dans un tableur. `outils/importer_saisie.py` range chaque colonne dans la bonne table.
+- **L'interface** (`python3 outils/interface.py`) : formulaire dans le navigateur, sélecteurs de date,
+  listes déroulantes, recherche d'un client existant, validation immédiate. **Méthode recommandée.**
+- **La feuille CSV** (`modeles/saisie_papier_*.csv` + `outils/importer_saisie.py`) : pour importer en lot
+  depuis un tableur (LibreOffice Calc…) ou pour reprendre des données déjà en tableau.
+
+Les deux appliquent exactement les mêmes règles (`outils/noyau.py`). La feuille CSV est « à plat » (une ligne =
+une fiche = un chantier) ; l'import range chaque colonne dans la bonne table :
 
 | Colonnes de la feuille | Destination |
 |---|---|
-| `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes` | `clients` |
-| `adresse`, `ville`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `sites` |
+| `client_nom`, `client_prenom`, `client_entreprise`, `client_telephone`, `client_telephone_2`, `client_courriel`, `client_sms_ok`, `client_notes`, `adresse`, `ville`, `province`, `code_postal`, `latitude`, `longitude`, `notes_acces` | `clients` |
 | `type_travaux`, `statut`, `description`, `notes`, `date_*`, `heure_prevue`, `duree_*`, `prix_ht`, `tps`, `tvq`, `numero_facture`, `ref_papier`, `fichier_papier`, `dossier_photos` | `chantiers` |
-| `paiement_date`, `paiement_montant`, `paiement_mode` | `paiements` (un paiement par ligne ; les acomptes supplémentaires se saisissent directement dans la base) |
+| `paiement_date`, `paiement_montant`, `paiement_mode` | `paiements` (un paiement par ligne ; les acomptes supplémentaires se saisissent dans l'interface) |
 
 L'import est plus souple que la base, puis écrit toujours le format strict :
 
@@ -190,7 +188,8 @@ L'import est plus souple que la base, puis écrit toujours le format strict :
 - séparateur `,` ou `;`, encodage UTF-8 ou Windows-1252 (export d'Excel) : détectés automatiquement
 - les **dates** restent strictes (`AAAA-MM-JJ`), parce que c'est là qu'un tableur fait des dégâts :
   formater ces colonnes en « Texte » avant de saisir
-- clients regroupés par téléphone, sinon par nom ; adresses regroupées par client + adresse + ville ;
+- **un même client** = même adresse + même nom (ou même téléphone) : ses chantiers s'ajoutent à sa fiche ;
+  même téléphone mais autre adresse = nouvelle fiche (2e propriété), avec un avertissement ;
   la première saisie gagne, les champs vides se complètent, les contradictions sont signalées
 - `--taxes-auto` calcule TPS 5 % et TVQ 9,975 % pour les lignes dont `tps` et `tvq` sont vides
 

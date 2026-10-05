@@ -5,11 +5,12 @@
 -- Création :   sqlite3 data/sylvainculteur.db < schema/schema.sql
 --          ou  python3 outils/importer_saisie.py ...   (crée la base si absente)
 --
--- Modèle :  clients 1─N sites 1─N chantiers 1─N paiements
---   clients    = la personne / l'entreprise (téléphone, courriel)
---   sites      = une adresse de travaux (géocodée UNE fois, réutilisée)
---   chantiers  = un travail à faire / fait sur un site (statut, date, durée, prix)
+-- Modèle :  clients 1─N chantiers 1─N paiements
+--   clients    = la personne / l'entreprise ET son adresse (géocodée UNE fois)
+--   chantiers  = un travail pour un client (statut, date, durée, prix) :
+--                un client qui revient = un nouveau chantier, jamais une nouvelle fiche
 --   paiements  = chaque somme reçue (acompte, solde...)
+--   Un client avec deux propriétés = deux fiches clients (une par adresse).
 --
 -- Conventions strictes (toutes vérifiées par la base elle-même) :
 --   dates          AAAA-MM-JJ        heures        HH:MM (24 h)
@@ -49,7 +50,7 @@ INSERT INTO types_travaux (code, libelle) VALUES
 
 
 -- -----------------------------------------------------------------------------
--- Clients
+-- Clients : une personne ou une entreprise, directement reliée à son adresse.
 -- -----------------------------------------------------------------------------
 CREATE TABLE clients (
     id          INTEGER PRIMARY KEY,
@@ -60,31 +61,6 @@ CREATE TABLE clients (
     telephone_2 TEXT,
     courriel    TEXT,
     sms_ok      INTEGER NOT NULL DEFAULT 1,   -- 1 = rappels par texto acceptés
-    notes       TEXT,
-    cree_le     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
-
-    CONSTRAINT ck_clients_identite
-        CHECK ((nom IS NOT NULL AND trim(nom) <> '') OR (entreprise IS NOT NULL AND trim(entreprise) <> '')),
-    CONSTRAINT ck_clients_telephone
-        CHECK (telephone IS NULL
-               OR telephone GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
-    CONSTRAINT ck_clients_telephone_2
-        CHECK (telephone_2 IS NULL
-               OR telephone_2 GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
-    CONSTRAINT ck_clients_courriel
-        CHECK (courriel IS NULL OR (courriel LIKE '_%@_%._%' AND courriel NOT LIKE '% %')),
-    CONSTRAINT ck_clients_sms_ok
-        CHECK (typeof(sms_ok) = 'integer' AND sms_ok IN (0, 1))
-);
-
-
--- -----------------------------------------------------------------------------
--- Sites : adresses de travaux (peuvent différer de l'adresse du client :
--- propriétaire qui habite ailleurs, syndicat, locataire...)
--- -----------------------------------------------------------------------------
-CREATE TABLE sites (
-    id             INTEGER PRIMARY KEY,
-    client_id      INTEGER NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
 
     -- Adresse "à la Postes Canada" : numéro + type + nom de rue, ville officielle.
     -- Google Maps l'accepte telle quelle : voir adresse_maps dans v_chantiers.
@@ -100,37 +76,47 @@ CREATE TABLE sites (
     longitude      REAL,
     geocode_statut TEXT NOT NULL DEFAULT 'a_faire',
 
-    notes_acces    TEXT,                      -- barrière, chien, où stationner, où est l'arbre
-    cree_le        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
+    notes_acces TEXT,                         -- barrière, chien, où stationner, où est l'arbre
+    notes       TEXT,                         -- préférences, historique utile
+    cree_le     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
-    CONSTRAINT uq_sites_adresse UNIQUE (client_id, adresse, ville),
-    CONSTRAINT ck_sites_adresse CHECK (trim(adresse) <> '' AND trim(ville) <> ''),
-    CONSTRAINT ck_sites_province CHECK (province GLOB '[A-Z][A-Z]'),
-    CONSTRAINT ck_sites_code_postal
+    CONSTRAINT ck_clients_identite
+        CHECK ((nom IS NOT NULL AND trim(nom) <> '') OR (entreprise IS NOT NULL AND trim(entreprise) <> '')),
+    CONSTRAINT ck_clients_telephone
+        CHECK (telephone IS NULL
+               OR telephone GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+    CONSTRAINT ck_clients_telephone_2
+        CHECK (telephone_2 IS NULL
+               OR telephone_2 GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+    CONSTRAINT ck_clients_courriel
+        CHECK (courriel IS NULL OR (courriel LIKE '_%@_%._%' AND courriel NOT LIKE '% %')),
+    CONSTRAINT ck_clients_sms_ok
+        CHECK (typeof(sms_ok) = 'integer' AND sms_ok IN (0, 1)),
+    CONSTRAINT ck_clients_adresse CHECK (trim(adresse) <> '' AND trim(ville) <> ''),
+    CONSTRAINT ck_clients_province CHECK (province GLOB '[A-Z][A-Z]'),
+    CONSTRAINT ck_clients_code_postal
         CHECK (code_postal IS NULL OR code_postal GLOB '[A-Z][0-9][A-Z] [0-9][A-Z][0-9]'),
     -- Boîte large Est du Canada / Nord-Est US : attrape surtout la longitude sans signe "-".
-    CONSTRAINT ck_sites_latitude
+    CONSTRAINT ck_clients_latitude
         CHECK (latitude IS NULL OR (typeof(latitude) IN ('real','integer') AND latitude BETWEEN 40 AND 65)),
-    CONSTRAINT ck_sites_longitude
+    CONSTRAINT ck_clients_longitude
         CHECK (longitude IS NULL OR (typeof(longitude) IN ('real','integer') AND longitude BETWEEN -90 AND -50)),
-    CONSTRAINT ck_sites_geocode_statut
+    CONSTRAINT ck_clients_geocode_statut
         CHECK (geocode_statut IN ('a_faire','ok','approximatif','echec','manuel')),
-    -- Cohérence : coordonnées ⇔ statut qui en suppose.
-    CONSTRAINT ck_sites_coordonnees
+    -- Cohérence : coordonnées <=> statut qui en suppose.
+    CONSTRAINT ck_clients_coordonnees
         CHECK ((latitude IS NULL) = (longitude IS NULL)
                AND (geocode_statut IN ('a_faire','echec')) = (latitude IS NULL))
 );
 
-CREATE INDEX idx_sites_client ON sites(client_id);
-
 
 -- -----------------------------------------------------------------------------
--- Chantiers : un travail sur un site.
+-- Chantiers : un travail pour un client (en moyenne ~2 h : plusieurs par journée).
 -- Un travail de plusieurs jours = un chantier par journée (durée <= 24 h).
 -- -----------------------------------------------------------------------------
 CREATE TABLE chantiers (
     id              INTEGER PRIMARY KEY,
-    site_id         INTEGER NOT NULL REFERENCES sites(id) ON DELETE RESTRICT,
+    client_id       INTEGER NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
     type_travaux    TEXT NOT NULL REFERENCES types_travaux(code),
 
     description     TEXT,     -- ce qu'il y a à faire (imprimé sur la feuille de route)
@@ -210,7 +196,7 @@ CREATE TABLE chantiers (
                AND fichier_papier NOT GLOB '[A-Za-z]:*'))
 );
 
-CREATE INDEX idx_chantiers_site       ON chantiers(site_id);
+CREATE INDEX idx_chantiers_client     ON chantiers(client_id);
 CREATE INDEX idx_chantiers_date_prevue ON chantiers(date_prevue);   -- requête de la journée
 CREATE INDEX idx_chantiers_statut     ON chantiers(statut);
 
@@ -265,14 +251,13 @@ base AS (
         c.date_soumission, c.date_prevue, c.heure_prevue, c.date_realisee,
         c.duree_estimee_h, c.duree_reelle_h,
 
-        s.id AS site_id, s.adresse, s.ville, s.province, s.code_postal,
-        s.adresse || ', ' || s.ville || ', ' || s.province
-            || COALESCE(' ' || s.code_postal, '') || ', Canada' AS adresse_maps,
-        s.latitude, s.longitude, s.geocode_statut, s.notes_acces,
-
         cl.id AS client_id, cl.prenom, cl.nom, cl.entreprise,
         COALESCE(NULLIF(trim(COALESCE(cl.prenom, '') || ' ' || COALESCE(cl.nom, '')), ''), cl.entreprise) AS client_nom_complet,
         cl.telephone, cl.telephone_2, cl.courriel, cl.sms_ok,
+        cl.adresse, cl.ville, cl.province, cl.code_postal,
+        cl.adresse || ', ' || cl.ville || ', ' || cl.province
+            || COALESCE(' ' || cl.code_postal, '') || ', Canada' AS adresse_maps,
+        cl.latitude, cl.longitude, cl.geocode_statut, cl.notes_acces,
 
         c.prix_ht, c.tps, c.tvq,
         ROUND(COALESCE(c.prix_ht, 0) + c.tps + c.tvq, 2) AS total_ttc,
@@ -281,8 +266,7 @@ base AS (
 
         c.dossier_photos, c.fichier_papier, c.ref_papier
     FROM chantiers c
-    JOIN sites s          ON s.id = c.site_id
-    JOIN clients cl       ON cl.id = s.client_id
+    JOIN clients cl       ON cl.id = c.client_id
     JOIN types_travaux t  ON t.code = c.type_travaux
     LEFT JOIN recu r      ON r.chantier_id = c.id
 ),
