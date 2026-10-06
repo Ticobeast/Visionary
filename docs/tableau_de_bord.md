@@ -62,8 +62,8 @@ Il n'y a **ni statut, ni paiement** sur cet écran : seulement le montant du cha
 Sous le tableau de la journée choisie, le bouton **Télécharger la journée (PDF)** télécharge un fichier `journee-AAAA-MM-JJ.pdf`
 (à imprimer ou à ouvrir sur l'iPad). Première page : le résumé de la journée (nombre de chantiers, heures de début et de fin, total en dollars)
 et une ligne par chantier. Ensuite, **chaque chantier avec tous ses détails** : heures de passage, client (téléphones, courriel, rappels par texto),
-adresse complète et secteur, accès et notes, travaux avec leurs précisions, description, options (nacelle, bois), durées, prix avant taxes, TPS/TVQ,
-total, mode de règlement prévu, paiements déjà reçus et **reste à encaisser**, références du dossier papier, et les **photos** du dossier de photos
+adresse complète (**en bleu et cliquable : elle ouvre Google Maps**) et secteur, accès et notes, travaux avec leurs précisions, description, options (nacelle, bois), durées, prix avant taxes, TPS/TVQ,
+total, mode de règlement prévu, paiements déjà reçus et **reste à encaisser**, et les **photos** du dossier de photos
 du chantier (JPEG et PNG, 12 au maximum par chantier, en vignettes avec leur nom de fichier).
 
 Photos : le programme ne demande rien d'installer. Si une photo de téléphone est lourde (plus de 1,5 Mo), elle n'est incluse que si **Pillow** est installé
@@ -132,7 +132,7 @@ Seuils d'attente : `SEUIL_SURVEILLER` et `SEUIL_URGENT` dans `outils/noyau.py`.
 
 ## 4. Créer un chantier, voir un chantier : l'essentiel d'abord
 
-**+ Nouveau** (client neuf) : le formulaire ne demande que l'essentiel : **nom, prénom, téléphone, adresse, ville / secteur (liste) ;
+**Clients > + Nouveau client** (client neuf, bouton en haut de la page Clients ; il n'y a plus d'onglet « Nouveau » dans le menu) : le formulaire ne demande que l'essentiel : **nom, prénom, téléphone, adresse, ville / secteur (liste) ;
 types de travaux (avec précisions), options du travail, durée estimée (obligatoire), prix, description**. Les **options du travail sont toujours
 visibles** (elles servent à préparer la job) :
 

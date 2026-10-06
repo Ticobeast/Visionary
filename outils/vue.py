@@ -152,7 +152,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False):
     return f"""<!doctype html><html lang="fr-CA"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(titre)} — SylvainCulteur</title>
 <style>{CSS}</style></head><body>
-<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/journee">Journée</a><a href="/chantiers">Chantiers</a><a href="/clients">Clients</a><a href="/nouveau">+ Nouveau</a>{etiquette_base()}</header>
+<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/journee">Journée</a><a href="/chantiers">Chantiers</a><a href="/clients">Clients</a>{etiquette_base()}</header>
 <main{" class=large" if large else ""}>{msg}{contenu}</main></body></html>"""
 
 

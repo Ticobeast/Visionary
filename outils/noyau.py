@@ -15,7 +15,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 7
+VERSION_SCHEMA = 8
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -39,7 +39,7 @@ COLONNES = [
     "duree_estimee_h", "duree_reelle_h",
     "prix_ht", "tps", "tvq", "modalite_paiement",
     "paiement_date", "paiement_montant", "paiement_mode",
-    "notes_acces", "ref_papier", "fichier_papier", "dossier_photos",
+    "notes_acces", "dossier_photos",
     "client_telephone_2", "client_courriel", "client_sms_ok", "client_notes",
     "province", "latitude", "longitude",
 ]
@@ -333,8 +333,6 @@ def lire_ligne(brut, alias_types, taxes_auto):
     if v["paiement_montant"] is not None and v["paiement_montant"] == 0:
         L.erreurs.append("paiement_montant doit être supérieur à 0")
 
-    v["ref_papier"] = L.texte("ref_papier")
-    v["fichier_papier"] = L.chemin("fichier_papier")
     v["dossier_photos"] = L.chemin("dossier_photos")
 
     # Cohérence statut / date (la même règle existe dans la base).
@@ -492,13 +490,12 @@ def trouver_ou_creer_client(conn, idx, v, res):
 def _valeurs_chantier(v):
     return (v["description"], v["statut"], v["date_soumission"], v["date_prevue"], v["nacelle"], v["debarrasser_bois"], v["bois_format"],
             _num(v["duree_estimee_h"]), _num(v["duree_reelle_h"]), _num(v["prix_ht"]), _num(v["tps"]) or 0,
-            _num(v["tvq"]) or 0, v["modalite_paiement"], v["dossier_photos"],
-            v["fichier_papier"], v["ref_papier"])
+            _num(v["tvq"]) or 0, v["modalite_paiement"], v["dossier_photos"])
 
 
 COLONNES_CHANTIER = ["description", "statut", "date_soumission", "date_prevue", "nacelle", "debarrasser_bois", "bois_format",
                      "duree_estimee_h", "duree_reelle_h", "prix_ht", "tps", "tvq", "modalite_paiement",
-                     "dossier_photos", "fichier_papier", "ref_papier"]
+                     "dossier_photos"]
 
 
 def _ecrire_travaux(conn, chantier_id, travaux):

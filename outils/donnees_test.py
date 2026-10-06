@@ -72,7 +72,7 @@ def generer(db, nombre=40, graine=2026):
             travaux += f" + {autre}: {TYPES[autre][2].format(n=rnd.randint(2, 20))}"
             prix += round(rnd.randint(TYPES[autre][0], TYPES[autre][1]) / 5) * 5
         ligne = {**c, "type_travaux": travaux, "nacelle": "oui" if rnd.random() < 0.15 else "non", "description": rnd.choice(["", "", "Résidus ramassés.", "Appeler avant de venir."]),
-                 "duree_estimee_h": f"{min(duree, 8):g}", "prix_ht": f"{prix:.2f}", "ref_papier": f"Classeur A, fiche {k + 1}"}
+                 "duree_estimee_h": f"{min(duree, 8):g}", "prix_ht": f"{prix:.2f}"}
         if type_ in ("abattage", "elagage") or "abattage" in travaux or "elagage" in travaux:
             ligne["debarrasser_bois"] = rnd.choice(["oui", "non"])
             if ligne["debarrasser_bois"] == "non":

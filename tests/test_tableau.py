@@ -116,7 +116,9 @@ class TestSuiviSupprime(BaseTableau):
         page = self.get("/")[1]
         entete = page[page.index("<header>"):page.index("</header>")]
         self.assertEqual(re.findall(r'<a href="([^"]+)">([^<]+)</a>', entete),
-                         [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/clients", "Clients"), ("/nouveau", "+ Nouveau")])
+                         [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/clients", "Clients")])
+        self.assertNotIn("+ Nouveau</a>", entete)                                # le bouton est dans la page Clients
+        self.assertIn('<a class="bouton" href="/nouveau">+ Nouveau client</a>', self.get("/clients")[1])
 
 
 class TestChantiersListe(BaseTableau):

@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 7;
+PRAGMA user_version = 8;
 
 
 -- -----------------------------------------------------------------------------
@@ -188,8 +188,6 @@ CREATE TABLE chantiers (
 
     -- Chemins relatifs au dossier de la base (data/)
     dossier_photos  TEXT,     -- ex. photos/2026/2026-06-14_gagnon
-    fichier_papier  TEXT,     -- ex. papier/2026/2026-06-14_gagnon.pdf (scan de la fiche)
-    ref_papier      TEXT,     -- ex. "Classeur B, fiche 34" (retrouver l'original)
 
     cree_le         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
@@ -235,12 +233,7 @@ CREATE TABLE chantiers (
         CHECK (dossier_photos IS NULL OR (trim(dossier_photos) <> ''
                AND dossier_photos NOT GLOB '/*' AND dossier_photos NOT GLOB '*/'
                AND dossier_photos NOT GLOB '*\*' AND dossier_photos NOT GLOB '*..*'
-               AND dossier_photos NOT GLOB '[A-Za-z]:*')),
-    CONSTRAINT ck_chantiers_fichier_papier
-        CHECK (fichier_papier IS NULL OR (trim(fichier_papier) <> ''
-               AND fichier_papier NOT GLOB '/*' AND fichier_papier NOT GLOB '*/'
-               AND fichier_papier NOT GLOB '*\*' AND fichier_papier NOT GLOB '*..*'
-               AND fichier_papier NOT GLOB '[A-Za-z]:*'))
+               AND dossier_photos NOT GLOB '[A-Za-z]:*'))
 );
 
 -- -----------------------------------------------------------------------------
@@ -320,8 +313,7 @@ WHEN OLD.statut = 'termine' AND (
      OR NEW.duree_estimee_h IS NOT OLD.duree_estimee_h OR NEW.duree_reelle_h IS NOT OLD.duree_reelle_h
      OR NEW.prix_ht IS NOT OLD.prix_ht OR NEW.tps IS NOT OLD.tps OR NEW.tvq IS NOT OLD.tvq
      OR NEW.nacelle IS NOT OLD.nacelle OR NEW.debarrasser_bois IS NOT OLD.debarrasser_bois OR NEW.bois_format IS NOT OLD.bois_format
-     OR NEW.modalite_paiement IS NOT OLD.modalite_paiement OR NEW.dossier_photos IS NOT OLD.dossier_photos
-     OR NEW.fichier_papier IS NOT OLD.fichier_papier OR NEW.ref_papier IS NOT OLD.ref_papier)
+     OR NEW.modalite_paiement IS NOT OLD.modalite_paiement OR NEW.dossier_photos IS NOT OLD.dossier_photos)
 BEGIN
     SELECT RAISE(ABORT, 'Chantier terminé : verrouillé en lecture seule');
 END;
@@ -397,7 +389,7 @@ base AS (
         COALESCE(r.paye, 0) AS paye,
         c.modalite_paiement,
 
-        c.dossier_photos, c.fichier_papier, c.ref_papier
+        c.dossier_photos
     FROM chantiers c
     JOIN clients cl       ON cl.id = c.client_id
     LEFT JOIN secteurs sec ON sec.code = cl.secteur

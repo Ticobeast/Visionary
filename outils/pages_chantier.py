@@ -33,7 +33,7 @@ def valeurs_chantier(conn, chantier_id):
     """(valeurs du chantier + de son client sous forme de textes, client_id), ou None."""
     cols = ["client_id", "description", "statut", "date_soumission", "date_prevue", "duree_estimee_h", "duree_reelle_h",
             "prix_ht", "tps", "tvq", "modalite_paiement", "dossier_photos",
-            "fichier_papier", "ref_papier", "nacelle", "debarrasser_bois", "bois_format"]
+            "nacelle", "debarrasser_bois", "bois_format"]
     r = conn.execute(f"SELECT {', '.join(cols)} FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
         return None
@@ -156,8 +156,6 @@ def cartes_chantier(conn, valeurs, creation):
 {liste("paiement_mode", "Mode", [(m, LIBELLES_MODE[m]) for m in MODES], valeurs, vide="—")}</div>
 <p class="doux">Le montant ne peut pas dépasser le total du chantier (jamais de solde négatif). D'autres paiements s'ajoutent ensuite sur la page du chantier.</p></div>"""
     avance_html += f"""<div class="carte"><h2>Fichiers</h2><div class="grille">
-{champ("ref_papier", "Où est la fiche papier ?", valeurs, placeholder="Classeur A, fiche 12")}
-{champ("fichier_papier", "Scan de la fiche (chemin dans data/)", valeurs, placeholder="papier/2026/gagnon.pdf")}
 {champ("dossier_photos", "Dossier de photos (chemin dans data/)", valeurs, placeholder="photos/2026/2026-06-14_gagnon")}</div></div>"""
     return essentiel, avance_html
 
@@ -199,8 +197,7 @@ def _bloc_lecture(conn, chantier_id, v):
               ("Durée réelle", heures(float(v["duree_reelle_h"])) if v.get("duree_reelle_h") else ""),
               ("Prix avant taxes", argent(float(v["prix_ht"])) if v.get("prix_ht") else ""),
               ("TPS", argent(float(v["tps"])) if v.get("tps") else ""), ("TVQ", argent(float(v["tvq"])) if v.get("tvq") else ""),
-              ("Mode de règlement", LIBELLES_MODE.get(v.get("modalite_paiement"), "")), ("Fiche papier", v.get("ref_papier")),
-              ("Scan de la fiche", v.get("fichier_papier")), ("Photos", v.get("dossier_photos"))]
+              ("Mode de règlement", LIBELLES_MODE.get(v.get("modalite_paiement"), "")), ("Photos", v.get("dossier_photos"))]
     corps = "".join(f"<dt>{esc(k)}</dt><dd>{esc(val)}</dd>" for k, val in lignes if val)
     return f'<div class="carte"><h2>Détails</h2><dl class="lecture">{corps}</dl></div>'
 

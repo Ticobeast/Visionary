@@ -106,6 +106,18 @@ class TestFichierPdf(BasePdf):
                         "500,00 $", "2 029,45 $", "Planifié", "2026-09-25", self.dossier, "Journée de travail"):
             self.assertIn(attendu, texte)
 
+    def test_adresse_avec_lien_google_maps(self):
+        corps = self.pdf()[2]
+        self.assertIn(b"/URI (https://www.google.com/maps/search/?api=1&query=850%20Boulevard%20du%20Lac%2C%20Blainville%2C%20QC%20J7C%202X1%2C%20Canada)", corps)
+        self.assertIn(b"/Subtype /Link", corps)
+        self.assertIn(b"/Annots [", corps)
+        self.assertIn("Les adresses en bleu ouvrent Google Maps", textes(corps))
+
+    def test_plus_de_fiche_papier(self):
+        texte = textes(self.pdf()[2])
+        self.assertNotIn("papier", texte.lower())
+        self.assertNotIn("Scan de la fiche", texte)
+
     def test_date_invalide_ou_jour_vide(self):
         self.assertIn("Aucun chantier planifié", textes(self.pdf("2030-01-01")[2]))
         statut, en_tetes, corps = interface.repondre(self.db, "GET", "/journee.pdf", {"date": "n'importe quoi"})

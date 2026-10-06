@@ -75,7 +75,8 @@ def page_clients(conn, query):
     select_sect, _ = select_secteur(lister_secteurs(conn), {"secteur": secteur}, nom="secteur", requis=False, tout="Tous les secteurs")
     recherche = (f'<form class="recherche" method="get" action="/clients"><input type="search" name="q" value="{esc(q)}" '
                  f'placeholder="Chercher : nom, téléphone, adresse…">{select_sect}<button type="submit">Chercher</button></form>')
-    return gabarit("Clients", f'<h1>Clients</h1>{recherche}{tableau}<p class="doux"><a href="/secteurs">Gérer les secteurs desservis</a></p>', query.get("ok"))
+    nouveau = '<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/nouveau">+ Nouveau client</a></div>'
+    return gabarit("Clients", f'<h1>Clients</h1>{nouveau}{recherche}{tableau}<p class="doux"><a href="/secteurs">Gérer les secteurs desservis</a></p>', query.get("ok"))
 
 
 def page_client(conn, client_id, query):

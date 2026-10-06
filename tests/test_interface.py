@@ -449,7 +449,7 @@ class TestSimpleParDefaut(BaseInterface):
         self.assertIn("Paramètres avancés", page)
         self.assertNotIn("date_prevue", self.noms(cache))                      # la date des travaux vient de la Journée
         for avance in ("client_entreprise", "client_courriel", "code_postal", "notes_acces", "latitude", "statut", "date_soumission",
-                       "tps", "tvq", "modalite_paiement", "paiement_montant", "dossier_photos", "fichier_papier"):
+                       "tps", "tvq", "modalite_paiement", "paiement_montant", "dossier_photos"):
             self.assertIn(avance, self.noms(cache), avance)
             self.assertNotIn(avance, self.noms(visible), avance)
         self.assertNotIn(" open", page[page.index('<details class="avance"'):][:30])     # replié par défaut
@@ -477,8 +477,7 @@ class TestSimpleParDefaut(BaseInterface):
         champs = {c for c in self.noms(visible) if not c.startswith(("type_", "precision_"))}
         # planifié : le statut et la date sont affichés (gérés par la Journée), pas des champs
         self.assertEqual(champs, {"nacelle", "debarrasser_bois", "bois_format", "duree_estimee_h", "prix_ht", "taxes_auto", "description"})
-        for avance in ("date_soumission", "duree_reelle_h", "tps", "tvq", "modalite_paiement",
-                       "ref_papier", "fichier_papier", "dossier_photos"):
+        for avance in ("date_soumission", "duree_reelle_h", "tps", "tvq", "modalite_paiement", "dossier_photos"):
             self.assertIn(avance, self.noms(cache), avance)
         self.assertIn("Autres chantiers de ce client", cache)
         self.assertIn("Supprimer ce chantier", cache)
@@ -501,8 +500,10 @@ class TestSimpleParDefaut(BaseInterface):
         visible, _, cache = page.partition('<details class="avance"')
         self.assertIn("verrouillé en lecture seule", visible)
         self.assertIn("Ajouter un paiement", visible)
-        self.assertNotIn("Fiche papier", visible)
-        self.assertIn("Fiche papier", cache)                                       # le détail complet est replié
+        self.assertNotIn("Fiche papier", page)                                     # plus de fiche papier nulle part
+        self.assertNotIn("Scan de la fiche", page)
+        self.assertNotIn("Mode de règlement", visible)
+        self.assertIn("Mode de règlement", cache)                                       # le détail complet est replié
         self.assertIn("Autres chantiers de ce client", cache)
         self.assertIn('class="montant">1 437,19 $', visible)                       # mais le montant est bien en vue
 

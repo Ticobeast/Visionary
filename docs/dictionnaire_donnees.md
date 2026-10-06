@@ -85,8 +85,6 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `tvq` | réel | oui, défaut `0` | montant de TVQ (idem) | `47.88` |
 | `modalite_paiement` | texte | non | **un seul choix** : `comptant`, `cheque`, `interac`, `carte`, `autre` (CHECK) ; imprimée sur la feuille de route pour savoir quoi encaisser sur place. Pas de paiement en plusieurs versements : les acomptes se saisissent comme paiements | `interac` |
 | `dossier_photos` | chemin | non | **un dossier par chantier** ; les photos qu'il contient seront lues par le script (miniatures) | `photos/2026/2026-06-14_gagnon` |
-| `fichier_papier` | chemin | non | scan de la fiche papier d'origine | `papier/2026/2026-06-14_gagnon.pdf` |
-| `ref_papier` | texte | non | où retrouver l'original en attendant le scan | `Classeur A, fiche 12` |
 | `cree_le` | texte | auto | | |
 
 ### Types de travaux d'un chantier : `chantier_travaux`

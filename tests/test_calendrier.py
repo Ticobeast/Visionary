@@ -358,7 +358,7 @@ class TestCalendrier(BaseJour):
 
     def test_navigation_principale(self):
         page = self.get("/")[1]
-        for lien in ("/", "/journee", "/chantiers", "/clients", "/nouveau"):
+        for lien in ("/", "/journee", "/chantiers", "/clients"):
             self.assertIn(f'<a href="{lien}">', page)
 
 

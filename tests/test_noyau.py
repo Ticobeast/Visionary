@@ -38,7 +38,7 @@ class TestSchema(unittest.TestCase):
 
     def test_version_et_integrite(self):
         self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
-        self.assertEqual(noyau.VERSION_SCHEMA, 7)
+        self.assertEqual(noyau.VERSION_SCHEMA, 8)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
@@ -138,9 +138,9 @@ class TestLecture(unittest.TestCase):
 
     def test_toutes_les_erreurs_sont_listees(self):
         _, erreurs = self.lire(client_telephone="12345", code_postal="ZZZ", date_soumission="14/06/2026", prix_ht="450.123",
-                               fichier_papier="/etc/passwd", dossier_photos="a/../b", latitude="45.6", longitude="74.1", type_travaux="pizza",
+                               dossier_photos="/etc/passwd", latitude="45.6", longitude="74.1", type_travaux="pizza",
                                statut="fini")
-        for attendu in ("client_telephone", "code_postal", "date_soumission", "prix_ht", "fichier_papier", "dossier_photos",
+        for attendu in ("client_telephone", "code_postal", "date_soumission", "prix_ht", "dossier_photos",
                         "longitude", "type_travaux", "statut"):
             self.assertTrue(any(attendu in e for e in erreurs), attendu)
 

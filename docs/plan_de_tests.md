@@ -42,7 +42,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 
 | # | Scénario | Résultat attendu |
 |---|---|---|
-| 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, Clients, + Nouveau ; **aucun emoji** nulle part |
+| 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, Clients ; **aucun emoji** nulle part |
 | 2 | **Tableau de bord** | un calendrier du mois ; **dans chaque case** d'un jour planifié : « N chantiers », « Temps total : X h », « Montant total : XXX $ » ; les jours de plus de 8 h sont en rouge |
 | 3 | Cliquer sur une **date** du calendrier | la journée s'affiche dessous : durée totale, montant total, chantiers dans l'ordre avec heures, temps, options (nacelle, bois) et **montant à droite** ; **aucun statut ni paiement** ; un seul bouton **Terminer**, en bas de chaque chantier |
 | 4 | Dîner : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
@@ -55,7 +55,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 11 | Page d'un chantier planifié, « Paramètres avancés », « Annuler le chantier » (confirmation) | il disparaît de la journée et apparaît dans les **archives** (bas de la page Chantiers) |
 | 12 | Journée : choisir demain, filtrer par secteur, cocher 3 chantiers, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché, et deviennent planifiés ; le total d'heures et de dollars se met à jour en cochant ; un chantier sans durée ne peut pas être coché |
 | 13 | **Chantiers** | une seule page : chantiers actifs en haut (date de la **demande**, délai d'attente en pastille, temps, options, **montant à droite**), « Archives » plus bas ; filtres statut / paiement / secteur |
-| 14 | **+ Nouveau**, client neuf : nom, adresse, secteur (liste), un type, durée, prix | « Chantier créé » ; « Paramètres avancés » reste replié ; la date de la demande est celle d'aujourd'hui |
+| 14 | **Clients > + Nouveau client**, client neuf : nom, adresse, secteur (liste), un type, durée, prix | « Chantier créé » ; « Paramètres avancés » reste replié ; la date de la demande est celle d'aujourd'hui |
 | 15 | Même formulaire : ville / secteur | **liste déroulante** obligatoire (pas de champ texte) ; la ville de l'adresse en découle |
 | 16 | Cocher « Nacelle requise » ; cocher un abattage **sans** « Débarrasser le bois » | refusé tant que le format du bois (16 pouces / 4 pieds) n'est pas précisé ; ces options sont visibles **sans** ouvrir « Paramètres avancés » |
 | 17 | Ouvrir le chantier créé | résumé avec la **valeur à droite**, client en lecture seule, paiements ; le statut et la date sont **affichés** (« géré automatiquement », « se change dans la page Journée ») |
@@ -70,7 +70,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 26 | Fermer l'interface (Ctrl+C), la relancer | les données sont toujours là |
 | 27 | **Clients** : ouvrir la fiche d'un client qui a un chantier annulé, un chantier terminé (avec paiement), « Supprimer le client » (confirmation) | le client est **toujours** supprimable ; la confirmation annonce les chantiers et paiements ; ensuite il n'apparaît plus nulle part (Clients, Chantiers, archives, calendrier) |
 | 28 | **Chantiers** : regarder une ligne et la page d'un chantier | pas de pastille « Nacelle requise » ni « Bois ... » (elles restent dans le tableau de bord et la Journée) |
-| 29 | **Tableau de bord** : choisir un jour avec des chantiers, « Télécharger la journée (PDF) » (en bas) | un fichier `journee-AAAA-MM-JJ.pdf` se télécharge ; il contient, pour chaque chantier : heures, client, téléphone, adresse, accès, travaux avec précisions, description, options, durée, prix et taxes, paiements, reste à encaisser, références papier et, si le dossier de photos existe, les photos en vignettes |
+| 29 | **Tableau de bord** : choisir un jour avec des chantiers, « Télécharger la journée (PDF) » (en bas) | un fichier `journee-AAAA-MM-JJ.pdf` se télécharge ; il contient, pour chaque chantier : heures, client, téléphone, adresse, accès, travaux avec précisions, description, options, durée, prix et taxes, paiements, reste à encaisser et, si le dossier de photos existe, les photos en vignettes |
 | 30 | **Journée** : regarder les boutons d'un chantier planifié | **Terminer** et **Retirer** sont côte à côte, sur une même ligne |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :

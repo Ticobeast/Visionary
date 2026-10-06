@@ -13,6 +13,7 @@ import struct
 import unicodedata
 import zlib
 from pathlib import Path
+from urllib.parse import quote
 
 from noyau import (DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, LIBELLES_BOIS, LIBELLES_MODE, LIBELLES_STATUT, calculer_horaire,
                    heure_texte, ids_de_la_journee)
@@ -52,7 +53,7 @@ _L_GRAS = ([278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333
 _TABLES = {False: dict(zip(_CARS, _L_NORMAL)), True: dict(zip(_CARS, _L_GRAS))}
 assert len(_CARS) == len(_L_NORMAL) == len(_L_GRAS) == 95
 
-_GRIS, _VERT, _NOIR = 0.40, (0.18, 0.42, 0.25), 0.0
+_GRIS, _VERT, _NOIR, _LIEN = 0.40, (0.18, 0.42, 0.25), 0.0, (0.07, 0.30, 0.65)
 
 
 def _nettoyer(texte):
@@ -245,7 +246,7 @@ class Document:
 
     # --- pages ----------------------------------------------------------
     def _ouvrir_page(self):
-        self.pages.append({"ops": [], "images": []})
+        self.pages.append({"ops": [], "images": [], "liens": []})
         self.y = HAUTEUR - MARGE - HAUT_ENTETE
 
     def _op(self, texte):
@@ -294,8 +295,9 @@ class Document:
             self.y -= interligne
             self._texte(MARGE + retrait, self.y, ligne, taille, gras, couleur)
 
-    def champ(self, etiquette, valeur, taille=9.5, colonne=118.0):
-        """Ligne « Étiquette : valeur » (valeur sur plusieurs lignes au besoin). Rien si la valeur est vide."""
+    def champ(self, etiquette, valeur, taille=9.5, colonne=118.0, lien=None):
+        """Ligne « Étiquette : valeur » (valeur sur plusieurs lignes au besoin). Rien si la valeur est vide.
+        Avec `lien` (adresse web), la valeur est en bleu et cliquable."""
         if valeur is None or str(valeur).strip() == "":
             return
         lignes = decouper(valeur, taille, False, LARGEUR - 2 * MARGE - colonne)
@@ -306,7 +308,9 @@ class Document:
             self.y -= interligne
             if i == 0:
                 self._texte(MARGE, self.y, etiquette, taille, True, _GRIS)
-            self._texte(MARGE + colonne, self.y, ligne, taille)
+            self._texte(MARGE + colonne, self.y, ligne, taille, False, _LIEN if lien else _NOIR)
+            if lien:
+                self.pages[-1]["liens"].append((MARGE + colonne, self.y - 2, MARGE + colonne + largeur(ligne, taille), self.y + taille, lien))
 
     def bandeau(self, texte, taille=12):
         """Titre d'un chantier sur fond gris clair."""
@@ -380,10 +384,15 @@ class Document:
             contenu = zlib.compress(b"\n".join(page["ops"]))
             objets.append(b"<< /Filter /FlateDecode /Length %d >>\nstream\n" % len(contenu) + contenu + b"\nendstream")
             numero_contenu = len(objets)
+            annots = []
+            for x1, y1, x2, y2, url in page["liens"]:
+                objets.append(("<< /Type /Annot /Subtype /Link /Rect [%s %s %s %s] /Border [0 0 0] /A << /S /URI /URI "
+                               % (_nombre(x1), _nombre(y1), _nombre(x2), _nombre(y2))).encode("latin-1") + _litteral(url) + b" >> >>")
+                annots.append("%d 0 R" % len(objets))
             xobjets = " ".join("/Im%d %d 0 R" % (i, numeros_images[i]) for i in page["images"])
             objets.append(("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %s %s] /Contents %d 0 R "
-                           "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << %s >> >> >>"
-                           % (_nombre(LARGEUR), _nombre(HAUTEUR), numero_contenu, xobjets)).encode("latin-1"))
+                           "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << %s >> >> /Annots [%s] >>"
+                           % (_nombre(LARGEUR), _nombre(HAUTEUR), numero_contenu, xobjets, " ".join(annots))).encode("latin-1"))
             numeros_pages.append(len(objets))
         objets[0] = b"<< /Type /Catalog /Pages 2 0 R >>"
         objets[1] = ("<< /Type /Pages /Count %d /Kids [%s] >>" % (len(numeros_pages), " ".join("%d 0 R" % p for p in numeros_pages))).encode("latin-1")
@@ -449,7 +458,7 @@ def _chantier(doc, rang, chantier, heure, travaux, paiements, client, dossier_ba
     doc.champ("Rappels par texto", _oui_non(c["sms_ok"]) if tel else "")
     doc.champ("Courriel", c["courriel"])
     adresse = f"{c['adresse']}, {c['ville']}, {c['province']}" + (f" {c['code_postal']}" if c["code_postal"] else "")
-    doc.champ("Adresse", adresse)
+    doc.champ("Adresse", adresse, lien="https://www.google.com/maps/search/?api=1&query=" + quote(c["adresse_maps"]))
     doc.champ("Secteur", c["secteur"])
     doc.champ("Accès / à savoir", c["notes_acces"])
     doc.champ("Notes sur le client", client["notes"])
@@ -493,8 +502,6 @@ def _chantier(doc, rang, chantier, heure, travaux, paiements, client, dossier_ba
         doc.champ("Déjà payé", argent(c["paye"]))
         doc.champ("Reste à encaisser", argent(max(c["solde"], 0)) if c["solde"] > 0 else "Rien (payé)")
     doc.espace(3)
-    doc.champ("Fiche papier", c["ref_papier"])
-    doc.champ("Scan de la fiche", c["fichier_papier"])
     doc.champ("Dossier de photos", c["dossier_photos"])
     _photos(doc, dossier_base, c["dossier_photos"])
     doc.espace(8)
@@ -541,6 +548,7 @@ def journee_pdf(conn, jour, dossier_base=None):
     doc.paragraphe(f"{len(chantiers)} chantier{'s' if len(chantiers) > 1 else ''}  -  durée totale {heures(total_h) if total_h else 'inconnue'}"
                    f"  -  début {heure_texte(DEBUT_JOURNEE)}  -  fin prévue {heure_texte(horaire[-1]['fin'])}", 10.5, True)
     doc.paragraphe(f"Total de la journée : {argent(total)} (taxes incluses)", 10.5)
+    doc.paragraphe("Les adresses en bleu ouvrent Google Maps (itinéraire et carte).", 8.5, False, 0, _GRIS)
     doc.paragraphe(f"Dîner {heure_texte(DINER_DEBUT)} - {heure_texte(DINER_FIN)} ; trajets non comptés ; heures calculées d'après l'ordre et les durées estimées.", 8.5, False, 0, _GRIS)
     doc.espace(8)
     # aperçu : une ligne par chantier

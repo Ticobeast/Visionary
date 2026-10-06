@@ -103,8 +103,7 @@ class TestTermineVerrouille(Base):
         self.conn.execute("INSERT INTO clients (nom, adresse, ville) VALUES ('Autre', '2 Rue B', 'Mirabel')")
         for colonne, valeur in (("statut", "'planifie'"), ("client_id", "2"), ("description", "'x'"), ("date_soumission", "'2026-01-01'"),
                                 ("date_prevue", "'2026-11-01'"), ("duree_estimee_h", "9"), ("duree_reelle_h", "9"), ("prix_ht", "1"),
-                                ("tps", "1"), ("tvq", "1"), ("modalite_paiement", "'carte'"), ("dossier_photos", "'photos/x'"),
-                                ("fichier_papier", "'papier/x.pdf'"), ("ref_papier", "'x'")):
+                                ("tps", "1"), ("tvq", "1"), ("modalite_paiement", "'carte'"), ("dossier_photos", "'photos/x'")):
             self.refuse(f"UPDATE chantiers SET {colonne} = {valeur} WHERE id = {i}")
         self.refuse(f"DELETE FROM chantiers WHERE id = {i}")
         self.refuse(f"DELETE FROM chantier_travaux WHERE chantier_id = {i}")
