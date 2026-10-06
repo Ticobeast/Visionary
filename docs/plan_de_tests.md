@@ -72,6 +72,9 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 28 | **Chantiers** : regarder une ligne et la page d'un chantier | pas de pastille « Nacelle requise » ni « Bois ... » (elles restent dans le tableau de bord et la Journée) |
 | 29 | **Tableau de bord** : choisir un jour avec des chantiers, « Télécharger la journée (PDF) » (en bas) | un fichier `journee-AAAA-MM-JJ.pdf` se télécharge ; il contient, pour chaque chantier : heures, client, téléphone, adresse, accès, travaux avec précisions, description, options, durée, prix et taxes, paiements, reste à encaisser et, si le dossier de photos existe, les photos en vignettes |
 | 30 | **Journée** : regarder les boutons d'un chantier planifié | **Terminer** et **Retirer** sont côte à côte, sur une même ligne |
+| 31 | **Téléphone** (après l'installation de `docs/acces_a_distance.md`) : ouvrir l'adresse sur un téléphone, parcourir Tableau de bord, Journée, Chantiers, Clients | aucune barre de défilement horizontale ; une carte par chantier ; boutons faciles à toucher ; « Terminer » et « Retirer » côte à côte |
+| 32 | **Deux appareils** : ouvrir le même chantier sur deux appareils, modifier la description sur le 1er et enregistrer, puis modifier sur le 2e et enregistrer | le 2e voit « Cette fiche vient d'être modifiée par quelqu'un d'autre », ses changements ne sont pas enregistrés, la fiche à jour s'affiche |
+| 33 | **Refus** : depuis un appareil qui n'est PAS dans ton Tailscale (ex. un ordinateur du Wi-Fi), ouvrir `http://adresse-de-l'atelier:8765` | la page ne s'ouvre pas (« Accès refusé » ou aucune réponse) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

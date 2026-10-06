@@ -4,6 +4,7 @@ Utilisé par l'interface (interface.py) et par le générateur de données d'ess
 passe par les mêmes règles. Bibliothèque standard seulement (Python 3.9+).
 """
 import datetime
+import hashlib
 import re
 import sqlite3
 import unicodedata
@@ -585,6 +586,15 @@ def transaction(conn):
 
 def _txt(x, fmt=None):
     return "" if x is None else (fmt(x) if fmt else str(x))
+
+
+def empreinte(valeurs):
+    """Signature courte d'une fiche (valeurs sous forme de textes) : sert à voir si quelqu'un d'autre l'a modifiée entre-temps."""
+    return hashlib.sha1(repr(sorted(valeurs.items())).encode("utf-8")).hexdigest()[:16]
+
+
+MSG_MODIFIE_ENTRE_TEMPS = ("Cette fiche vient d'être modifiée par quelqu'un d'autre : tes changements n'ont PAS été enregistrés. "
+                           "Voici les valeurs à jour ; vérifie-les, puis refais ta modification si elle est encore nécessaire.")
 
 
 def valeurs_client(conn, client_id):

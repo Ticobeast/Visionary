@@ -11,8 +11,8 @@ Règles appliquées ici :
 import datetime
 import sqlite3
 
-from noyau import (COLONNES, STATUTS_MANUELS, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
-                   dupliquer_chantier, encaisser, lire_ligne, lister_secteurs, mettre_a_jour_fiche,
+from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_MANUELS, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
+                   dupliquer_chantier, empreinte, encaisser, lire_ligne, lister_secteurs, mettre_a_jour_fiche,
                    supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire, valeurs_client)
 from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, MODES, argent, avance, badge, bloc_options_travaux,
                  bloc_types, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps,
@@ -208,7 +208,7 @@ def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
         f'<tr><td>{esc(d)}</td><td>{esc(LIBELLES_MODE[m])}</td><td>{esc(ref)}</td><td class="droite">{argent(mt)}</td>'
         f'<td class="droite"><form method="post" action="/paiement/{pid}/supprimer" onsubmit="return confirm(\'Supprimer ce paiement ?\')">'
         f'<button class="danger" type="submit">Supprimer</button></form></td></tr>' for pid, d, m, mt, ref in pmts)
-    table = (f'<table><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="droite">Montant</th><th></th></tr></thead><tbody>{lignes}</tbody></table>'
+    table = (f'<div class="liste-defile"><table><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="droite">Montant</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
              if pmts else '<p class="doux">Aucun paiement enregistré.</p>')
     ev = {"paiement_date": datetime.date.today().isoformat(), "paiement_montant": f"{solde:.2f}" if solde and solde > 0 else "",
           **(erreur_paiement[1] if erreur_paiement else {})}
@@ -286,7 +286,8 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         danger = (f'<div class="carte"><h2>Annuler ou supprimer</h2><div class="barre">{annuler}<button class="danger" type="submit" form="supprimer-chantier" '
                   f'onclick="return confirm(\'Supprimer ce chantier ? Le client sera aussi supprimé s\\\'il n\\\'a aucun autre chantier. Cette action est définitive.\')">'
                   f'Supprimer ce chantier</button></div></div>')
-        formulaire = (f'{_erreurs_html(erreurs)}<form method="post" action="/chantier/{chantier_id}">{essentiel}'
+        formulaire = (f'{_erreurs_html(erreurs)}<form method="post" action="/chantier/{chantier_id}">'
+                      f'<input type="hidden" name="empreinte" value="{empreinte(depuis_base)}">{essentiel}'
                       '<div class="barre" style="margin-bottom:16px"><button type="submit">Enregistrer les modifications</button>'
                       '<a class="bouton secondaire" href="/">Fermer</a></div>'
                       f'{avance(avance_chantier + autres + danger, ouvert=bool(erreurs))}</form>'
@@ -301,7 +302,9 @@ def modifier(conn, chantier_id, form):
     trouve = valeurs_chantier(conn, chantier_id)
     if trouve is None:
         return page_chantier(conn, chantier_id, {})
-    _, client_id = trouve
+    actuel, client_id = trouve
+    if form.get("empreinte") and form["empreinte"] != empreinte(actuel):        # quelqu'un a modifié la fiche depuis l'ouverture du formulaire
+        return page_chantier(conn, chantier_id, {}, erreur_globale=MSG_MODIFIE_ENTRE_TEMPS)
     brut, v, erreurs = lire_formulaire(conn, form, client_id=client_id, chantier_id=chantier_id)     # le client vient de la base
     if not erreurs:
         try:

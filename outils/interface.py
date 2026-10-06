@@ -26,6 +26,7 @@ from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, jou
                    priorite, sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
+from reseau import adresses_tailscale, client_autorise, hote_autorise  # noqa: E402
 from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, esc, gabarit,  # noqa: E402,F401
                  heures, redirection, select_secteur)
 
@@ -230,6 +231,11 @@ def repondre(db_path, methode, chemin, query=None, form=None):
 class Gestionnaire(BaseHTTPRequestHandler):
     db_path = DB_DEFAUT
     hotes_autorises = ()
+    reseau = False      # True : téléphones / iPads du réseau privé Tailscale acceptés (voir reseau.py)
+    port = 0
+
+    def _hote_ok(self, valeur):
+        return valeur in self.hotes_autorises or (valeur is not None and hote_autorise(valeur, self.port, self.reseau))
 
     def log_message(self, *args):  # silence : le terminal reste lisible
         pass
@@ -238,7 +244,8 @@ class Gestionnaire(BaseHTTPRequestHandler):
         # Protection contre les sites web qui tenteraient d'écrire dans la base à ton insu
         # (requêtes « cross-site » et « DNS rebinding ») : l'hôte et l'origine doivent être locaux.
         origine = self.headers.get("Origin")
-        if self.headers.get("Host") not in self.hotes_autorises or (origine and urlsplit(origine).netloc not in self.hotes_autorises):
+        if (not client_autorise(self.client_address[0], self.reseau) or not self._hote_ok(self.headers.get("Host"))
+                or (origine and not self._hote_ok(urlsplit(origine).netloc))):
             return self._envoyer("403 Forbidden", [("Content-Type", "text/plain; charset=utf-8")], "Accès refusé.".encode())
         url = urlsplit(self.path)
         query = {k: v[0] for k, v in parse_qs(url.query, keep_blank_values=True).items()}
@@ -265,10 +272,13 @@ class Gestionnaire(BaseHTTPRequestHandler):
         self._traiter("POST")
 
 
-def creer_serveur(db_path, port):
-    classe = type("GestionnaireLie", (Gestionnaire,), {
-        "db_path": Path(db_path), "hotes_autorises": (f"127.0.0.1:{port}", f"localhost:{port}")})
-    return ThreadingHTTPServer(("127.0.0.1", port), classe)
+def creer_serveur(db_path, port, reseau=False):
+    """reseau=True : écoute sur toutes les interfaces, mais refuse tout appareil hors Tailscale (voir reseau.py)."""
+    serveur = ThreadingHTTPServer(("0.0.0.0" if reseau else "127.0.0.1", port), Gestionnaire)
+    port = serveur.server_address[1]       # port réel (utile quand on demande le port 0)
+    serveur.RequestHandlerClass = type("GestionnaireLie", (Gestionnaire,), {
+        "db_path": Path(db_path), "hotes_autorises": (f"127.0.0.1:{port}", f"localhost:{port}"), "reseau": reseau, "port": port})
+    return serveur
 
 
 def main(argv=None):
@@ -276,6 +286,8 @@ def main(argv=None):
     p.add_argument("--db", default=str(DB_DEFAUT), help=f"fichier de base (défaut : {DB_DEFAUT})")
     p.add_argument("--essai", action="store_true", help="ouvre la base d'essai (data/test.db) au lieu de la vraie base")
     p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--reseau", action="store_true",
+                   help="accepte aussi les téléphones / iPads de ton réseau privé Tailscale (voir docs/acces_a_distance.md)")
     p.add_argument("--sans-navigateur", action="store_true", help="ne pas ouvrir le navigateur automatiquement")
     a = p.parse_args(argv)
     db = DB_DEFAUT.parent / "test.db" if a.essai else Path(a.db)
@@ -295,12 +307,20 @@ def main(argv=None):
     if existait and not list((db.parent / "sauvegardes").glob(f"{datetime.date.today():%Y-%m-%d}_*")):
         print(f"Sauvegarde du jour : {sauvegarder(db, 'demarrage')}")
     try:
-        serveur = creer_serveur(db, a.port)
+        serveur = creer_serveur(db, a.port, a.reseau)
     except OSError:
         sys.exit(f"Le port {a.port} est déjà utilisé (l'interface est peut-être déjà ouverte ?). Essaie : --port {a.port + 1}")
     url = f"http://localhost:{a.port}/"
     mode = "BASE D'ESSAI (fausses données)" if db.name != DB_DEFAUT.name else "BASE RÉELLE"
     print(f"{mode} : {db}\nInterface : {url}\nArrêter : Ctrl+C")
+    if a.reseau:
+        adresses = adresses_tailscale()
+        print("\nACCÈS À DISTANCE ACTIVÉ (appareils de ton Tailscale seulement ; les autres sont refusés).")
+        if adresses:
+            print("Sur les téléphones / iPads :  " + "   ou   ".join(f"http://{ip}:{a.port}/" for ip in adresses))
+        else:
+            print("Tailscale n'a pas été trouvé sur cet ordinateur : installe-le (voir docs/acces_a_distance.md).")
+        print("Laisse cette fenêtre ouverte et l'ordinateur allumé (mise en veille désactivée).\n")
     if db.name == DB_DEFAUT.name:
         print("Pour t'entraîner sur de fausses données, lance plutôt :  python outils/interface.py --essai")
     nuage = service_nuage(db)

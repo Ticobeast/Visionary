@@ -16,6 +16,9 @@ sans retranscription.
   des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), les fiches clients, la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
+**Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
+(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. L'affichage s'adapte aux petits écrans.
+
 ## Modèle
 
 ```

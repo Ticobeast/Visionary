@@ -117,6 +117,29 @@ label.coche,span.coche{display:inline-flex;align-items:center;gap:6px;color:var(
 .montant{font-size:18px;font-weight:700;text-align:right;white-space:nowrap}.montant small{display:block;font-size:12px;font-weight:400;color:var(--doux)}
 .total-jour .total,.resume-jour .total{font-weight:700}
 @media (max-width:700px){table.liste th:nth-child(n+5),table.liste td:nth-child(n+5){display:none}}
+/* Téléphone : cibles tactiles de 44 px, champs à 16 px (sinon l'iPhone zoome), tableaux de la journée en cartes */
+@media (max-width:700px){
+main,main.large{padding:12px}header{gap:4px 12px;padding:8px 12px}header a{padding:8px 4px}.base{margin-left:0}
+button,.bouton{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+input,select,textarea,.mini input,.mini select{font-size:16px;min-height:44px}.mini button,.actions-ligne .bouton,.actions-ligne button{font-size:15px;min-height:44px;padding:8px 16px}
+input[type=checkbox],input[type=radio]{min-height:0;width:22px;height:22px}
+.recherche select,.recherche input,.cal-nav .bouton,.onglets{flex:1 1 auto}.recherche select{width:100%}
+.cal-jour{min-height:58px;padding:4px 3px}.cal-ligne{display:none}.cal-info{font-size:11px}.cal-info b{display:block;font-size:0}.cal-info b::first-letter{font-size:13px}.cal-tete{font-size:11px}
+td,th{white-space:normal!important}
+table.tableau,table.tableau tbody,.liste-defile table,.liste-defile table tbody,table.liste,table.liste tbody{display:block}table.tableau thead,.liste-defile table thead,table.liste thead{display:none}
+.liste-defile table tr,table.liste tr{display:block;border:1px solid var(--trait);border-radius:10px;margin:0 0 10px;padding:6px 4px}.liste-defile table td,table.liste td{display:block;border:0;padding:3px 8px;text-align:left!important}
+.liste-defile table td:first-child,table.liste td:first-child{color:var(--doux);font-size:13px}.liste-defile table td.droite form{margin-top:4px}
+table.liste td:nth-child(n+5){display:none}table.tableau tr{display:block;border:1px solid var(--trait);border-radius:10px;margin:0 0 10px;padding:6px 4px;background:var(--carte)}
+table.tableau tr.sans-bas{margin-bottom:0;border-bottom:0;border-radius:10px 10px 0 0;padding-bottom:0}
+table.tableau tr.ligne-actions{border-top:0;border-radius:0 0 10px 10px;padding-top:0}
+table.tableau tr.diner{border:0;background:none;padding:0;text-align:center}table.tableau tr.diner td{padding:2px}
+table.tableau td{display:block;border:0;padding:4px 8px;min-width:0!important;text-align:left!important}
+table.tableau td.col-ordre{display:flex;align-items:center;gap:10px}table.tableau .col-ordre .fleches{margin:0}
+table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne{flex-wrap:wrap}
+.liste-defile{overflow-x:visible}.carte{padding:12px}
+dl.lecture{grid-template-columns:1fr}.type{grid-template-columns:1fr}
+.modale-carte{padding:18px}
+}
 """
 
 

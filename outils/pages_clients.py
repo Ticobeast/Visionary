@@ -8,7 +8,7 @@ import datetime
 import sqlite3
 from urllib.parse import urlencode
 
-from noyau import (COLONNES, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
+from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (LIBELLES_STATUT, avance, badge, bloc_options_travaux, bloc_types, champ, champ_modalite, client_avance,
@@ -128,7 +128,8 @@ def _form_client(conn, client_id, valeurs, erreurs=()):
     err = ""
     if erreurs:
         err = ('<div class="erreurs"><strong>À corriger :</strong><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>")
-    return (f'{err}<form method="post" action="/client/{client_id}/modifier">{client_essentiel(valeurs, lister_secteurs(conn))}{avance(client_avance(valeurs), ouvert=bool(erreurs))}'
+    actuel = valeurs_client(conn, client_id)
+    return (f'{err}<form method="post" action="/client/{client_id}/modifier"><input type="hidden" name="empreinte" value="{empreinte(actuel) if actuel else ""}">{client_essentiel(valeurs, lister_secteurs(conn))}{avance(client_avance(valeurs), ouvert=bool(erreurs))}'
             f'<div class="barre"><button type="submit">Enregistrer</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>')
 
 
@@ -140,8 +141,11 @@ def page_client_modifier(conn, client_id):
 
 
 def client_modifier(conn, client_id, form):
-    if valeurs_client(conn, client_id) is None:
+    actuel = valeurs_client(conn, client_id)
+    if actuel is None:
         return _introuvable()
+    if form.get("empreinte") and form["empreinte"] != empreinte(actuel):        # modifié par quelqu'un d'autre entre-temps
+        return gabarit("Modifier le client", f'<h1>Modifier le client</h1>{_form_client(conn, client_id, actuel, [MSG_MODIFIE_ENTRE_TEMPS])}')
     brut = {c: form.get(c, "") for c in COLONNES}
     brut["client_sms_ok"] = "1" if form.get("client_sms_ok") else "0"
     erreurs_secteur = appliquer_secteur(conn, brut, requis=True)         # la ville vient du secteur choisi

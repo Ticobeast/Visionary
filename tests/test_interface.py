@@ -430,7 +430,7 @@ class TestSimpleParDefaut(BaseInterface):
 
     @staticmethod
     def noms(html):
-        return set(re.findall(r'<(?:input|select|textarea)[^>]*\bname="([^"]+)"', html))
+        return set(re.findall(r'<(?:input|select|textarea)(?![^>]*type="hidden")[^>]*\bname="([^"]+)"', html))
 
     def separer(self, page, debut):
         """(partie visible, partie « Paramètres avancés ») du premier formulaire commençant par `debut`."""
