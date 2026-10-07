@@ -8,7 +8,8 @@
 Sert à s'entraîner et à tester avant de saisir tes vrais dossiers. Refuse de toucher à la
 vraie base (sylvainculteur.db). Les dates sont calculées par rapport à aujourd'hui : on y
 trouve des chantiers passés (payés, à recevoir), des chantiers planifiés, et des
-soumissions : complètes (prêtes à accepter), incomplètes, vide (un simple appel) et refusées.
+soumissions : complètes (prêtes à accepter), incomplètes, vide (un simple appel) et refusées ; des chantiers en attente (avec ou sans
+date de reprise) ; et trois ans d'historique, pour essayer l'onglet Archives.
 Téléphones en 555-01xx (réservés à la fiction).
 """
 import argparse
@@ -19,8 +20,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, lister_secteurs, refuser_soumission,  # noqa: E402
-                   taxes_pour, ouvrir_base, trouver_ou_creer_client)
+from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, lister_secteurs, mettre_en_attente,  # noqa: E402
+                   refuser_soumission, taxes_pour, ouvrir_base, trouver_ou_creer_client)
 
 PRENOMS = ["Marie", "Jean", "Sylvie", "Luc", "Nathalie", "Pierre", "Isabelle", "Marc", "Julie", "André",
            "Chantal", "Daniel", "Josée", "Michel", "Louise", "Éric", "Francine", "Guy", "Manon", "Yves"]
@@ -38,8 +39,8 @@ TYPES = {  # code: (prix min, prix max, description)
 }
 MODES = ["interac", "interac", "cheque", "comptant", "carte"]
 # Fiches « pas encore planifiées », en alternance : on y trouve toujours des soumissions de chaque sorte, même avec peu de données.
-SORTES_A_VENIR = ["a_planifier", "soumission", "a_planifier", "incomplete", "a_planifier", "refusee", "a_planifier", "vide", "soumission",
-                  "a_planifier", "annule", "incomplete", "refusee"]
+SORTES_A_VENIR = ["a_planifier", "soumission", "a_planifier", "incomplete", "attente_date", "refusee", "a_planifier", "vide", "soumission",
+                  "attente_indef", "annule", "incomplete", "refusee", "a_planifier"]
 
 
 def jour(d):
@@ -85,7 +86,7 @@ def generer(db, nombre=40, graine=2026):
         sort = rnd.random()
         ligne["modalite_paiement"] = rnd.choice(["", "interac", "cheque", "comptant", "carte"])
         if sort < 0.55:        # passé : terminé
-            realise = aujourdhui - datetime.timedelta(days=rnd.randint(8, 540))
+            realise = aujourdhui - datetime.timedelta(days=rnd.randint(8, 1000))
             ligne.update(statut="termine", date_soumission=jour(realise - datetime.timedelta(days=rnd.randint(3, 20))),
                          date_prevue=jour(realise),
                          duree_reelle_h=f"{min(duree + rnd.choice([-0.5, 0, 0, 0.5, 1]), 8):g}")
@@ -109,7 +110,8 @@ def generer(db, nombre=40, graine=2026):
             if sorte == "vide":                      # un appel : on a ouvert la soumission, rien d'autre
                 ligne = {"statut": "soumission", "date_soumission": demande}
             else:
-                ligne.update(statut={"a_planifier": "a_planifier", "annule": "annule"}.get(sorte, "soumission"), date_soumission=demande)
+                ligne.update(statut={"a_planifier": "a_planifier", "attente_date": "a_planifier", "attente_indef": "a_planifier",
+                                     "annule": "annule"}.get(sorte, "soumission"), date_soumission=demande)
                 if sorte == "incomplete":            # soit visite faite sans prix, soit simple appel (adresse pas encore prise)
                     inconnus = ("prix_ht", "duree_estimee_h") if rnd.random() < 0.5 else ("adresse", "ville", "code_postal", "client_secteur")
                     for champ in inconnus:
@@ -120,6 +122,9 @@ def generer(db, nombre=40, graine=2026):
         chantier_id = creer_chantier(conn, client_id, v, res)
         if sort >= 0.72 and sorte == "refusee":
             assert refuser_soumission(conn, chantier_id) == []
+        elif sort >= 0.72 and sorte in ("attente_date", "attente_indef"):        # accepté, mais pas tout de suite (ex. haie : pas avant juin)
+            reprise = (aujourdhui + datetime.timedelta(days=rnd.randint(20, 150))).isoformat() if sorte == "attente_date" else None
+            assert mettre_en_attente(conn, chantier_id, reprise) == []
     conn.execute("COMMIT")
     conn.close()
     return res

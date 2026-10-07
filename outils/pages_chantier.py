@@ -22,7 +22,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_
                    valeurs_client)
 from vue import (libelle_statut, est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, MODES, adresses, argent, avance, badge, badge_statut, bloc_options_travaux,
                  bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps,
-                 redirection, url_fiche, utilisateur_courant, zone)
+                 redirection, texte_attente, url_fiche, utilisateur_courant, zone)
 
 
 def types_triees(conn):
@@ -247,10 +247,12 @@ CONFIRMATION_REFUS = "Refuser cette soumission ? Elle ira dans les soumissions r
 
 
 def boutons_soumission(chantier_id, retour, retour_accepter=None):
-    """Accepter / Refuser : les deux boutons rapides d'une soumission en cours (deux formulaires ; la page qui les place les enveloppe).
-    `retour` : où l'on revient après avoir refusé ; `retour_accepter` (par défaut le même) : où l'on revient après avoir accepté."""
+    """Accepter / En attente / Refuser : les boutons rapides d'une soumission en cours (la page qui les place les enveloppe).
+    `retour` : où l'on revient après avoir refusé ; `retour_accepter` (par défaut le même) : où l'on revient après avoir accepté
+    ou mis en attente. « En attente » ouvre une petite page (date de reprise, ou jusqu'à nouvel ordre)."""
     return (f'<form class="mini" method="post" action="/soumission/{chantier_id}/accepter">'
             f'<input type="hidden" name="retour" value="{esc(retour_accepter or retour)}"><button type="submit">Accepter</button></form>'
+            f'<a class="bouton secondaire" href="/soumission/{chantier_id}/attente?retour={quote(retour_accepter or retour, safe="")}">En attente</a>'
             f'<form class="mini" method="post" action="/soumission/{chantier_id}/refuser" onsubmit="return confirm({esc(repr(CONFIRMATION_REFUS))})">'
             f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire">Refuser</button></form>')
 
@@ -260,9 +262,9 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if trouve is None:
         return gabarit("Introuvable", '<h1>Fiche introuvable</h1><p><a href="/chantiers">Retour aux chantiers</a> · <a href="/soumissions">Retour aux soumissions</a></p>'), 404
     depuis_base, client_id = trouve
-    (statut, genre, stp, total, paye, solde, prix, tps, tvq, nom, detail, archive, date_prevue, duree, demande, cree_par) = conn.execute(
+    (statut, genre, stp, total, paye, solde, prix, tps, tvq, nom, detail, archive, date_prevue, duree, demande, cree_par, reprise) = conn.execute(
         "SELECT statut, genre, statut_paiement, total_ttc, paye, solde, prix_ht, tps, tvq, client_nom_complet, travaux_detail, archive,"
-        " date_prevue, duree_estimee_h, date_soumission, cree_par FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
+        " date_prevue, duree_estimee_h, date_soumission, cree_par, reprise_le FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()
     soumission = genre == "soumission"
     refusee = soumission and statut == "annule"
     termine = statut == "termine"
@@ -275,7 +277,8 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         (f"Demande du {demande}" if soumission and demande else ""),
         (f"Prévu le {date_prevue}" if date_prevue and not termine else (f"Fait le {date_prevue}" if date_prevue else "")),
         (f"Durée {heures(duree)}" if duree else ""),
-        (f"Ouverte par {cree_par}" if soumission and cree_par else "")) if x)
+        (f"Ouverte par {cree_par}" if soumission and cree_par else ""),
+        (f"En attente : {texte_attente(reprise)}" if statut == "en_attente" else "")) if x)
     montants = (f'<div class="montant">{argent(total) if total is not None and total else "prix à saisir"}'
                 + (f'<small>{argent(prix)} + TPS {argent(tps)} + TVQ {argent(tvq)}</small>' if total else "")
                 + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and est_admin() and not soumission else "") + "</div>")
@@ -302,9 +305,14 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         boutons = dupliquer
         if statut == "planifie" and est_admin():
             boutons = f'<a class="bouton" href="/chantier/{chantier_id}?terminer={chantier_id}">Terminer</a>' + boutons
-        if statut == "a_planifier":
+        if statut in ("a_planifier", "en_attente"):
             boutons = _formulaire_action(f"/chantier/{chantier_id}", f"/chantier/{chantier_id}/remettre-soumission", chantier_id, "Remettre en soumission", "secondaire",
-                                         "Remettre ce chantier en soumission ? Il quitte « À planifier » et retourne dans l'onglet Soumissions.") + boutons
+                                         "Remettre ce chantier en soumission ? Il retourne dans l'onglet Soumissions.") + boutons
+        if statut == "a_planifier":
+            boutons = f'<a class="bouton secondaire" href="/chantier/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">Mettre en attente</a>' + boutons
+        if statut == "en_attente":
+            boutons = (_formulaire_action(f"/chantier/{chantier_id}", f"/chantier/{chantier_id}/reprendre", chantier_id, "Sortir de l'attente")
+                       + f'<a class="bouton secondaire" href="/chantier/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">Changer la date</a>' + boutons)
         if statut == "annule" and est_admin():
             boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="actions-bloc"><div class="actions-page">{boutons}</div>{manque}</div>'
@@ -312,6 +320,10 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if refusee:
         bandeau = ('<div class="verrou-termine">Soumission <b>refusée</b> : elle est dans la section « Refusées » de l\'onglet Soumissions. '
                    'Tu peux la rouvrir si le client a changé d\'avis.</div>')
+    elif statut == "en_attente":
+        bandeau = ('<div class="verrou-termine">Chantier <b>en attente</b> : il n\'est pas proposé dans la Journée. '
+                   + ("Il redevient « À planifier » le <b>" + esc(reprise) + "</b>, ou dès que tu l'en sors." if reprise
+                      else "Il reste en attente jusqu'à ce que tu l'en sortes.") + '</div>')
     elif statut == "annule":
         bandeau = ('<div class="verrou-termine">Chantier <b>annulé</b> : il est dans les archives. Il disparaît des journées ; '
                    'tu peux le rouvrir si l\'annulation était une erreur.</div>')

@@ -243,7 +243,7 @@ def connexion(conn, nom, mot_de_passe, ip):
 # ---------------------------------------------------------------------------
 _REFUS_SOUMISSION = [re.compile(p) for p in (
     r"^/utilisateurs", r"^/secteurs", r"^/client/\d+/supprimer$", r"^/chantier/\d+/supprimer$", r"^/chantier/\d+/paiement$",
-    r"^/soumission/\d+/supprimer$", r"^/paiement/", r"^/journee", r"^/action/", r"^/tournee", r"^/suivi")]
+    r"^/soumission/\d+/supprimer$", r"^/paiement/", r"^/journee", r"^/action/", r"^/tournee", r"^/suivi", r"^/archives")]
 
 
 def permis(role, methode, chemin):

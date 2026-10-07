@@ -88,7 +88,8 @@ class TestPages(BaseInterface):
         self.assertIn("1 437,19 $", actifs)                      # Lavoie : 1250 + taxes, non facturé
         self.assertNotIn('class="onglet', page)                        # plus d'onglets : une seule section principale
         entete = page[page.index("<header"):page.index("</header>")]
-        self.assertNotIn("Archives", entete)                     # et pas d'entrée « Archives » dans le menu
+        self.assertIn('href="/archives"', entete)                # l'onglet Archives (historique complet, recherches, statistiques) est dans le menu
+        self.assertIn('href="/archives">onglet Archives</a>', page)     # et la petite section d'archives de cette page y mène
 
     def test_un_chantier_termine_et_paye_rejoint_les_archives_tout_seul(self):
         self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers")[1]))

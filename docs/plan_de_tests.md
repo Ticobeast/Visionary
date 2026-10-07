@@ -42,7 +42,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 
 | # | Scénario | Résultat attendu |
 |---|---|---|
-| 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, **Soumissions**, Clients ; **aucun emoji** nulle part |
+| 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, **Soumissions**, Clients, **Archives** ; **aucun emoji** nulle part |
 | 2 | **Tableau de bord** | un calendrier du mois ; **dans chaque case** d'un jour planifié : « N chantiers », « Temps total : X h », « Montant total : XXX $ » ; les jours de plus de 8 h sont en rouge |
 | 3 | Cliquer sur une **date** du calendrier | la journée s'affiche dessous : durée totale, montant total, chantiers dans l'ordre avec heures, temps, options (nacelle, bois) et **montant à droite** ; **aucun statut ni paiement** ; un seul bouton **Terminer**, en bas de chaque chantier |
 | 4 | Dîner : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
@@ -87,7 +87,16 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 43 | **Modifier les raccourcis** (lien à côté des pastilles) : ajouter « Terminés », créer « Planifiés du centre-ville » (statut + secteur), monter / descendre, retirer, « Rétablir ceux du départ » | chaque action se voit tout de suite dans les pastilles ; on peut tout retirer (ceux du départ ne reviennent pas seuls) ; un doublon est refusé |
 | 44 | Deux comptes : ajouter un raccourci avec un compte, regarder avec l'autre | chacun garde **ses** raccourcis ; « Mes soumissions » ne compte que celles que le compte a ouvertes ; le compte Soumission **ne voit aucune pastille de paiement** |
 | 45 | Fiche d'un client créé par une soumission vide : « Modifier le client » sans rien remplir | accepté tant que le client n'a que des soumissions ; avec un chantier, le nom, l'adresse et le secteur redeviennent obligatoires ; depuis une soumission, « Modifier le client » **ramène à la soumission** |
-| 46 | *(si tu as déjà une base d'une version précédente)* Lancer la nouvelle version | une copie « avant_migration » apparaît dans `data/sauvegardes` ; tes chantiers sont toujours là (anciens « En attente » devenus des soumissions) |
+| 46 | *(si tu as déjà une base d'une version précédente)* Lancer la nouvelle version | une copie « avant_migration » apparaît dans `data/sauvegardes` ; tes chantiers sont toujours là |
+| 47 | Soumissions : une soumission **complète**, bouton **En attente** | une petite page demande « Jusqu'au [date] » (raccourcis dans 1, 2, 3, 6 mois) ou « Jusqu'à nouvel ordre » ; après « Mettre en attente », elle a quitté Soumissions et est dans **Chantiers**, statut « En attente », avec « reprise le … » |
+| 48 | Même bouton sur une soumission **incomplète** | le programme demande d'abord ce qui manque (« Mettre en attente la soumission »), puis passe à la page de la date : **pour mettre en attente, la soumission doit être complète** |
+| 49 | Chantiers : lien « En attente (N) » en haut ; page d'un chantier en attente | le lien montre seulement les chantiers en attente ; la fiche indique « En attente : reprise le … » et offre **Sortir de l'attente**, **Changer la date**, **Remettre en soumission** ; ce chantier **n'est pas proposé dans la Journée** |
+| 50 | Mettre en attente un chantier « À planifier » (bouton de sa fiche), choisir une date de reprise **demain** ; le lendemain, ouvrir Chantiers | il est redevenu « À planifier » **tout seul**, avec un délai d'attente à 0 jour, et il est de nouveau dans la Journée |
+| 51 | « Jusqu'à nouvel ordre », puis **Sortir de l'attente** | il reste en attente jusqu'au clic ; le bouton le remet « À planifier » tout de suite |
+| 52 | **Archives** (administrateur) : filtres Type « Taille de haie », texte « cèdre », « Fait il y a plus de 1 an », cocher « Un seul résultat par client », tri « Plus ancien d'abord » | la liste des clients à relancer : un par ligne, avec la date et les travaux de leur dernier chantier ; le bouton **Relancer** ouvre une nouvelle soumission à leur nom |
+| 53 | Archives : regarder les chiffres clés et les statistiques (par type de travaux, par secteur, par année, selon le mois de l'année, que deviennent les soumissions) | des nombres cohérents avec les chantiers terminés ; les barres suivent le chiffre d'affaires ; le taux d'acceptation compte les soumissions acceptées et refusées |
+| 54 | Archives : « Exporter (Excel) », ouvrir le fichier dans Excel | un fichier `archives-AAAA-MM-JJ.csv` : accents corrects, montants avec la virgule, mêmes résultats que la page (et tous, pas seulement les 200 premiers) |
+| 55 | Compte « Soumission » : chercher « Archives » dans le menu, ouvrir `/archives` à la main | pas d'entrée Archives, et la page est refusée (réservée à l'administrateur) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -102,7 +111,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 46 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 55 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

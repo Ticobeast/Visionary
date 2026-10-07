@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v10)
+# Dictionnaire de données (schéma v11)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -94,6 +94,7 @@ secteur **au moment d'accepter** la soumission, et pour modifier un client qui a
 | `cree_le` | texte | auto | | |
 | `accepte_le` | date | non | `AAAA-MM-JJ` : **jour où la soumission a été acceptée** (posé par le bouton Accepter). Vide : soumission en cours ou refusée. Rempli : c'est un chantier (même annulé plus tard). C'est ce qui distingue une soumission refusée d'un chantier annulé | `2026-10-07` |
 | `cree_par` | texte | non | **nom du compte** qui a ouvert la soumission (pour « Mes soumissions »). Vide : interface ouverte sans comptes, ou fiche d'avant les comptes | `Marc` |
+| `reprise_le` | date | non | `AAAA-MM-JJ` : tant que le chantier est `en_attente`, **le jour où il redevient `a_planifier` tout seul** (vide : jusqu'à nouvel ordre). Une fois revenu (à la date ou à la main), **le jour du retour** : son délai d'attente repart de là | `2026-06-01` |
 
 ### Types de travaux d'un chantier : `chantier_travaux`
 
@@ -106,7 +107,7 @@ même jour). Chaque type coché a sa **précision** libre (« érable argenté c
 | `type_travaux` | texte | oui | un `code` de `types_travaux` : `emondage`, `elagage`, `taille_haie`, `abattage`, `essouchement`, `autre` ; un type par chantier au maximum | `elagage` |
 | `precision` | texte | non | ce qu'il y a à faire pour ce type | `érable argenté côté garage` |
 
-Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depuis` (date à partir de laquelle le client attend), `modalite_paiement`, `types_codes`
+Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depuis` (date à partir de laquelle le client attend : la demande pour une soumission ; l'acceptation pour un chantier, ou son retour d'attente `reprise_le`), `modalite_paiement`, `types_codes`
 (`elagage+taille_haie`), `type_libelle` (`Élagage + Taille de haie`) et `travaux_detail`
 (`Élagage : érable argenté côté garage ; Taille de haie : cèdres, 35 m`).
 
@@ -115,22 +116,28 @@ Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depui
 | `statut` | Signification | Contrainte |
 |---|---|---|
 | `soumission` | **soumission en cours** : demande ouverte, estimé à donner, remis ou en attente de la réponse du client (onglet *Soumissions*) | `accepte_le` vide |
-| `en_attente` | ancien statut, **traité comme `soumission`** et n'est plus offert (les anciennes fiches « En attente » sont devenues des soumissions à la migration v10) | date effacée |
+| `en_attente` | **chantier accepté mis de côté** (saison, client pas prêt...) : pas dans la Journée ; revient à `a_planifier` à la date `reprise_le`, ou quand on l'en sort | date effacée ; `accepte_le` rempli |
 | `a_planifier` | **soumission acceptée** (renseignements complets), pas encore de date (file d'attente classée par délai) | date effacée ; `accepte_le` rempli |
 | `planifie` | date fixée, rang dans la journée | `date_prevue` obligatoire |
 | `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) ; garde son rang dans la journée |
 | `annule` | **soumission refusée** (`accepte_le` vide) ou **chantier annulé** (`accepte_le` rempli) | |
 
-**Genre** (colonne `genre` de la vue `v_chantiers`, calculée) : `soumission` pour `soumission`, `en_attente`, et `annule` quand `accepte_le` est vide ;
+**Genre** (colonne `genre` de la vue `v_chantiers`, calculée) : `soumission` pour `soumission` et pour `annule` quand `accepte_le` est vide ;
 `chantier` pour tout le reste. Les pages Chantiers, Journée et le tableau de bord ne lisent que le genre `chantier` ; la page Soumissions, que le genre
 `soumission` (les refusées dans leur section du bas).
 
 **Terminé = définitivement verrouillé** : des déclencheurs de la base (`trg_chantiers_termine_verrouille`, `trg_chantiers_termine_non_supprimable`, `trg_travaux_termine_*`) refusent toute modification du chantier terminé (statut, client, description, dates, durées, prix, taxes, modalité, fichiers), de ses types de travaux et sa suppression. Restent permis : les **paiements** et la **duplication**. Le verrou est donc garanti même pour un autre outil (DB Browser…). Limite connue : l'ajout d'un type de travaux à un chantier déjà terminé n'est pas bloqué par la base (nécessaire à la création d'un chantier directement terminé, par import) ; l'interface ne l'offre pas.
 
-Parcours normal : *Soumission, À planifier, Planifié, Terminé* ; *Refusée* (soumission) ou *Annulé* (chantier) à tout moment (sauf après Terminé).
+Parcours normal : *Soumission, (En attente,) À planifier, Planifié, Terminé* ; *Refusée* (soumission) ou *Annulé* (chantier) à tout moment (sauf après Terminé).
 **Le statut est automatique** : Créer = `soumission` ; **Accepter** = `a_planifier` (si les conditions sont remplies : `noyau.CONDITIONS_ACCEPTATION`, et `accepte_le` = aujourd'hui) ;
 **Refuser** = `annule` (sans `accepte_le`) ; ajouter à une journée = `planifie` ; Retirer = `a_planifier` ; Annuler = `annule` ; Terminer = `termine`.
-**Rouvrir** une soumission refusée = `soumission` ; **Remettre en soumission** (chantier `a_planifier` seulement) = `soumission`, `accepte_le` effacée.
+**Rouvrir** une soumission refusée = `soumission` ; **Remettre en soumission** (chantier `a_planifier` ou `en_attente`) = `soumission`, `accepte_le` et `reprise_le` effacées.
+
+**Mettre en attente** (`noyau.mettre_en_attente`) : un chantier `a_planifier` (ou déjà `en_attente` : on change la date), ou une soumission **complète** (mêmes conditions que pour l'accepter ; elle est alors
+acceptée aujourd'hui : `accepte_le` = aujourd'hui) devient `en_attente`, avec `reprise_le` (une date à venir) ou vide. **Sortir de l'attente** (`noyau.sortir_de_l_attente`) = `a_planifier`, `reprise_le` = aujourd'hui.
+**Retour automatique** (`noyau.reprendre_les_attentes`, appelé à chaque requête) : les `en_attente` dont `reprise_le` est arrivée (ou passée) deviennent `a_planifier` ; `reprise_le` garde la date prévue, qui
+devient le début du délai d'attente. Un chantier `planifie` doit d'abord être retiré de sa journée ; un `en_attente` ne peut être planifié ni terminé sans en être sorti ; on ne choisit jamais `en_attente`
+par un simple changement de statut (la date de reprise est demandée).
 
 Conditions pour **accepter** (vérifiées par l'application, pas par la base : une soumission se remplit librement) : nom ou entreprise, téléphone, adresse,
 secteur, au moins un type de travaux, sort du bois (abattage ou élagage seulement : débarrassé, ou format précisé), durée estimée, prix (0 est un prix).
@@ -148,8 +155,8 @@ colonne : la vue `v_chantiers` le calcule à partir du statut des travaux et de 
 | `a_payer` | `termine`, rien reçu | **à recevoir** |
 | `partiel` | une partie reçue (acompte...), solde > 0 | |
 | `paye` | somme reçue >= total | |
-| `a_venir` | `a_planifier` / `planifie`, pas encore fait | |
-| `sans_objet` | soumission (`soumission`, `en_attente`), `annule`, ou travail gratuit | |
+| `a_venir` | `en_attente` / `a_planifier` / `planifie`, pas encore fait | |
+| `sans_objet` | soumission (`soumission`), `annule`, ou travail gratuit | |
 
 Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiements`, `solde = total_ttc − paye`.
 
@@ -203,15 +210,26 @@ Au premier passage d'une personne sur une page, ses raccourcis de départ sont e
 Soumission : À planifier, Planifiés ; Soumissions : Mes soumissions, À relancer). Une ligne spéciale (`filtre` = `__vide__`, invisible) retient qu'une
 personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendraient.
 
-## Migration v9 vers v10 (automatique)
+## Migrations automatiques (v8, v9 et v10 vers v11)
 
-Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v9…`), puis, dans une
-seule transaction (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) : assouplit la table `clients` (nom, adresse et ville ne sont
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v10…`, ou `_v9`, `_v8`), puis
+migre. De v9 ou v10 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
+vue `v_chantiers` est recréée à la fin, telle que dans `schema.sql`.
+
+### Étape v10 vers v11 : « En attente » devient un statut de chantier
+
+Ajoute `chantiers.reprise_le` et recrée la vue (colonnes `reprise_le`, `genre` et `attente_depuis` revues ; `en_attente` n'est plus une soumission). Au format v10, `en_attente`
+n'était qu'un vieux nom de `soumission` : ces rares fiches (il n'y en a pas si la base vient d'être migrée de v9) deviennent des soumissions. Les données ne changent pas autrement.
+
+### Étape v9 vers v10 (soumissions)
+
+Dans la même transaction : assouplit la table `clients` (nom, adresse et ville ne sont
 plus obligatoires en base ; adresse et ville vides deviennent `''`), ajoute `chantiers.accepte_le` et `chantiers.cree_par`, crée la table `raccourcis`,
 recrée la vue `v_chantiers` (colonnes `genre`, `accepte_le`, `cree_par`) et reprend les données : les anciens statuts `en_attente` deviennent
 `soumission` ; les autres fiches (`a_planifier`, `planifie`, `termine`, `annule`) sont des **chantiers acceptés** (`accepte_le` = leur date de demande, à défaut leur
 date de création) : d'anciennes fiches « Annulé » restent donc dans les archives des chantiers, pas dans les soumissions refusées. Rien n'est
-perdu ; en cas d'échec, la base reste telle quelle (v9). Un test automatique vérifie que la base migrée est identique à une base neuve.
+perdu ; en cas d'échec, la base reste telle quelle (v9 ou v10). Les tables de cette étape sont dans `schema/migration_v9_v10.sql` (définitions **figées** : `schema.sql` peut
+évoluer sans les changer). Un test automatique vérifie que la base migrée (de v9 comme de v10) est identique à une base neuve.
 
 ## `types_travaux`
 
@@ -224,7 +242,7 @@ Ajouter un type : `INSERT INTO types_travaux (code, libelle) VALUES ('haubanage'
 
 ## La vue `v_chantiers` (ce que les scripts Python liront)
 
-Une ligne par fiche (soumission ou chantier), tout déjà joint : `genre` (`soumission` ou `chantier`), `accepte_le`, `cree_par`, client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
+Une ligne par fiche (soumission ou chantier), tout déjà joint : `genre` (`soumission` ou `chantier`), `accepte_le`, `cree_par`, `reprise_le`, client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
 (`adresse_maps`, `latitude`, `longitude`, `notes_acces`), travaux (`type_libelle`, `travaux_detail`,
 `description`, `date_prevue`, `duree_estimee_h`, `dossier_photos`…) et finances (`total_ttc`, `paye`, `solde`,
 `statut_paiement`). Exemple — le travail de la journée pour l'étape 2 :

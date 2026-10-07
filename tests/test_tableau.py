@@ -112,12 +112,12 @@ class TestSuiviSupprime(BaseTableau):
         statut, en_tetes, _ = interface.repondre(self.db, "GET", "/tournee", {"date": dans(2)})
         self.assertEqual((statut[:3], dict(en_tetes)["Location"]), ("303", f"/journee?date={dans(2)}"))
 
-    def test_navigation_sans_suivi_ni_tournee_ni_archives(self):
+    def test_navigation_sans_suivi_ni_tournee(self):
         page = self.get("/")[1]
         entete = page[page.index("<header"):page.index("</header>")]
         self.assertEqual(re.findall(r'<a href="([^"]+)">([^<]+)</a>', entete),
                          [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/soumissions", "Soumissions"),
-                          ("/clients", "Clients")])
+                          ("/clients", "Clients"), ("/archives", "Archives")])
         self.assertNotIn("+ Nouveau</a>", entete)                                # le bouton est dans la page Clients
         self.assertIn('<a class="bouton" href="/nouveau">+ Nouveau client</a>', self.get("/clients")[1])
 

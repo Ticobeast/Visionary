@@ -28,7 +28,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 11;
+PRAGMA user_version = 10;
 
 
 -- -----------------------------------------------------------------------------
@@ -158,8 +158,7 @@ CREATE TABLE chantiers (
 
     -- Statuts (dans l'ordre du parcours d'un chantier) :
     --   soumission  = soumission ouverte (rien n'est obligatoire) ; onglet « Soumissions »
-    --   en_attente  = chantier ACCEPTÉ mais mis de côté (saison, client pas prêt...) : pas dans la Journée ; il redevient
-    --                 « À planifier » à la date reprise_le, ou quand on l'en sort (vide : jusqu'à nouvel ordre)
+    --   en_attente  = ancien statut, traité comme « soumission » (n'est plus offert)
     --   a_planifier = soumission ACCEPTÉE (renseignements complets), pas encore de date ; onglet « Chantiers »
     --   planifie    = date fixée
     --   termine     = fait
@@ -196,10 +195,6 @@ CREATE TABLE chantiers (
     accepte_le      TEXT CONSTRAINT ck_chantiers_accepte_le CHECK (accepte_le IS NULL OR date(accepte_le, '+0 days') IS accepte_le),
                               -- AAAA-MM-JJ : jour où la soumission a été acceptée (vide : soumission en cours ou refusée)
     cree_par        TEXT,     -- nom du compte qui a ouvert la soumission (vide : interface ouverte sans comptes)
-    reprise_le      TEXT CONSTRAINT ck_chantiers_reprise_le CHECK (reprise_le IS NULL OR date(reprise_le, '+0 days') IS reprise_le),
-                              -- AAAA-MM-JJ : tant que le chantier est « En attente », le jour où il redevient « À planifier »
-                              -- tout seul (vide : jusqu'à nouvel ordre). Une fois revenu (à la date ou à la main), le jour
-                              -- du retour : le délai d'attente du chantier repart de là.
 
     CONSTRAINT ck_chantiers_modalite
         CHECK (modalite_paiement IS NULL OR modalite_paiement IN ('comptant','cheque','interac','carte','autre')),
@@ -402,9 +397,9 @@ END;
 --   prix_manquant  travaux faits mais prix_ht vide (fiche à compléter)
 --   paye           somme reçue >= total
 --   partiel        une partie reçue (acompte...), solde > 0
---   sans_objet     soumission / annulé, ou travail gratuit
+--   sans_objet     soumission / en attente / annulé, ou travail gratuit
 --   a_payer        travaux faits (client facturé d'office), rien reçu : à relancer
---   a_venir        en attente / à planifier / planifié, pas encore fait
+--   a_venir        à planifier / planifié, pas encore fait
 -- -----------------------------------------------------------------------------
 CREATE VIEW v_chantiers AS
 WITH recu AS (
@@ -417,9 +412,9 @@ base AS (
         c.id AS chantier_id,
         c.statut,
         -- genre : « soumission » (ouverte ou refusée, onglet Soumissions) ou « chantier » (accepté, onglet Chantiers)
-        CASE WHEN c.statut = 'soumission' OR (c.statut = 'annule' AND c.accepte_le IS NULL)
+        CASE WHEN c.statut IN ('soumission', 'en_attente') OR (c.statut = 'annule' AND c.accepte_le IS NULL)
              THEN 'soumission' ELSE 'chantier' END AS genre,
-        c.accepte_le, c.cree_par, c.reprise_le,
+        c.accepte_le, c.cree_par,
         (SELECT group_concat(code, '+') FROM (SELECT ct.type_travaux AS code FROM chantier_travaux ct
             WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS types_codes,
         (SELECT group_concat(libelle, ' + ') FROM (SELECT t.libelle FROM chantier_travaux ct
@@ -431,13 +426,10 @@ base AS (
         c.description,
         c.date_soumission, c.date_prevue, c.ordre_jour,
         -- Depuis quand le client attend : une soumission, depuis la date de la demande ; un chantier accepté, depuis le jour
-        -- où la soumission a été acceptée, ou depuis son retour d'attente (reprise_le) ; un chantier encore en attente garde
-        -- son jour d'acceptation (sa date de reprise future ne le place pas en tête des listes)
-        CASE WHEN c.statut = 'soumission' OR (c.statut = 'annule' AND c.accepte_le IS NULL)
+        -- où la soumission a été acceptée (à défaut, la date de la demande, puis la création de la fiche)
+        CASE WHEN c.statut IN ('soumission', 'en_attente') OR (c.statut = 'annule' AND c.accepte_le IS NULL)
              THEN COALESCE(c.date_soumission, date(c.cree_le))
-             WHEN c.statut = 'en_attente'
-             THEN COALESCE(c.accepte_le, c.date_soumission, date(c.cree_le))
-             ELSE COALESCE(c.reprise_le, c.accepte_le, c.date_soumission, date(c.cree_le)) END AS attente_depuis,
+             ELSE COALESCE(c.accepte_le, c.date_soumission, date(c.cree_le)) END AS attente_depuis,
         c.duree_estimee_h, c.duree_reelle_h,
 
         cl.id AS client_id, cl.prenom, cl.nom, cl.entreprise,
@@ -474,7 +466,7 @@ SELECT
         WHEN statut = 'termine' AND prix_ht IS NULL        THEN 'prix_manquant'
         WHEN paye > 0 AND solde <= 0                        THEN 'paye'
         WHEN paye > 0                                       THEN 'partiel'
-        WHEN statut IN ('soumission', 'annule')               THEN 'sans_objet'
+        WHEN statut IN ('soumission', 'en_attente', 'annule') THEN 'sans_objet'
         WHEN statut = 'termine' AND total_ttc = 0           THEN 'sans_objet'
         WHEN statut = 'termine'                             THEN 'a_payer'
         ELSE 'a_venir'

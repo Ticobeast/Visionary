@@ -52,9 +52,9 @@ def _table(conn, lignes, retour, refusees=False):
         travaux = esc(l["type_libelle"]) if l["type_libelle"] else '<span class="doux">à préciser</span>'
         montant = f'<td class="montant">{esc(argent(l["total_ttc"]))}</td>' if l["total_ttc"] else '<td class="montant"><small>prix à saisir</small></td>'
         if refusees:
-            action = f'<div class="actions-ligne">{_formulaire_action(retour, f"/soumission/{i}/rouvrir", i, "Rouvrir", "secondaire")}</div>'
+            action = f'<div class="actions-ligne actions-soumission">{_formulaire_action(retour, f"/soumission/{i}/rouvrir", i, "Rouvrir", "secondaire")}</div>'
         else:
-            action = f'<div class="actions-ligne">{boutons_soumission(i, retour)}</div>'
+            action = f'<div class="actions-ligne actions-soumission">{boutons_soumission(i, retour)}</div>'
         corps += (f'<tr><td>{demande}</td><td><a href="{url_fiche(i, "soumission")}">{esc(nom)}</a>{tel}{manque}</td><td>{adresse}</td>'
                   f'<td>{travaux}{duree}</td>{montant}<td class="col-actions">{action}</td></tr>')
     return ('<div class="liste-defile"><table class="tableau"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th>'
@@ -91,9 +91,11 @@ def page_soumissions(conn, query):
     else:
         bas = '<div class="carte doux">Aucune soumission refusée' + (" ne correspond à cette recherche." if demande else " pour l'instant.") + "</div>"
     lien_refusees = f' <a class="doux" href="#refusees">Refusées ({total_refusees})</a>' if total_refusees else ""
+    en_attente = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'en_attente'").fetchone()[0]
+    lien_attente = f' <a class="doux" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
     section_refusees = (f'<h2 id="refusees" style="margin-top:32px">Refusées <small class="doux">({total_refusees})</small></h2>'
                         '<p class="doux">Soumissions refusées par le client. Elles ne sont plus dans les chantiers ; « Rouvrir » la remet en cours.</p>' + bas)
-    contenu = (f'<h1>Soumissions{lien_refusees}</h1><div class="barre" style="margin-bottom:16px"><a class="bouton" href="/nouveau">+ Nouvelle soumission</a></div>'
+    contenu = (f'<h1>Soumissions{lien_attente}{lien_refusees}</h1><div class="barre" style="margin-bottom:16px"><a class="bouton" href="/nouveau">+ Nouvelle soumission</a></div>'
                f'{raccourcis.barre(conn, "soumissions", query)}{recherche}{tableau}{section_refusees}')
     return gabarit("Soumissions", contenu, query.get("ok"), query.get("err"), large=True)
 
@@ -143,7 +145,7 @@ def post_rouvrir(conn, i, form):
 # ---------------------------------------------------------------------------
 # Compléter ce qui manque pour accepter
 # ---------------------------------------------------------------------------
-def _formulaire_completer(conn, i, manques, valeurs, retour, erreurs=(), message=None):
+def _formulaire_completer(conn, i, manques, valeurs, retour, erreurs=(), message=None, pour_attente=False):
     secteurs = lister_secteurs(conn)
     nom, travaux, adresse = conn.execute("SELECT client_nom_complet, travaux_detail, adresse FROM v_chantiers WHERE chantier_id = ?", (i,)).fetchone()
     champs = []
@@ -170,11 +172,19 @@ def _formulaire_completer(conn, i, manques, valeurs, retour, erreurs=(), message
     liste_manques = "".join(f"<li>{esc(t)}</li>" for t in libelles_manques(manques))
     err = ('<div class="erreurs"><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>") if erreurs else ""
     info = f'<div class="message">{esc(message)}</div>' if message else ""
+    if pour_attente:
+        but = ("Pour mettre cette soumission <b>en attente</b> (le client a accepté, mais le travail ne se fait pas tout de suite), elle doit être "
+               "complète, comme pour l'accepter. Il faut encore :")
+        pour = '<input type="hidden" name="pour" value="attente">'
+        bouton = "Enregistrer et continuer"
+    else:
+        but = "Pour mettre cette soumission dans <b>Chantiers, À planifier</b>, il faut encore :"
+        pour, bouton = "", "Enregistrer et accepter"
     return (f'{info}{err}<div class="carte"><h2>{esc(nom)}</h2><p>{esc(travaux) if travaux else "travaux à préciser"}</p>'
-            f'<p>Pour mettre cette soumission dans <b>Chantiers, À planifier</b>, il faut encore :</p><ul>{liste_manques}</ul></div>'
-            f'<form method="post" action="/soumission/{i}/completer"><input type="hidden" name="retour" value="{esc(retour)}">'
+            f'<p>{but}</p><ul>{liste_manques}</ul></div>'
+            f'<form method="post" action="/soumission/{i}/completer"><input type="hidden" name="retour" value="{esc(retour)}">{pour}'
             f'<div class="carte"><h2>À compléter</h2><div class="grille">{"".join(champs)}</div></div>'
-            f'<div class="barre"><button type="submit">Enregistrer et accepter</button>'
+            f'<div class="barre"><button type="submit">{bouton}</button>'
             f'<a class="bouton secondaire" href="{esc(url_fiche(i, "soumission"))}">Annuler</a></div></form>')
 
 
@@ -187,10 +197,12 @@ def page_completer(conn, i, query, erreurs=(), valeurs=None, message=None):
         return redirection(url_fiche(i, genre))
     manques = manques_pour_accepter(conn, i)
     retour = retour_valide(query.get("retour"), "/soumissions")
+    pour_attente = query.get("pour") == "attente"
     if not manques:                                    # tout est déjà rempli : rien à compléter
-        return redirection(url_fiche(i, genre))
-    return gabarit(f"Accepter la soumission {i}", f'<h1>Accepter la soumission #{i}</h1>' + _formulaire_completer(
-        conn, i, manques, valeurs if valeurs is not None else trouve[0], retour, erreurs, message), section="soumissions")
+        return redirection(f"/soumission/{i}/attente?retour={quote(retour, safe='')}" if pour_attente else url_fiche(i, genre))
+    titre = f"{'Mettre en attente' if pour_attente else 'Accepter'} la soumission #{i}"
+    return gabarit(titre, f'<h1>{titre}</h1>' + _formulaire_completer(
+        conn, i, manques, valeurs if valeurs is not None else trouve[0], retour, erreurs, message, pour_attente), section="soumissions")
 
 
 def post_completer(conn, i, form):
@@ -202,6 +214,7 @@ def post_completer(conn, i, form):
     if statut not in STATUTS_SOUMISSION:
         return redirection(url_fiche(i, genre))
     retour = retour_valide(form.get("retour"), "/soumissions")
+    pour_attente = form.get("pour") == "attente"
     manques = manques_pour_accepter(conn, i)
     erreurs = []
     # --- le client : seulement les renseignements qui manquent (jamais ceux déjà là)
@@ -239,7 +252,7 @@ def post_completer(conn, i, form):
     if ("travaux" in manques or "bois" in manques) and not erreurs and any(code in TYPES_AVEC_BOIS for code, _ in v["travaux"]) \
             and not v["debarrasser_bois"] and not v["bois_format"]:
         erreurs.append("bois_format : précise le format du bois laissé sur place (16 pouces ou 4 pieds), ou coche « Débarrasser le bois »")
-    accepte = False
+    accepte = suite_attente = False
     if not erreurs:
         try:
             with transaction(conn):
@@ -247,10 +260,15 @@ def post_completer(conn, i, form):
                     mettre_a_jour_client(conn, client_id, vc)
                 erreurs = mettre_a_jour_fiche(conn, i, v)
                 if not erreurs and not manques_pour_accepter(conn, i):
-                    erreurs = accepter_soumission(conn, i)
-                    accepte = not erreurs
+                    if pour_attente:                    # la fiche est complète : on passe à la page « Mettre en attente » (date de reprise)
+                        suite_attente = True
+                    else:
+                        erreurs = accepter_soumission(conn, i)
+                        accepte = not erreurs
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]
+    if suite_attente and not erreurs:
+        return redirection(f"/soumission/{i}/attente?retour={quote(retour, safe='')}")
     if accepte:
         return redirection(avec_params(retour, ok="soumission_acceptee", err=None))
     reste = manques_pour_accepter(conn, i)
@@ -259,8 +277,9 @@ def post_completer(conn, i, form):
     if not reste and erreurs:                                           # plus rien à compléter mais l'acceptation a échoué
         return redirection(avec_params(retour, err=" ; ".join(erreurs)[:300], ok=None))
     formulaire = dict(form)
-    return gabarit(f"Accepter la soumission {i}", f'<h1>Accepter la soumission #{i}</h1>' + _formulaire_completer(
-        conn, i, reste or manques, formulaire, retour, erreurs), section="soumissions")
+    titre = f"{'Mettre en attente' if pour_attente else 'Accepter'} la soumission #{i}"
+    return gabarit(titre, f'<h1>{titre}</h1>' + _formulaire_completer(
+        conn, i, reste or manques, formulaire, retour, erreurs, pour_attente=pour_attente), section="soumissions")
 
 
 ROUTES_SOUMISSIONS = [

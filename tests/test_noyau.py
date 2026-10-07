@@ -38,7 +38,7 @@ class TestSchema(unittest.TestCase):
 
     def test_version_et_integrite(self):
         self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
-        self.assertEqual(noyau.VERSION_SCHEMA, 10)
+        self.assertEqual(noyau.VERSION_SCHEMA, 11)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
@@ -160,8 +160,8 @@ class TestLecture(unittest.TestCase):
         v, erreurs = noyau.lire_ligne({"statut": "soumission"}, ALIAS, False)
         self.assertEqual(erreurs, [])
         self.assertEqual((v["adresse"], v["ville"], v["travaux"], v["duree_estimee_h"], v["client_nom"]), ("", "", [], None, None))
-        for statut in ("en_attente", "Soumission"):
-            self.assertEqual(noyau.lire_ligne({"statut": statut}, ALIAS, False)[1], [], statut)
+        self.assertEqual(noyau.lire_ligne({"statut": "Soumission"}, ALIAS, False)[1], [])
+        self.assertTrue(noyau.lire_ligne({"statut": "en_attente"}, ALIAS, False)[1])          # « En attente » : un chantier accepté, pas une soumission
 
     def test_un_chantier_exige_l_essentiel(self):
         _, erreurs = noyau.lire_ligne({"statut": "a_planifier"}, ALIAS, False)

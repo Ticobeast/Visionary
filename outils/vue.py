@@ -37,6 +37,9 @@ MESSAGES = {
     "soumission_rouverte": "Soumission rouverte : elle redevient une soumission en cours.",
     "soumission_supprimee": "Soumission supprimée.",
     "remise_soumission": "Chantier remis en soumission.",
+    "mis_en_attente": "Mis en attente : il est dans Chantiers (statut « En attente ») et n'est plus proposé dans la Journée. Sa date de reprise est sur sa fiche.",
+    "attente_modifiee": "Attente modifiée.",
+    "sorti_attente": "Sorti de l'attente : il est de nouveau « À planifier ».",
     "raccourci_ajoute": "Raccourci ajouté.",
     "raccourci_retire": "Raccourci retiré.",
     "raccourcis_reinitialises": "Raccourcis rétablis comme au départ.",
@@ -174,11 +177,21 @@ td a{color:var(--vert-fonce)}
 .b-prix_manquant{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.b-a_payer{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
 .b-partiel{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.b-paye,.b-termine{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
 .b-soumission{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.b-a_planifier{background:#fff7e6;color:#92400e;border-color:#fcd9a0}
+.b-en_attente{background:#f1f5f9;color:#475569;border-color:#cbd5e1}
 .b-planifie{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}.b-annule,.b-refusee{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
 .raccourcis-bloc{display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.raccourcis{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}.raccourcis .puce{min-width:130px}
 .puce.actif{border-color:var(--vert);background:var(--vert-doux)}.puce.actif b{color:var(--vert)}.raccourcis-bloc .modifier{font-size:.88rem}
 .actions-bloc{margin-bottom:16px}.actions-page{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.actions-page form{margin:0}
 .actions-page .bouton,.actions-page button{padding:11px 20px;font-size:.95rem;white-space:nowrap}.actions-bloc .manque{margin:8px 0 0;font-size:.9rem}
+.actions-soumission .bouton,.actions-soumission button{padding:7px 14px;font-size:14px;line-height:1.3;white-space:nowrap}
+.tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}
+.tuile{background:#fff;border:1px solid var(--trait-leger);border-radius:14px;box-shadow:var(--ombre-sm);padding:12px 16px}
+.tuile b{display:block;font-size:1.35rem;font-weight:800;color:var(--vert-fonce);line-height:1.2}.tuile span{color:var(--doux);font-size:.78rem;font-weight:700}
+.grille-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(400px,100%),1fr));gap:16px}.grille-stats .carte{margin-bottom:0}
+table.stat{box-shadow:none;border:0}table.stat th,table.stat td{padding:7px 8px;font-size:14px;white-space:normal}table.stat td:first-child{white-space:normal}
+.cellule-barre{width:24%}.stat-barre{display:block;height:8px;border-radius:4px;background:var(--vert)}.stat-defile{overflow-x:auto}
+table.tableau.archive td:first-child{white-space:nowrap}
+form.filtres{margin-bottom:12px}form.filtres .recherche{margin-bottom:12px}
 .manque{font-size:.82rem;color:var(--alerte);margin-top:4px}.attente{border-radius:8px}.a-normale{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
 .a-surveiller{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.a-urgente{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
 .erreurs{background:var(--alerte-fond);border:1px solid var(--alerte-bord);border-radius:12px}.message,.verrou-termine{background:var(--vert-doux);border:1px solid var(--vert-bord);border-radius:12px}
@@ -203,7 +216,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 main,main.large,main.conteneur{padding:16px 12px 24px}.navbar{position:static}.nav-contenu{padding:10px 14px;gap:10px}.nav-bureau{display:none}.nav-droite .admin-seul{display:none}.nav-droite{gap:8px}
 .bandeau-page{padding:18px 0 14px}.conteneur{padding:0 14px}.bandeau-page h1{font-size:1.5rem}
 body{padding-bottom:84px}.pied{display:none}.puces{display:none}.recherche select{display:none}
-.raccourcis-bloc{display:block}.raccourcis{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.raccourcis .puce{flex:0 0 auto;min-width:110px}.raccourcis-bloc .modifier{display:inline-block;margin-top:8px}
+.raccourcis-bloc{display:block}.tuiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cellule-barre{display:none}.raccourcis{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.raccourcis .puce{flex:0 0 auto;min-width:110px}.raccourcis-bloc .modifier{display:inline-block;margin-top:8px}
 .barre-mobile{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:1000;gap:6px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--trait-leger)}
 .barre-mobile a{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.76rem;padding:0 2px;text-align:center;text-decoration:none;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
 .barre-mobile a.actif{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
@@ -263,9 +276,9 @@ CONTEXTE = threading.local()
 STATIC = Path(__file__).resolve().parent / "static"       # logo.svg ou logo.png facultatif : voir docs/acces_a_distance.md
 
 SECTIONS = [(r"^/$", "tableau"), (r"^/(?:journee|tournee)", "journee"), (r"^/(?:client|secteurs)", "clients"),
-            (r"^/(?:soumission|nouveau)", "soumissions"), (r"^/chantier", "chantiers"), (r"^/utilisateurs", "admin")]
+            (r"^/(?:soumission|nouveau)", "soumissions"), (r"^/chantier", "chantiers"), (r"^/archives", "archives"), (r"^/utilisateurs", "admin")]
 NOMS_SECTIONS = {"tableau": "Tableau de bord", "journee": "Journée", "chantiers": "Chantiers", "soumissions": "Soumissions",
-                 "clients": "Clients", "admin": "Administration"}
+                 "clients": "Clients", "archives": "Archives", "admin": "Administration"}
 
 
 def utilisateur_courant():
@@ -295,9 +308,10 @@ def logo_html():
 def _navigation(section):
     admin = est_admin()
     liens = ([("/", "Tableau de bord"), ("/journee", "Journée")] if admin else []) + [("/chantiers", "Chantiers"), ("/soumissions", "Soumissions"),
-                                                                                       ("/clients", "Clients")]
+                                                                                       ("/clients", "Clients")] + ([("/archives", "Archives")] if admin else [])
     nav = "".join(f'<a href="{h}">{t}</a>' for h, t in liens)
-    actif = {"tableau": "/", "journee": "/journee", "chantiers": "/chantiers", "soumissions": "/soumissions", "clients": "/clients"}.get(section, "")
+    actif = {"tableau": "/", "journee": "/journee", "chantiers": "/chantiers", "soumissions": "/soumissions", "clients": "/clients",
+             "archives": "/archives"}.get(section, "")
     surlignage = f'<style>.nav-bureau a[href="{actif}"]{{background:var(--vert-doux);color:var(--vert)}}</style>' if actif else ""
     u = utilisateur_courant()
     droite = etiquette_base()
@@ -377,6 +391,11 @@ def redirection(url):
 
 def badge(code, libelle):
     return f'<span class="badge b-{esc(code)}">{esc(libelle)}</span>'
+
+
+def texte_attente(reprise):
+    """« reprise le 2026-06-01 » ou « jusqu'à nouvel ordre » : la fin de l'attente d'un chantier mis de côté."""
+    return f"reprise le {reprise}" if reprise else "jusqu'à nouvel ordre"
 
 
 def url_fiche(chantier_id, genre):

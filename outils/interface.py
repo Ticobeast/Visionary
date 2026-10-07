@@ -26,12 +26,12 @@ import auth  # noqa: E402
 import vue  # noqa: E402
 from listes import filtres_depuis, selection_chantiers  # noqa: E402
 from noyau import (DB_DEFAUT, Index, Resultat, cle, creer_chantier, jours_attente, lister_secteurs, ouvrir_base,  # noqa: E402
-                   priorite, sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
+                   priorite, reprendre_les_attentes, sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
 from reseau import adresses_tailscale, client_autorise, hote_autorise  # noqa: E402
 from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, badge_statut, esc, gabarit,  # noqa: E402,F401
-                 heures, redirection, select_secteur)
+                 heures, redirection, select_secteur, texte_attente)
 
 # ---------------------------------------------------------------------------
 # Pages
@@ -52,6 +52,8 @@ def _table_chantiers(lignes, finances=True):
             jours = jours_attente(l["attente_depuis"], aujourdhui)
             date_ += f'<div>{badge_attente(jours, priorite(jours))}</div>'
         prevu = f'<div class="doux">prévu le {esc(l["date_prevue"])}</div>' if l["date_prevue"] and st == "planifie" else ""
+        if st == "en_attente":
+            prevu = f'<div class="doux">{esc(texte_attente(l["reprise_le"]))}</div>'
         paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""
         if stp in ("a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
@@ -84,7 +86,8 @@ def page_chantiers(conn, query):
     recherche_filtre = bool(f)
 
     opt_statut = '<option value="">Tous les statuts</option>' + "".join(
-        f'<option value="{s}"{" selected" if s == f.get("statut") else ""}>{LIBELLES_STATUT[s]}</option>' for s in ("a_planifier", "planifie", "termine", "annule"))
+        f'<option value="{s}"{" selected" if s == f.get("statut") else ""}>{LIBELLES_STATUT[s]}</option>'
+        for s in ("a_planifier", "en_attente", "planifie", "termine", "annule"))
     paiements = [("a_recevoir", "À recevoir (terminé non payé, ou acompte)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
     opt_paiement = ('<select name="paiement"><option value="">Tous les paiements</option>' + "".join(
         f'<option value="{k}"{" selected" if k == f.get("paiement") else ""}>{esc(v)}</option>' for k, v in paiements) + "</select>") if admin else ""
@@ -109,11 +112,14 @@ def page_chantiers(conn, query):
     else:
         archives_html = '<div class="carte doux">Aucune archive' + (" ne correspond à cette recherche." if total_archives else " pour l'instant.") + "</div>"
     lien_archives = f' <a class="doux" href="#archives">Archives ({total_archives})</a>' if total_archives else ""
+    en_attente = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'en_attente'").fetchone()[0]
+    lien_attente = f' <a class="doux" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
     section_archives = (f'<h2 id="archives" style="margin-top:32px">Archives <small class="doux">({total_archives})</small></h2>'
                         '<p class="doux">Chantiers <b>annulés</b>, et chantiers <b>terminés et payés</b> : ils sont déplacés ici automatiquement. '
-                        'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent.</p>'
+                        'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent. '
+                        + ('Pour chercher dans tout l\'historique, comparer et voir les statistiques : <a href="/archives">onglet Archives</a>.</p>' if admin else "</p>")
                         + archives_html)
-    return gabarit("Chantiers", f'<h1>Chantiers{lien_archives}</h1>{raccourcis.barre(conn, "chantiers", query)}{recherche}{tableau}{section_archives}', query.get("ok"))
+    return gabarit("Chantiers", f'<h1>Chantiers{lien_attente}{lien_archives}</h1>{raccourcis.barre(conn, "chantiers", query)}{recherche}{tableau}{section_archives}', query.get("ok"))
 
 
 def page_nouveau(conn, query):
@@ -164,13 +170,15 @@ def creer(conn, form):
 from auth import ROUTES_AUTH, controler  # noqa: E402
 import raccourcis  # noqa: E402
 from pages_clients import ROUTES_CLIENTS  # noqa: E402
+from archives import ROUTES_ARCHIVES  # noqa: E402
+from pages_attente import ROUTES_ATTENTE  # noqa: E402
 from pages_soumissions import ROUTES_SOUMISSIONS  # noqa: E402
 from raccourcis import ROUTES_RACCOURCIS  # noqa: E402
 from tableau import ROUTES_TABLEAU  # noqa: E402
 from calendrier import page_calendrier  # noqa: E402
 from composants import fenetre_terminer  # noqa: E402
 
-ROUTES = ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_SOUMISSIONS + ROUTES_RACCOURCIS + ROUTES_CHANTIER + [
+ROUTES = ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_SOUMISSIONS + ROUTES_ATTENTE + ROUTES_ARCHIVES + ROUTES_RACCOURCIS + ROUTES_CHANTIER + [
     ("GET", r"^/$", lambda c, q, f, *g: page_calendrier(c, q)),
     ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
@@ -196,6 +204,10 @@ def repondre(db_path, methode, chemin, query=None, form=None, requete=None):
     conn = None
     try:
         conn, _ = ouvrir_base(db_path)
+        try:
+            reprendre_les_attentes(conn)          # les chantiers en attente dont la date de reprise est arrivée redeviennent « À planifier »
+        except sqlite3.OperationalError:          # base occupée par quelqu'un d'autre : ce sera fait à la requête suivante
+            pass
         if requete is not None:
             refus = controler(conn, requete, methode, chemin, query)
             if refus is not None:

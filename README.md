@@ -13,7 +13,7 @@ sans retranscription.
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
 - **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**
-  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / Refuser), des **raccourcis** à ton goût en haut des listes, les fiches clients, la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
+  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / En attente / Refuser), des **raccourcis** à ton goût en haut des listes, les fiches clients, l'onglet **Archives** (tout l'historique, recherches, statistiques, export Excel), la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
 **Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
@@ -29,7 +29,7 @@ clients (personne ou entreprise + son adresse)  1 ─── N  chantiers  1 ─�
 Un client = une personne **et** son adresse. Un client qui revient = une nouvelle soumission sur son dossier. **Une soumission est un chantier pas encore
 accepté** (même fiche, autre nom) : on l'ouvre dès que le client appelle, **sans rien d'obligatoire** ; le bouton **Accepter** la place dans les chantiers
 (« À planifier ») seulement si tout ce qu'il faut est rempli (nom, téléphone, adresse, secteur, travaux, durée, prix : sinon le programme demande ce qui
-manque), **Refuser** la range dans les soumissions refusées. Un
+manque), **En attente** la met de côté (le client accepte, mais pas tout de suite : à une date de reprise, ou à nouvel ordre), **Refuser** la range dans les soumissions refusées. Un
 chantier dure en moyenne 2 h : plusieurs par journée ; il peut combiner plusieurs types de travaux, et il n'a
 qu'**une seule date** de travaux (prévue, puis réalisée ; elle se change dans la page Journée). Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
 
@@ -42,9 +42,11 @@ d'écriture) ; nacelle et sort du bois sont des options du travail.
 ## Contenu
 
 ```
-schema/schema.sql                       schéma SQLite prêt à exécuter (tables, règles, vue v_chantiers) ; schema/migration_v8_v9.sql : migration automatique
+schema/schema.sql                       schéma SQLite prêt à exécuter (tables, règles, vue v_chantiers) ; schema/migration_v*.sql : migrations automatiques
 outils/interface.py                     serveur local, page Chantiers, nouvelle soumission
-outils/pages_soumissions.py             onglet Soumissions : liste, boutons Accepter / Refuser, page « Accepter » qui ne demande que ce qui manque
+outils/pages_soumissions.py             onglet Soumissions : liste, boutons Accepter / En attente / Refuser, page « Accepter » qui ne demande que ce qui manque
+outils/pages_attente.py                 « Mettre en attente » (date de reprise ou à nouvel ordre) et « Sortir de l'attente »
+outils/archives.py                      onglet Archives : recherche, relance par client, statistiques, export CSV (administrateur)
 outils/raccourcis.py                    pastilles de raccourcis en haut de Chantiers et Soumissions (chaque compte garde les siennes)
 outils/listes.py                        sélections des listes Chantiers et Soumissions (filtres, recherche, délais)
 outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)
@@ -82,7 +84,7 @@ python3 outils/interface.py                            # la VRAIE base (créée 
 Le coin supérieur droit de l'interface indique toujours la base ouverte : **« BASE D’ESSAI »** en orange pour
 les fausses données, « Base : sylvainculteur.db » pour la vraie.
 
-**Mises à jour du programme.** Une base des formats v8 et v9 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien est refusé : tant qu'il n'y a pas de vraies données, il suffit de supprimer le fichier de base (`data/sylvainculteur.db`). La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
+**Mises à jour du programme.** Une base des formats v8, v9 et v10 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien est refusé : tant qu'il n'y a pas de vraies données, il suffit de supprimer le fichier de base (`data/sylvainculteur.db`). La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
 
 Pas à pas : [`docs/plan_de_tests.md`](docs/plan_de_tests.md). Sous Windows, remplacer `python3` par `python`
 ou `py`. Outil graphique gratuit pour consulter la base : [DB Browser for SQLite](https://sqlitebrowser.org/).

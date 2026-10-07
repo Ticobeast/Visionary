@@ -50,7 +50,7 @@ def _texte(ligne, champs):
 def selection_chantiers(conn, f, archive):
     """Chantiers (jamais de soumissions) : actifs (archive=False) ou archives (annulés, terminés et payés)."""
     sql = ("SELECT chantier_id, client_nom_complet, entreprise, adresse, ville, telephone, travaux_detail, description, statut,"
-           " statut_paiement, solde, date_prevue, attente_depuis, type_libelle, duree_estimee_h, total_ttc, secteur, genre"
+           " statut_paiement, solde, date_prevue, attente_depuis, type_libelle, duree_estimee_h, total_ttc, secteur, genre, reprise_le"
            " FROM v_chantiers WHERE genre = 'chantier' AND archive = ?")
     params = [1 if archive else 0]
     if f.get("statut") in STATUTS:

@@ -15,10 +15,12 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
-MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"   # ajout des comptes
-# Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions, voir _migrer_9_10).
+MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"     # ajout des comptes
+MIGRATION_9_10 = RACINE / "schema" / "migration_v9_v10.sql"   # tables figées créées par l'étape 9 -> 10 (clients assouplis, raccourcis)
+# Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions), 10 -> 11 (en attente) ;
+# les deux dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 10
+VERSION_SCHEMA = 11
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -54,8 +56,8 @@ LIBELLES_STATUT = {"soumission": "Soumission", "en_attente": "En attente", "a_pl
 # Statuts sans date : le chantier n'est pas (encore) placé dans une journée.
 STATUTS_SANS_DATE = ("soumission", "en_attente", "a_planifier")
 # Une SOUMISSION est un chantier pas encore accepté (même fiche, autre nom) : onglet « Soumissions », rien d'obligatoire.
-# « en_attente » est un ancien statut, traité comme « soumission » et qui n'est plus offert.
-STATUTS_SOUMISSION = ("soumission", "en_attente")
+# « en_attente » n'en est plus une : c'est un chantier ACCEPTÉ mis de côté jusqu'à une date (reprise_le) ou à nouvel ordre.
+STATUTS_SOUMISSION = ("soumission",)
 # Ce qu'il faut pour ACCEPTER une soumission (elle devient alors un chantier « À planifier »). Pour changer la règle,
 # modifier cette liste et manques_pour_accepter().
 CONDITIONS_ACCEPTATION = (
@@ -401,16 +403,16 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (8, 9):                               # migrations automatiques, précédées d'une copie de sécurité
+        if version in (8, 9, 10):                           # migrations automatiques, précédées d'une copie de sécurité
             try:
                 sauvegarder(db_path, f"avant_migration_v{version}")
                 if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
                     conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
                     conn.execute("PRAGMA foreign_keys = ON")
                     version = 9
-                if version == 9:                            # v9 -> v10 : soumissions, clients sans champs obligatoires, raccourcis
-                    _migrer_9_10(conn)
-                    version = 10
+                if version in (9, 10):                      # v9 -> v10 -> v11 : en UNE transaction, tout ou rien
+                    _migrer_vers_courant(conn, version)
+                    version = VERSION_SCHEMA
             except BaseException:
                 conn.close()
                 raise
@@ -422,42 +424,67 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
     return conn, existait
 
 
-def _migrer_9_10(conn):
-    """Format v9 -> v10, en une seule transaction (tout ou rien) :
+def _instructions(texte):
+    """Les instructions SQL complètes d'un texte, une à une (executescript validerait la transaction en cours)."""
+    courante = ""
+    for ligne in texte.splitlines(keepends=True):
+        courante += ligne
+        if sqlite3.complete_statement(courante):
+            if courante.strip().rstrip(";").strip():
+                yield courante
+            courante = ""
+
+
+def _etapes_9_10(conn):
+    """Format v9 -> v10 (à l'intérieur de la transaction de _migrer_vers_courant) :
 
       * table `clients` reconstruite sans les champs obligatoires (nom, adresse) : une soumission s'ouvre avec ce qu'on sait ;
       * `chantiers` reçoit `accepte_le` et `cree_par` ; les chantiers existants sont considérés comme déjà acceptés ;
-        l'ancien statut « en attente » devient « soumission » ;
-      * tables `raccourcis` et vue `v_chantiers` reprises telles que dans schema.sql.
-    Les définitions viennent de schema.sql lui-même : la base migrée est identique à une base neuve (un test le vérifie).
+        l'ancien statut « en attente » (soumission remise) devient « soumission » ;
+      * table `raccourcis`.
+    Les tables viennent de schema/migration_v9_v10.sql (définitions figées : schema.sql peut évoluer sans les changer).
     """
-    schema = SCHEMA.read_text(encoding="utf-8")
-    table_clients = re.search(r"CREATE TABLE clients \(.*?\n\);\n", schema, re.S).group(0).replace("CREATE TABLE clients (", "CREATE TABLE clients_nouveau (", 1)
-    table_raccourcis = re.search(r"CREATE TABLE raccourcis \(.*?\n\);\n", schema, re.S).group(0)
-    index_raccourcis = re.search(r"CREATE INDEX idx_raccourcis_utilisateur[^;]*;", schema).group(0)
-    vue = schema[schema.index("CREATE VIEW v_chantiers"):]          # dernière instruction du fichier
     colonnes = ("id, prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville, secteur, province, code_postal,"
                 " latitude, longitude, geocode_statut, notes_acces, notes, cree_le")
+    definitions = list(_instructions(MIGRATION_9_10.read_text(encoding="utf-8")))
+    conn.execute(definitions[0])                                        # CREATE TABLE clients_nouveau
+    conn.execute(f"INSERT INTO clients_nouveau ({colonnes}) SELECT {colonnes} FROM clients")
+    conn.execute("DROP TABLE clients")
+    conn.execute("ALTER TABLE clients_nouveau RENAME TO clients")
+    conn.execute("ALTER TABLE chantiers ADD COLUMN accepte_le TEXT CONSTRAINT ck_chantiers_accepte_le "
+                 "CHECK (accepte_le IS NULL OR date(accepte_le, '+0 days') IS accepte_le)")
+    conn.execute("ALTER TABLE chantiers ADD COLUMN cree_par TEXT")
+    conn.execute("UPDATE chantiers SET statut = 'soumission' WHERE statut = 'en_attente'")
+    conn.execute("UPDATE chantiers SET accepte_le = COALESCE(date_soumission, date(cree_le)) WHERE statut <> 'soumission'")
+    for instruction in definitions[1:]:                                 # raccourcis et son index
+        conn.execute(instruction)
+
+
+def _etapes_10_11(conn):
+    """Format v10 -> v11 : `chantiers.reprise_le` (mise en attente d'un chantier accepté, avec date de retour facultative).
+    Au format v10, « en attente » n'était qu'un vieux nom de « soumission » : ces fiches deviennent des soumissions."""
+    conn.execute("ALTER TABLE chantiers ADD COLUMN reprise_le TEXT CONSTRAINT ck_chantiers_reprise_le "
+                 "CHECK (reprise_le IS NULL OR date(reprise_le, '+0 days') IS reprise_le)")
+    conn.execute("UPDATE chantiers SET statut = 'soumission' WHERE statut = 'en_attente'")
+
+
+def _migrer_vers_courant(conn, version):
+    """Formats v9 et v10 -> format courant, en UNE seule transaction (tout ou rien). La vue `v_chantiers` est recréée à la fin,
+    telle que dans schema.sql : la base migrée est identique à une base neuve (un test le vérifie)."""
+    schema = SCHEMA.read_text(encoding="utf-8")
+    vue = schema[schema.index("CREATE VIEW v_chantiers"):]              # dernière instruction du fichier
     conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
     try:
         conn.execute("BEGIN")
         conn.execute("DROP VIEW IF EXISTS v_chantiers")
-        conn.execute(table_clients)
-        conn.execute(f"INSERT INTO clients_nouveau ({colonnes}) SELECT {colonnes} FROM clients")
-        conn.execute("DROP TABLE clients")
-        conn.execute("ALTER TABLE clients_nouveau RENAME TO clients")
-        conn.execute("ALTER TABLE chantiers ADD COLUMN accepte_le TEXT CONSTRAINT ck_chantiers_accepte_le "
-                     "CHECK (accepte_le IS NULL OR date(accepte_le, '+0 days') IS accepte_le)")
-        conn.execute("ALTER TABLE chantiers ADD COLUMN cree_par TEXT")
-        conn.execute("UPDATE chantiers SET statut = 'soumission' WHERE statut = 'en_attente'")
-        conn.execute("UPDATE chantiers SET accepte_le = COALESCE(date_soumission, date(cree_le)) WHERE statut <> 'soumission'")
-        conn.execute(table_raccourcis)
-        conn.execute(index_raccourcis)
+        if version == 9:
+            _etapes_9_10(conn)
+        _etapes_10_11(conn)
         conn.execute(vue.rstrip().rstrip(";"))
         problemes = conn.execute("PRAGMA foreign_key_check").fetchall()
         if problemes:
             raise sqlite3.IntegrityError(f"la migration laisserait des liens brisés : {problemes[:3]}")
-        conn.execute("PRAGMA user_version = 10")
+        conn.execute(f"PRAGMA user_version = {VERSION_SCHEMA}")
         conn.execute("COMMIT")
     except BaseException:
         if conn.in_transaction:
@@ -748,6 +775,15 @@ def priorite(jours):
     return "surveiller" if jours >= SEUIL_SURVEILLER else "normale"
 
 
+def decaler_mois(jour, n):
+    """La même date n mois plus tard (n < 0 : plus tôt) ; le 31 devient le dernier jour d'un mois plus court."""
+    rang = jour.year * 12 + jour.month - 1 + n
+    annee, mois = divmod(rang, 12)
+    mois += 1
+    suivant = datetime.date(annee + (mois == 12), mois % 12 + 1, 1)
+    return datetime.date(annee, mois, min(jour.day, (suivant - datetime.timedelta(days=1)).day))
+
+
 # ---------------------------------------------------------------------------
 # Actions rapides (tableau de bord, tournées). Chacune retourne la liste des erreurs
 # (vide = fait). À appeler dans une transaction.
@@ -774,8 +810,12 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
     ancienne_date, ancien_statut, duree_actuelle, reelle_actuelle, accepte_actuel, demande = actuel
     if ancien_statut == "termine":
         return [VERROU]
+    if statut == "en_attente":
+        return ["pour mettre un chantier en attente, utilise « Mettre en attente » : il demande la date de reprise"]
     if ancien_statut in STATUTS_SOUMISSION and statut in ("a_planifier", "planifie", "termine"):
         return ["une soumission doit d'abord être acceptée (bouton Accepter) : le programme vérifie alors que tout ce qu'il faut est rempli"]
+    if ancien_statut == "en_attente" and statut in ("planifie", "termine"):
+        return ["ce chantier est en attente : sors-le d'abord de l'attente (il redevient « À planifier »)"]
     duree_finale = float(h) if h is not None else duree_actuelle
     if statut in ("planifie", "termine"):
         d = d or ancienne_date
@@ -788,10 +828,13 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
     else:
         d = ancienne_date
     colonnes = {"statut": statut, "date_prevue": d}
-    if statut in STATUTS_SOUMISSION:                      # redevenue une soumission : plus acceptée
+    if statut in STATUTS_SOUMISSION:                      # redevenue une soumission : plus acceptée, plus en attente
         colonnes["accepte_le"] = None
+        colonnes["reprise_le"] = None
     elif not accepte_actuel and (statut in ("a_planifier", "planifie", "termine") or (statut == "annule" and ancien_statut in ("a_planifier", "planifie"))):
         colonnes["accepte_le"] = demande or datetime.date.today().isoformat()      # un chantier a toujours été accepté
+    if statut == "a_planifier" and ancien_statut in ("en_attente", "annule"):
+        colonnes["reprise_le"] = datetime.date.today().isoformat()     # de retour dans la file : le délai d'attente repart d'aujourd'hui
     if h is not None:
         colonnes["duree_estimee_h"] = float(h)
     if statut == "termine":
@@ -1063,15 +1106,80 @@ def refuser_soumission(conn, chantier_id):
 
 
 def remettre_en_soumission(conn, chantier_id):
-    """Un chantier accepté par erreur (pas encore placé dans une journée) redevient une soumission."""
+    """Un chantier accepté par erreur (« À planifier » ou « En attente », pas encore placé dans une journée) redevient une soumission."""
     r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
         return [f"fiche #{chantier_id} introuvable"]
-    if r[0] != "a_planifier":
-        return ["seul un chantier « À planifier » peut être remis en soumission (retire-le d'abord de sa journée)"]
-    conn.execute("UPDATE chantiers SET statut = 'soumission', accepte_le = NULL, date_prevue = NULL WHERE id = ?", (chantier_id,))
+    if r[0] not in ("a_planifier", "en_attente"):
+        return ["seul un chantier « À planifier » ou « En attente » peut être remis en soumission (retire-le d'abord de sa journée)"]
+    conn.execute("UPDATE chantiers SET statut = 'soumission', accepte_le = NULL, reprise_le = NULL, date_prevue = NULL WHERE id = ?", (chantier_id,))
     ajuster_ordre(conn, chantier_id)
     return []
+
+
+def mettre_en_attente(conn, chantier_id, reprise=None):
+    """Met de côté un chantier ACCEPTÉ : il n'est plus proposé dans la Journée. `reprise` (AAAA-MM-JJ, dans le futur) : le jour où il
+    redevient « À planifier » tout seul ; vide : jusqu'à nouvel ordre. Valable pour :
+      * un chantier « À planifier » (ou déjà « En attente » : on change alors la date) ;
+      * une soumission COMPLÈTE (mêmes conditions que pour l'accepter) : le client a dit oui, mais pas tout de suite. Elle devient
+        un chantier accepté aujourd'hui, en attente.
+    Retourne la liste des erreurs ; vide = fait. À appeler dans une transaction."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"fiche #{chantier_id} introuvable"]
+    jour = None
+    if (reprise or "").strip():
+        try:
+            jour = datetime.date.fromisoformat(reprise.strip())
+        except ValueError:
+            return ["la date de reprise n'est pas valide (format AAAA-MM-JJ)"]
+        if jour <= datetime.date.today():
+            return ["la date de reprise doit être à venir : c'est le jour où le chantier redevient « À planifier » "
+                    "(pour « jusqu'à nouvel ordre », ne choisis pas de date)"]
+        jour = jour.isoformat()
+    statut = r[0]
+    if statut == "soumission":
+        manques = manques_pour_accepter(conn, chantier_id)
+        if manques:
+            return ["pour mettre une soumission en attente, il faut qu'elle soit complète : il manque encore " + ", ".join(libelles_manques(manques))]
+        conn.execute("UPDATE chantiers SET statut = 'en_attente', accepte_le = ?, reprise_le = ?, date_prevue = NULL WHERE id = ?",
+                     (datetime.date.today().isoformat(), jour, chantier_id))
+    elif statut in ("a_planifier", "en_attente"):
+        conn.execute("UPDATE chantiers SET statut = 'en_attente', reprise_le = ?, date_prevue = NULL WHERE id = ?", (jour, chantier_id))
+    elif statut == "planifie":
+        return ["ce chantier est placé dans une journée : retire-le d'abord de sa journée (page Journée), puis mets-le en attente"]
+    else:
+        return ["seul un chantier « À planifier » ou une soumission complète peut être mis en attente"]
+    ajuster_ordre(conn, chantier_id)
+    return []
+
+
+def sortir_de_l_attente(conn, chantier_id):
+    """Un chantier « En attente » redevient « À planifier » tout de suite (son délai d'attente repart d'aujourd'hui)."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"fiche #{chantier_id} introuvable"]
+    if r[0] != "en_attente":
+        return ["ce chantier n'est pas en attente"]
+    conn.execute("UPDATE chantiers SET statut = 'a_planifier', reprise_le = ? WHERE id = ?", (datetime.date.today().isoformat(), chantier_id))
+    return []
+
+
+def reprendre_les_attentes(conn, aujourdhui=None):
+    """Les chantiers « En attente » dont la date de reprise est arrivée redeviennent « À planifier » (leur délai d'attente compte
+    à partir de cette date). Appelée à chaque requête : une simple lecture tant qu'il n'y a rien à faire. Retourne le nombre repris."""
+    jour = (aujourdhui or datetime.date.today()).isoformat()
+    echus = "statut = 'en_attente' AND reprise_le IS NOT NULL AND reprise_le <= ?"
+    if conn.execute(f"SELECT 1 FROM chantiers WHERE {echus} LIMIT 1", (jour,)).fetchone() is None:
+        return 0
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        n = conn.execute(f"UPDATE chantiers SET statut = 'a_planifier' WHERE {echus}", (jour,)).rowcount
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+    return n
 
 
 def terminer_chantier(conn, chantier_id, duree_reelle=None, paye=False, mode=None):

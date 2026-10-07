@@ -1,4 +1,4 @@
-# Tableau de bord, Journée, Chantiers, Soumissions et clients
+# Tableau de bord, Journée, Chantiers, Soumissions, clients et archives
 
 Principe : **simple par défaut**. Chaque écran montre d'abord l'important ; les options rarement utiles sont dans « Paramètres
 avancés » (repliés). Chaque chose a **un seul endroit** :
@@ -7,9 +7,10 @@ avancés » (repliés). Chaque chose a **un seul endroit** :
 |---|---|
 | **Tableau de bord** | voir le calendrier et le déroulement de la journée choisie ; terminer un chantier |
 | **Journée** | créer et gérer une journée complète : placer des chantiers, ordre, terminer, retirer, annuler |
-| **Chantiers** | les jobs **acceptés** : liste des chantiers actifs ; plus bas, les archives (anciens chantiers) |
-| **Soumissions** | les demandes de soumission, du premier appel à la réponse du client : boutons **Accepter** / **Refuser** |
+| **Chantiers** | les jobs **acceptés** : liste des chantiers actifs (dont ceux **en attente**) ; plus bas, les archives récentes |
+| **Soumissions** | les demandes de soumission, du premier appel à la réponse du client : boutons **Accepter** / **En attente** / **Refuser** |
 | **Clients** | les fiches clients (seul endroit où l'on modifie un client) et la liste des secteurs desservis |
+| **Archives** | *(administrateur)* tout l'historique (terminés, annulés, soumissions refusées) : recherche, **statistiques**, relance des clients, export Excel |
 
 L'interface ne contient **aucun emoji**.
 
@@ -26,6 +27,7 @@ Chantiers, jusqu'à leur acceptation.
 | **Soumission** | onglet Soumissions | demande ouverte, soumission à faire, remise ou en attente de la réponse du client |
 | **Refusée** | Soumissions, section « Refusées » | le client a dit non (la soumission n'est pas supprimée) |
 | **À planifier** | Chantiers | soumission acceptée, pas encore de date |
+| **En attente** | Chantiers | accepté, mais **mis de côté** (pas de taille de haie en avril...) : pas dans la Journée ; revient tout seul à une date, ou à nouvel ordre |
 | **Planifié** | Chantiers, Journée | placé dans une journée |
 | **Terminé** | Chantiers | travaux faits (puis verrouillé) |
 | **Annulé** | Chantiers, archives | chantier accepté puis abandonné |
@@ -36,9 +38,12 @@ Chantiers, jusqu'à leur acceptation.
 |---|---|
 | **Créer** (nouvelle soumission) | **Soumission** |
 | **Accepter** la soumission (si tout est rempli : voir plus bas) | **À planifier** (la date d'acceptation est notée) |
+| **En attente** sur une soumission **complète** (le client accepte, mais pas tout de suite) | **En attente** (acceptée aujourd'hui) |
+| **Mettre en attente** un chantier « À planifier » | **En attente** |
+| **Sortir de l'attente** (ou la date de reprise arrive) | retour à **À planifier** |
 | **Refuser** la soumission | **Refusée** |
 | **Rouvrir** une soumission refusée | retour à **Soumission** |
-| **Remettre en soumission** (chantier « À planifier » seulement) | retour à **Soumission** |
+| **Remettre en soumission** (chantier « À planifier » ou « En attente ») | retour à **Soumission** |
 | Ajouter le chantier à une journée (page *Journée*) | **Planifié** |
 | **Retirer** le chantier de la journée | retour à **À planifier** |
 | **Annuler** le chantier (administrateur) | **Annulé** : il disparaît de la journée et va **automatiquement dans les archives** |
@@ -127,7 +132,8 @@ En dessous, les **chantiers à placer** : filtres statut (À planifier / Planifi
 **délai d'attente**, **secteur**, tri. Chaque ligne montre le délai d'attente, le travail, son **temps**, ses options et sa **valeur à droite**. On **coche**
 des chantiers (le total d'heures **et de dollars** de la journée se met à jour en direct), puis **Ajouter à la journée** : ils sont ajoutés
 **à la fin**, dans l'ordre affiché, et deviennent « Planifié ». Un chantier sans durée estimée ne peut pas être coché : un lien mène à sa page pour la
-saisir. Tout est planifié d'un coup, ou rien. **Une soumission n'apparaît jamais ici** : elle doit d'abord être acceptée. L'ordre optimal et le trajet sur la carte viendront avec l'étape 2.
+saisir. Tout est planifié d'un coup, ou rien. **Une soumission n'apparaît jamais ici** : elle doit d'abord être acceptée. **Un chantier en attente non plus** :
+il y revient quand sa date de reprise arrive (ou quand tu l'en sors). L'ordre optimal et le trajet sur la carte viendront avec l'étape 2.
 
 ## 3. Chantiers et archives
 
@@ -138,8 +144,11 @@ Menu **Chantiers** : une seule page, qui ne contient **que des chantiers accept�
 - **Les chantiers actifs**, classés du plus récent au plus ancien d'après leur **date d'attente** (pour un chantier : depuis son **acceptation**), avec le
   **délai d'attente** des chantiers « À planifier » (pastille verte moins de 7 jours, jaune 7 à 30, rouge plus de 30), le temps, le statut, le paiement
   et le **montant à droite** (écran minimal : ni nacelle ni bois affichés ici).
+- **Les chantiers en attente** (voir plus bas) sont dans cette liste, avec « reprise le … » ou « jusqu'à nouvel ordre » sous leur statut. Un lien « En attente (N) »
+  en haut de page les isole ; le filtre « Statut » et un raccourci « En attente » (à ajouter, voir Raccourcis) aussi.
 - **Plus bas : « Archives »** : les chantiers **annulés** et les chantiers **terminés et payés**. Ils y vont **automatiquement**, sans rien cliquer.
-  Les 50 plus récents s'affichent ; la recherche couvre tout. Un lien « Archives (N) » en haut de page y descend.
+  Les 50 plus récents s'affichent ; la recherche couvre tout. Un lien « Archives (N) » en haut de page y descend. **Pour chercher dans tout l'historique,
+  comparer et voir les statistiques : l'onglet Archives** (administrateur).
 
 Seuils d'attente : `SEUIL_SURVEILLER` et `SEUIL_URGENT` dans `outils/noyau.py`.
 
@@ -164,7 +173,8 @@ main, mode de règlement. **Après la création, on revient à la fiche du clien
 
 Les soumissions en cours, **la plus récente en haut** ; chaque ligne montre la date de la demande avec la **pastille d'attente** (verte moins de
 7 jours, jaune 7 à 30, rouge plus de 30) et « par » le compte qui l'a ouverte, le client, l'adresse, les travaux, le montant, et **ce qui manque encore
-pour l'accepter** (en rouge). À droite : les deux **boutons rapides Accepter et Refuser**.
+pour l'accepter** (en rouge). À droite : les trois **boutons rapides Accepter, En attente et Refuser**. Un lien « En attente (N) » à côté du titre mène aux chantiers
+qui ont été mis en attente.
 
 Au-dessus : les **raccourcis** (par défaut « Mes soumissions » et « À relancer (7 jours et plus) »), une recherche (nom, téléphone, adresse,
 travaux), un filtre par **délai** et un filtre « **ouvertes par** ». En bas : la section **Refusées**.
@@ -196,10 +206,28 @@ demandée tant qu'on ne cherche pas à accepter.
   supprimer (« Paramètres avancés »).
 - Depuis la **liste**, les deux boutons ramènent à la liste. Depuis la **page de la fiche**, **Accepter** t'amène sur le **nouveau chantier** et **Refuser**
   reste sur la fiche, où le bouton **Rouvrir** est tout de suite là en cas d'erreur de clic.
-- **Remettre en soumission** : sur la page d'un chantier « À planifier » (accepté par erreur, ou le client veut revoir le prix) : il retourne dans Soumissions.
-  Un chantier déjà placé dans une journée doit d'abord en être **retiré**.
+- **Remettre en soumission** : sur la page d'un chantier « À planifier » ou « En attente » (accepté par erreur, ou le client veut revoir le prix) : il retourne
+  dans Soumissions. Un chantier déjà placé dans une journée doit d'abord en être **retiré**.
 - Le **délai d'attente** d'une soumission part de la date de la demande ; une fois acceptée, celui du chantier part de **l'acceptation**.
 - **Dupliquer** (page d'une soumission ou d'un chantier) : nouvelle soumission pour le même client, d'après la fiche (voir les règles plus bas).
+
+### En attente : accepté, mais pas tout de suite
+
+Un client accepte l'estimation, mais le travail ne peut pas se faire maintenant (par exemple, **pas de taille de haie en avril : on attend juin**). Au lieu de
+laisser le dossier dans « À planifier » (où il reviendrait chaque jour dans la Journée), on le met **en attente** :
+
+- **Depuis Soumissions** : le **troisième bouton, « En attente »**, à côté d'Accepter et de Refuser. Comme pour accepter, **la soumission doit être complète**
+  (mêmes conditions : sinon la page « Mettre en attente la soumission » demande seulement ce qui manque, puis continue). Elle devient un chantier **accepté
+  aujourd'hui**, statut « En attente ».
+- **Depuis un chantier « À planifier »** : le bouton **Mettre en attente** de sa page.
+- **Jusqu'à quand ?** Une petite page demande : « **Jusqu'au** [date] » (avec des raccourcis : dans 1, 2, 3 ou 6 mois) ou « **Jusqu'à nouvel ordre** ».
+  Avec une date, le chantier **redevient « À planifier » tout seul** ce jour-là (au plus tard à la première ouverture du programme ce jour-là ou après) ; son
+  délai d'attente repart alors de cette date. Sans date, il reste en attente tant qu'on ne l'en sort pas.
+- **Sortir de l'attente** (bouton sur la fiche) le remet « À planifier » tout de suite ; **Changer la date** modifie la reprise ou la rend « jusqu'à nouvel ordre » ;
+  **Remettre en soumission** le renvoie dans Soumissions.
+- Un chantier **en attente** n'est **pas proposé dans la Journée**, ne compte pas dans le délai d'attente des « À planifier », mais reste dans Chantiers (lien
+  « En attente (N) » en haut, filtre « Statut »). Un chantier déjà **placé dans une journée** doit d'abord en être retiré avant d'être mis en attente.
+- Le compte « Soumission » peut mettre en attente et sortir de l'attente, comme accepter et refuser.
 
 ## 5. Raccourcis : les pastilles du haut
 
@@ -211,7 +239,7 @@ Le lien **Modifier les raccourcis** (à côté des pastilles) ouvre la page de r
 
 - **Mes raccourcis** : la liste, avec les flèches pour **monter / descendre** et le bouton **Retirer** (on peut tout retirer : les raccourcis de départ ne
   reviennent pas tout seuls) ;
-- **Ajouter un raccourci proposé** : « Terminés », « Payés en partie », « Prix manquants », « À planifier depuis 7 jours et plus »... ;
+- **Ajouter un raccourci proposé** : « En attente », « Terminés », « Payés en partie », « Prix manquants », « À planifier depuis 7 jours et plus »... ;
 - **Créer un raccourci personnalisé** : on combine un **statut**, un **paiement**, un **secteur**, un **délai d'attente** et un **texte contenu**, avec un nom
   (facultatif : sinon le nom décrit les critères) ;
 - **Rétablir ceux du départ**.
@@ -221,23 +249,62 @@ Le lien **Modifier les raccourcis** (à côté des pastilles) ouvre la page de r
 (le compte Soumission ne les voit pas et ne peut pas en créer). Sur la page Soumissions : « Mes soumissions » (celles que **j'ai ouvertes**, seulement avec
 des comptes) et « À relancer (7 jours et plus) ».
 
-## 6. Créer une soumission, voir une fiche : l'essentiel d'abord
+## 6. Archives : l'historique, les recherches et les statistiques
+
+Onglet **Archives** (administrateur seulement : les montants y sont ; le compte « Soumission » ne le voit pas). Il regroupe **tout ce qui est fini** :
+les chantiers **terminés** (payés ou non), les chantiers **annulés** et les soumissions **refusées**. Les chantiers en cours restent dans Chantiers, qui garde sa
+petite section « Archives » (les plus récents) comme avant, avec un lien vers cet onglet.
+
+**Chercher.** Une recherche de texte (nom, téléphone, adresse, travaux, **précisions**, description : sans tenir compte des accents ni des majuscules, par
+exemple « cèdre »), et des filtres :
+
+| Filtre | Sert à |
+|---|---|
+| **Quoi** | chantiers terminés (par défaut), annulés, soumissions refusées, ou tout l'historique |
+| **Type de travaux** | par exemple « Taille de haie » (un chantier qui combine deux types est trouvé par chacun) |
+| **Secteur** | un secteur desservi |
+| **Fait il y a plus de… / et il y a moins de…** | 1 mois à 5 ans : « il y a plus d'un an », « entre 3 et 6 mois »... |
+| **Ou entre le… et le…** | des dates précises |
+| **Prix avant taxes d'au moins** | les plus gros chantiers |
+| **Trier par** | date (récent ou ancien d'abord), montant, nom du client |
+
+La date d'un chantier terminé est celle des **travaux** ; celle d'une soumission refusée, celle de la **demande**.
+Quelques **idées de recherche** toutes faites sont en haut de la page (la première : *haies de cèdre faites il y a plus d'un an : qui relancer ?*).
+
+**Relancer.** Coche **« Un seul résultat par client »** : chaque client n'apparaît qu'une fois, avec la date et les travaux de son **dernier** chantier, le nombre de
+chantiers et le total. Le bouton **Relancer** de chaque ligne ouvre une **nouvelle soumission** à son nom. Exemple : *type « Taille de haie », texte « cèdre », fait
+il y a plus de 12 mois, un résultat par client, plus ancien d'abord* = la liste des clients à appeler pour leur haie de cèdres.
+
+**Exporter.** Le bouton **Exporter (Excel)** donne un fichier `archives-AAAA-MM-JJ.csv` avec les mêmes critères (et **tous** les résultats, pas seulement les 200 premiers
+de la page) : il s'ouvre dans Excel (accents lus correctement, montants avec la virgule), pratique pour une liste d'appels ou un publipostage.
+
+**Statistiques.** Sur les chantiers terminés qui correspondent aux critères :
+
+- les **chiffres clés** : nombre de chantiers, chiffre d'affaires avant taxes, prix moyen, durée moyenne, **revenu par heure** (prix divisé par les heures passées sur
+  place, durée réelle sinon estimée : par heure de chantier, pas par personne), clients différents, et ce qui reste **à recevoir** ;
+- **par type de travaux** (nombre, chiffre d'affaires, prix moyen, durée moyenne, revenu par heure : pour voir ce qui rapporte), **par secteur**, **par année**, et
+  **selon le mois de l'année** (toutes années ensemble : pour voir quand l'ouvrage est là) ;
+- **que deviennent les soumissions ?** : combien ont été acceptées, refusées, sont en cours ; le **taux d'acceptation** ; le **délai de réponse** (jours entre la demande
+  et l'acceptation) ; le même tableau **par personne qui a ouvert** les soumissions. Les chantiers en attente comptent comme acceptés.
+
+## 7. Créer une soumission, voir une fiche : l'essentiel d'abord
 
 **Après l'enregistrement d'une modification**, on reste sur la fiche. **Fermer** ramène à la liste de son genre (Soumissions ou Chantiers).
 
 La **page d'une soumission** montre, de haut en bas :
 
 1. le résumé : client, étiquette « Soumission », travaux, date de la demande, qui l'a ouverte, et **la valeur à droite** ;
-2. les **boutons Accepter, Refuser, Dupliquer**, et en rouge ce qu'il **manque encore pour accepter** ;
+2. les **boutons Accepter, En attente, Refuser, Dupliquer**, et en rouge ce qu'il **manque encore pour accepter** ;
 3. le client en **lecture seule** (avec « Modifier le client » et « Fiche client ») ;
 4. les champs à modifier : travaux, options, durée estimée, prix, description (rien d'obligatoire) ;
 5. **« Paramètres avancés »** (replié) : date de la demande, taxes, mode de règlement, fichiers, autres fiches du client, suppression (administrateur).
 
 La **page d'un chantier** (accepté) ajoute les **paiements** (administrateur : liste, « + Ajouter un paiement ») et les boutons **Terminer** (chantier
-planifié), **Remettre en soumission** (chantier « À planifier »), **Rouvrir** (chantier annulé) et **Dupliquer**. Un chantier **Terminé** n'a pas de
+planifié), **Mettre en attente** (chantier « À planifier »), **Sortir de l'attente** et **Changer la date** (chantier en attente), **Remettre en soumission**
+(chantier « À planifier » ou « En attente »), **Rouvrir** (chantier annulé) et **Dupliquer**. Un chantier **Terminé** n'a pas de
 formulaire : résumé, client et paiements en clair ; le détail complet est dans « Paramètres avancés ».
 
-## 7. Clients
+## 8. Clients
 
 `Clients` : une liste épurée avec **seulement Nom, Téléphone et Adresse** (le secteur est écrit sous l'adresse), filtrable par **secteur**. La fiche
 d'un client montre ses coordonnées et **toutes ses fiches : soumissions et chantiers** (date, travaux, statut ; un clic mène à la bonne page).
@@ -267,7 +334,7 @@ Pointe-du-Lac, Saint-Louis-de-France, Bécancour, Champlain, Yamachiche, Saint-�
 aux secteurs réellement desservis** dans la page **Secteurs** (lien au bas de la liste des clients) : ajouter, renommer, supprimer un secteur
 inutilisé. Un nom déjà présent (à l'accent, au tiret ou à la casse près) est refusé : pas de doublons.
 
-## 8. Règles d'une fiche
+## 9. Règles d'une fiche
 
 - **Date de la demande** : préremplie avec aujourd'hui (modifiable). Pour une soumission, c'est le début du **délai d'attente**.
 - **Mode de règlement** : un seul choix parmi Comptant, Chèque, Interac, Carte, Autre.

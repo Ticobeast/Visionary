@@ -438,6 +438,218 @@ class TestCompleter(BasePages):
         self.assertIn("Rouvrir la soumission", self.get(f"/soumission/{i}"))
 
 
+def jour_dans(n):
+    return (AUJOURDHUI + datetime.timedelta(days=n)).isoformat()
+
+
+class TestEnAttentePages(BasePages):
+    """Le troisième bouton « En attente » et tout ce qui l'entoure : page de la date, Chantiers, fiche, retour automatique."""
+
+    def en_attente(self, i=None, reprise=None, **perso):
+        """Met en attente (par la page, comme le navigateur) une soumission complète ; retourne son id."""
+        i = i or self.complete(**perso)
+        form = {"retour": "/soumissions", "choix": "date" if reprise else "indefini", "reprise_le": reprise or ""}
+        statut, en_tetes, _ = self.post(f"/soumission/{i}/attente", form)
+        self.assertEqual(statut[:3], "303", (statut, en_tetes))
+        return i
+
+    def test_la_liste_offre_trois_boutons_dans_l_ordre(self):
+        i = self.complete()
+        page = self.get("/soumissions")
+        accepter = page.index(f'action="/soumission/{i}/accepter"')
+        attente = page.index(f'href="/soumission/{i}/attente?retour=%2Fsoumissions">En attente</a>')
+        refuser = page.index(f'action="/soumission/{i}/refuser"')
+        self.assertLess(accepter, attente)
+        self.assertLess(attente, refuser)
+
+    def test_la_page_de_la_date(self):
+        i = self.complete()
+        page = self.texte(f"/soumission/{i}/attente?retour=%2Fsoumissions")
+        self.assertIn("<h1>Mettre en attente</h1>", page)
+        for texte in ('type="radio" name="choix" value="date" id="choix-date" checked', 'type="radio" name="choix" value="indefini"', 'type="date" name="reprise_le"',
+                      'name="retour" value="/soumissions"', "Jusqu'au", "Jusqu'à nouvel ordre", "Dans 1 mois", "Dans 6 mois"):
+            self.assertIn(texte, page, texte)
+        self.assertIn("pas de taille de haie en avril", page)                               # l'exemple du client qui accepte pour plus tard
+        prochain = noyau.decaler_mois(AUJOURDHUI, 2).isoformat()
+        self.assertIn(f"&amp;reprise_le={prochain}", self.get(f"/soumission/{i}/attente?retour=%2Fsoumissions"))   # raccourci « Dans 2 mois »
+        self.assertIn(f'name="reprise_le" value="{prochain}"', self.get(f"/soumission/{i}/attente?reprise_le={prochain}"))   # …et il préremplit la date
+
+    def test_mise_en_attente_avec_une_date(self):
+        i = self.complete(client_nom="Hamel", adresse="5 Rue de la Haie")
+        form = {"retour": "/soumissions", "choix": "date", "reprise_le": jour_dans(60)}
+        statut, en_tetes, _ = self.post(f"/soumission/{i}/attente", form)
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/soumissions?ok=mis_en_attente"))
+        self.assertEqual(self.sql("SELECT statut, accepte_le, reprise_le FROM chantiers WHERE id = ?", (i,)), [("en_attente", AUJOURDHUI.isoformat(), jour_dans(60))])
+        self.assertIn("Mis en attente", self.get(en_tetes["Location"]))
+        self.assertNotIn("Hamel", self.get("/soumissions").split('id="refusees"')[0].split("<tbody>", 1)[-1])      # elle a quitté la liste des soumissions
+        chantiers = self.get("/chantiers")
+        ligne = chantiers[chantiers.rindex("<tr>", 0, chantiers.index("Hamel")):chantiers.index("</tr>", chantiers.index("Hamel"))]
+        self.assertIn("En attente", ligne)
+        self.assertIn(f"reprise le {jour_dans(60)}", ligne)
+
+    def test_jusqu_a_nouvel_ordre(self):
+        i = self.en_attente()
+        self.assertEqual(self.sql("SELECT statut, reprise_le FROM chantiers WHERE id = ?", (i,)), [("en_attente", None)])
+        self.assertIn("jusqu'à nouvel ordre", html.unescape(self.get("/chantiers")))
+        fiche = self.texte(f"/chantier/{i}")
+        self.assertIn("En attente : jusqu'à nouvel ordre", fiche)
+        self.assertIn("Il reste en attente jusqu'à ce que tu l'en sortes", fiche)
+
+    def test_les_chantiers_en_attente_sont_faciles_a_retrouver(self):
+        self.en_attente(reprise=jour_dans(30), client_nom="Hamel")
+        chantiers = self.get("/chantiers")
+        self.assertIn('href="/chantiers?statut=en_attente">En attente (1)</a>', chantiers)       # lien dans le titre
+        self.assertIn('<option value="en_attente">En attente</option>', chantiers)               # et dans les filtres
+        filtre = self.get("/chantiers?statut=en_attente")
+        self.assertIn("Hamel", filtre.split('id="archives"')[0])
+        self.assertNotIn("Boucher", filtre.split('id="archives"')[0])
+        self.assertIn('href="/chantiers?statut=en_attente">En attente (1)</a>', self.get("/soumissions"))    # aussi depuis Soumissions
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE statut = 'en_attente'"), [(1,)])
+
+    def test_un_chantier_en_attente_n_est_pas_propose_dans_la_journee(self):
+        i = self.en_attente(reprise=jour_dans(30), client_nom="Hamel")
+        lot = self.get(f"/journee?date={jour_dans(1)}")
+        self.assertNotIn("Hamel", lot)
+        self.post(f"/chantier/{i}/reprendre", {})
+        self.assertIn("Hamel", self.get(f"/journee?date={jour_dans(1)}"))                     # sorti de l'attente : il est de nouveau à placer
+
+    def test_une_soumission_incomplete_demande_d_abord_de_completer(self):
+        i = self.partielle()
+        statut, en_tetes, _ = self.req("GET", f"/soumission/{i}/attente?retour=%2Fsoumissions")
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", f"/soumission/{i}/completer?pour=attente&retour=%2Fsoumissions"))
+        statut, en_tetes, _ = self.post(f"/soumission/{i}/attente", {"retour": "/soumissions", "choix": "indefini"})
+        self.assertEqual(en_tetes["Location"], f"/soumission/{i}/completer?pour=attente&retour=%2Fsoumissions")
+        self.assertEqual(self.etat(i)[0], "soumission")
+        page = self.texte(f"/soumission/{i}/completer?pour=attente&retour=%2Fsoumissions")
+        self.assertIn("<h1>Mettre en attente la soumission #", page)
+        self.assertIn('name="pour" value="attente"', page)
+        self.assertIn("Enregistrer et continuer", page)
+        self.assertIn("elle doit être complète, comme pour l'accepter", page)
+        # on complète : on passe à la page de la date, SANS accepter la soumission
+        form = {"retour": "/soumissions", "pour": "attente", "adresse": "9 Rue des Lilas", "client_secteur": "centre_ville", "duree_estimee_h": "2", "prix_ht": "100"}
+        statut, en_tetes, _ = self.post(f"/soumission/{i}/completer", form)
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", f"/soumission/{i}/attente?retour=%2Fsoumissions"))
+        self.assertEqual(self.etat(i), ("soumission", None))
+        self.en_attente(i, reprise=jour_dans(45))
+        self.assertEqual(self.etat(i)[0], "en_attente")
+
+    def test_un_complement_partiel_garde_le_cap_vers_l_attente(self):
+        i = self.partielle()
+        statut, _, page = self.post(f"/soumission/{i}/completer", {"retour": "/soumissions", "pour": "attente", "adresse": "9 Rue des Lilas"})
+        self.assertTrue(statut.startswith("200"))
+        self.assertIn('name="pour" value="attente"', page)
+        self.assertIn("Enregistrer et continuer", page)
+        self.assertEqual(self.etat(i)[0], "soumission")
+
+    def test_dates_et_choix_invalides(self):
+        i = self.complete()
+        for form in ({"choix": "date", "reprise_le": ""}, {"choix": "date", "reprise_le": AUJOURDHUI.isoformat()}, {"choix": "date", "reprise_le": jour_dans(-3)},
+                     {"choix": "date", "reprise_le": "2026-13-45"}, {"choix": "peut-etre"}):
+            statut, _, page = self.post(f"/soumission/{i}/attente", {"retour": "/soumissions", **form})
+            self.assertTrue(statut.startswith("200"), form)
+            self.assertIn('class="erreurs"', page, form)
+            self.assertEqual(self.etat(i)[0], "soumission", form)
+
+    def test_depuis_la_fiche_on_arrive_sur_le_chantier_en_attente(self):
+        i = self.complete()
+        fiche = self.get(f"/soumission/{i}")
+        self.assertIn(f'href="/soumission/{i}/attente?retour=%2Fchantier%2F{i}">En attente</a>', fiche)
+        statut, en_tetes, _ = self.post(f"/soumission/{i}/attente", {"retour": f"/chantier/{i}", "choix": "date", "reprise_le": jour_dans(70)})
+        self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=mis_en_attente")
+        page = self.texte(en_tetes["Location"])
+        self.assertIn("Mis en attente", page)
+        self.assertIn(f"En attente : reprise le {jour_dans(70)}", page)
+        self.assertIn(f"Il redevient « À planifier » le <b>{jour_dans(70)}</b>", page)
+        for bouton in ("Sortir de l'attente", "Changer la date", "Remettre en soumission", "Dupliquer"):
+            self.assertIn(bouton, page, bouton)
+        self.assertNotIn(">Terminer<", page)
+        self.assertNotIn("Mettre en attente", page.split("<h1>")[1].split("</main>")[0].replace("Chantier en attente", ""))
+
+    def test_un_chantier_a_planifier_se_met_en_attente_depuis_sa_fiche(self):
+        i = self.complete()
+        self.post(f"/soumission/{i}/accepter", {})
+        fiche = self.get(f"/chantier/{i}")
+        self.assertIn(f'href="/chantier/{i}/attente?retour=%2Fchantier%2F{i}">Mettre en attente</a>', fiche)
+        page = self.texte(f"/chantier/{i}/attente?retour=%2Fchantier%2F{i}")
+        self.assertIn("Un chantier en attente n'est plus proposé dans la Journée.", page)
+        self.assertIn(f'action="/chantier/{i}/attente"', page)
+        statut, en_tetes, _ = self.post(f"/chantier/{i}/attente", {"retour": f"/chantier/{i}", "choix": "date", "reprise_le": jour_dans(20)})
+        self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=mis_en_attente")
+        self.assertEqual(self.etat(i), ("en_attente", AUJOURDHUI.isoformat()))
+
+    def test_changer_la_date_puis_sortir_de_l_attente(self):
+        i = self.en_attente(reprise=jour_dans(30))
+        page = self.texte(f"/chantier/{i}/attente")
+        self.assertIn("<h1>Changer l'attente</h1>", page)
+        self.assertIn(f'name="reprise_le" value="{jour_dans(30)}"', page)
+        self.assertIn("Sortir de l'attente maintenant", page)
+        statut, en_tetes, _ = self.post(f"/chantier/{i}/attente", {"retour": f"/chantier/{i}", "choix": "date", "reprise_le": jour_dans(90)})
+        self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=attente_modifiee")
+        self.assertEqual(self.sql("SELECT reprise_le FROM chantiers WHERE id = ?", (i,)), [(jour_dans(90),)])
+        statut, en_tetes, _ = self.post(f"/chantier/{i}/attente", {"retour": f"/chantier/{i}", "choix": "indefini"})
+        self.assertEqual(self.sql("SELECT reprise_le FROM chantiers WHERE id = ?", (i,)), [(None,)])
+        self.assertIn("jusqu'à nouvel ordre", self.texte(f"/chantier/{i}/attente"))
+        statut, en_tetes, _ = self.post(f"/chantier/{i}/reprendre", {"retour": f"/chantier/{i}"})
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", f"/chantier/{i}?ok=sorti_attente"))
+        self.assertEqual(self.etat(i)[0], "a_planifier")
+        self.assertIn("Sorti de l'attente", self.texte(en_tetes["Location"]))
+        statut, en_tetes, _ = self.post(f"/chantier/{i}/reprendre", {})
+        self.assertIn("err=", en_tetes["Location"])                                         # déjà sorti
+
+    def test_le_retour_automatique_se_fait_a_l_ouverture_d_une_page(self):
+        i = self.en_attente(reprise=jour_dans(5), client_nom="Hamel")
+        c = sqlite3.connect(self.db)                                                         # le temps a passé : la date de reprise est hier
+        c.execute("UPDATE chantiers SET reprise_le = ? WHERE id = ?", (jour_dans(-1), i))
+        c.commit()
+        c.close()
+        page = self.get("/chantiers")
+        self.assertEqual(self.etat(i)[0], "a_planifier")
+        ligne = page[page.rindex("<tr>", 0, page.index("Hamel")):page.index("</tr>", page.index("Hamel"))]
+        self.assertIn("À planifier", ligne)
+        self.assertIn("1 j", ligne)                                                          # son délai d'attente compte depuis la date de reprise
+        self.assertNotIn("En attente (", page.split("</h1>")[0])
+
+    def test_un_chantier_planifie_ou_termine_ne_se_met_pas_en_attente(self):
+        for i in (3, 2):
+            statut, en_tetes, _ = self.req("GET", f"/chantier/{i}/attente")
+            self.assertEqual(statut[:3], "303")
+            self.assertTrue(en_tetes["Location"].startswith(f"/chantier/{i}?err="), en_tetes["Location"])
+            statut, en_tetes, _ = self.post(f"/chantier/{i}/attente", {"choix": "indefini"})
+            self.assertTrue(en_tetes["Location"].startswith(f"/chantier/{i}?err="))
+        self.assertEqual(self.etat(3)[0], "planifie")
+        self.assertIn("retire-le d'abord", urllib.parse.unquote_plus(self.req("GET", "/chantier/3/attente")[1]["Location"]))
+        self.assertTrue(self.req("GET", "/chantier/999/attente")[0].startswith("404"))
+        self.assertTrue(self.post("/soumission/999/attente", {"choix": "indefini"})[0].startswith("404"))
+        self.assertTrue(self.post("/chantier/999/reprendre", {})[0].startswith("404"))
+
+    def test_une_fiche_en_attente_se_modifie_sans_changer_d_etat(self):
+        i = self.en_attente(reprise=jour_dans(30))
+        statut, en_tetes, _ = self.post(f"/chantier/{i}", {**COMPLETE, "description": "Cèdres au fond du terrain"})
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", f"/chantier/{i}?ok=maj"))
+        self.assertEqual(self.sql("SELECT statut, reprise_le, description FROM chantiers WHERE id = ?", (i,)), [("en_attente", jour_dans(30), "Cèdres au fond du terrain")])
+
+    def test_le_raccourci_en_attente(self):
+        self.en_attente(reprise=jour_dans(30))
+        self.assertIn("+ En attente", self.get("/raccourcis?page=chantiers"))
+        statut, en_tetes, _ = self.post("/raccourcis/ajouter", {"page": "chantiers", "code": "en_attente"})
+        self.assertEqual(en_tetes["Location"], "/raccourcis?page=chantiers&ok=raccourci_ajoute")
+        puces = {n: (c, h) for n, c, a, h in self.puces(self.get("/chantiers"))}
+        self.assertEqual(puces["En attente"], (1, "/chantiers?statut=en_attente"))
+        self.assertIn("Statut : En attente", self.texte("/raccourcis?page=chantiers"))
+        statut, en_tetes, _ = self.post("/raccourcis/ajouter", {"page": "chantiers", "statut": "en_attente", "secteur": "centre_ville"})
+        self.assertEqual(en_tetes["Location"], "/raccourcis?page=chantiers&ok=raccourci_ajoute")
+
+    def test_le_texte_de_la_date_est_echappe(self):
+        i = self.complete()
+        page = self.get(f"/soumission/{i}/attente?reprise_le=%22%3E%3Cscript%3Ealert(1)%3C/script%3E")
+        self.assertNotIn("<script>alert", page)
+        self.assertIn("&quot;&gt;&lt;script&gt;", page)
+
+    def test_les_messages_existent(self):
+        for ok, texte in (("mis_en_attente", "Mis en attente"), ("attente_modifiee", "Attente modifiée"), ("sorti_attente", "Sorti de l'attente")):
+            self.assertIn(texte, self.texte(f"/chantiers?ok={ok}"))
+
+
 class TestClientsSansRenseignements(BasePages):
     def test_la_fiche_d_un_client_vide_est_lisible(self):
         i = self.vide()
@@ -754,6 +966,20 @@ class TestComptesEtSoumissions(BaseComptes):
         self.assertNotIn("Supprimer cette soumission", page)
         self.assertIn("Supprimer cette soumission", self.get(f"/soumission/{j}", cookie=self.admin))
         self.assertTrue(self.post(f"/soumission/{j}/supprimer", {}, cookie=self.admin)[0].startswith("303"))
+
+    def test_le_compte_soumission_met_en_attente_et_sort_de_l_attente(self):
+        i = self.complete(cookie=self.alice)
+        statut, en_tetes, _ = self.post(f"/soumission/{i}/attente", {"retour": "/soumissions", "choix": "date", "reprise_le": jour_dans(60)}, cookie=self.alice)
+        self.assertEqual(en_tetes["Location"], "/soumissions?ok=mis_en_attente")
+        self.assertEqual(self.sql("SELECT statut, reprise_le FROM chantiers WHERE id = ?", (i,)), [("en_attente", jour_dans(60))])
+        self.assertIn('href="/chantiers?statut=en_attente">En attente (1)</a>', self.get("/soumissions", cookie=self.marc))
+        page = self.get("/chantiers?statut=en_attente", cookie=self.marc)                       # la liste, sans finances, pour tout le monde
+        self.assertIn("Roy", page)
+        self.assertNotIn("Paiement", page)
+        self.assertTrue(self.req("GET", f"/chantier/{i}/attente", cookie=self.marc)[0].startswith("200"))
+        statut, en_tetes, _ = self.post(f"/chantier/{i}/reprendre", {}, cookie=self.marc)
+        self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=sorti_attente")
+        self.assertEqual(self.etat(i)[0], "a_planifier")
 
     def test_l_administrateur_peut_supprimer_une_soumission_refusee(self):
         i = self.vide(cookie=self.alice)

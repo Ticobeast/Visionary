@@ -113,11 +113,15 @@ class TestStatuts(BaseJour):
 
     def test_a_planifier_et_soumission_n_ont_pas_de_date(self):
         conn, _ = noyau.ouvrir_base(self.db)
-        for nom, statut in (("Alpha", "a_planifier"), ("Bravo", "soumission"), ("Charlie", "en_attente")):
+        for nom, statut in (("Alpha", "a_planifier"), ("Bravo", "soumission")):
             self.assertEqual(noyau.changer_statut(conn, self.ids[nom], statut), [])
             self.assertEqual(conn.execute("SELECT statut, date_prevue, ordre_jour FROM chantiers WHERE id = ?", (self.ids[nom],)).fetchone(), (statut, None, None))
         # une soumission ne revient pas à « Planifié » par ce chemin : elle passe par Accepter
         self.assertTrue(noyau.changer_statut(conn, self.ids["Bravo"], "planifie", dans(1)))
+        # « En attente » a sa propre action (avec la date de reprise) : jamais par un simple changement de statut
+        self.assertTrue(noyau.changer_statut(conn, self.ids["Charlie"], "en_attente"))
+        self.assertEqual(noyau.mettre_en_attente(conn, self.ids["Delta"]), [])
+        self.assertTrue(noyau.changer_statut(conn, self.ids["Delta"], "planifie", dans(1)))        # il faut d'abord l'en sortir
         conn.close()
 
     def test_seul_un_chantier_a_planifier_se_planifie_en_lot(self):
