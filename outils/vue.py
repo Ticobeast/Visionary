@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from urllib.parse import quote
 
-from noyau import DB_DEFAUT, LIBELLES_MODE, LIBELLES_STATUT, MODES  # noqa: F401  (réexportés pour les pages)
+from noyau import DB_DEFAUT, LIBELLES_MODE, LIBELLES_STATUT, MODES, adresses, libelle_statut  # noqa: F401  (réexportés pour les pages)
 
 LIBELLES_PAIEMENT = {"a_payer": "À recevoir", "partiel": "Partiel",
                      "paye": "Payé", "a_venir": "À venir", "sans_objet": "—", "prix_manquant": "Prix manquant"}
@@ -30,6 +30,16 @@ MESSAGES = {
     "deplace": "Ordre de passage mis à jour : les heures sont recalculées.",
     "client_maj": "Fiche client enregistrée.",
     "client_supprime": "Client supprimé.",
+    "soumission_creee": "Soumission créée.",
+    "soumission_reutilisee": "Soumission créée pour un client déjà dans la base (même adresse) : sa fiche a été réutilisée.",
+    "soumission_acceptee": "Soumission acceptée : elle est maintenant dans Chantiers, à planifier.",
+    "soumission_refusee": "Soumission refusée : elle est dans les soumissions refusées (en bas de la liste).",
+    "soumission_rouverte": "Soumission rouverte : elle redevient une soumission en cours.",
+    "soumission_supprimee": "Soumission supprimée.",
+    "remise_soumission": "Chantier remis en soumission.",
+    "raccourci_ajoute": "Raccourci ajouté.",
+    "raccourci_retire": "Raccourci retiré.",
+    "raccourcis_reinitialises": "Raccourcis rétablis comme au départ.",
     "utilisateur_cree": "Compte créé.",
     "mdp_change": "Mot de passe changé : l'appareil de cette personne devra se reconnecter.",
     "utilisateur_maj": "Compte mis à jour.",
@@ -66,7 +76,7 @@ td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);
 .erreurs{background:var(--alerte-fond);border:1px solid var(--alerte);color:var(--alerte);border-radius:10px;padding:12px 16px;margin-bottom:16px}
 .erreurs ul{margin:6px 0 0 18px;padding:0}.message{background:var(--ok-fond);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-bottom:16px}
 .doux{color:var(--doux);font-size:14px}.droite{text-align:right}.barre{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.recherche{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.recherche input{flex:1;min-width:180px}.recherche select{width:auto}
+.recherche{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.recherche input{flex:1 1 260px;min-width:180px}.recherche select{width:auto;max-width:210px;flex:0 1 auto}.recherche button{flex:0 0 auto}
 .type{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px;align-items:center;margin-bottom:8px}
 .type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
 .base{font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
@@ -163,7 +173,13 @@ td a{color:var(--vert-fonce)}
 .badge{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:12px;background:var(--fond);border:1px solid var(--trait-leger);color:var(--vert)}
 .b-prix_manquant{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.b-a_payer{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
 .b-partiel{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.b-paye,.b-termine{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
-.attente{border-radius:8px}.a-normale{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
+.b-soumission{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.b-a_planifier{background:#fff7e6;color:#92400e;border-color:#fcd9a0}
+.b-planifie{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}.b-annule,.b-refusee{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
+.raccourcis-bloc{display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin-bottom:16px}.raccourcis{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}.raccourcis .puce{min-width:130px}
+.puce.actif{border-color:var(--vert);background:var(--vert-doux)}.puce.actif b{color:var(--vert)}.raccourcis-bloc .modifier{font-size:.88rem}
+.actions-bloc{margin-bottom:16px}.actions-page{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.actions-page form{margin:0}
+.actions-page .bouton,.actions-page button{padding:11px 20px;font-size:.95rem;white-space:nowrap}.actions-bloc .manque{margin:8px 0 0;font-size:.9rem}
+.manque{font-size:.82rem;color:var(--alerte);margin-top:4px}.attente{border-radius:8px}.a-normale{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
 .a-surveiller{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.a-urgente{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
 .erreurs{background:var(--alerte-fond);border:1px solid var(--alerte-bord);border-radius:12px}.message,.verrou-termine{background:var(--vert-doux);border:1px solid var(--vert-bord);border-radius:12px}
 .verrou,.lecture-seule{background:var(--fond);border:1px dashed var(--trait);border-radius:12px}
@@ -187,14 +203,15 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 main,main.large,main.conteneur{padding:16px 12px 24px}.navbar{position:static}.nav-contenu{padding:10px 14px;gap:10px}.nav-bureau{display:none}.nav-droite .admin-seul{display:none}.nav-droite{gap:8px}
 .bandeau-page{padding:18px 0 14px}.conteneur{padding:0 14px}.bandeau-page h1{font-size:1.5rem}
 body{padding-bottom:84px}.pied{display:none}.puces{display:none}.recherche select{display:none}
-.barre-mobile{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:1000;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--trait-leger)}
-.barre-mobile a{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.92rem;text-decoration:none;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
+.raccourcis-bloc{display:block}.raccourcis{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.raccourcis .puce{flex:0 0 auto;min-width:110px}.raccourcis-bloc .modifier{display:inline-block;margin-top:8px}
+.barre-mobile{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:1000;gap:6px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--trait-leger)}
+.barre-mobile a{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.76rem;padding:0 2px;text-align:center;text-decoration:none;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
 .barre-mobile a.actif{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
-.barre-mobile a.principal{background:var(--vert);border-color:transparent;color:#fff;box-shadow:var(--ombre-btn)}
+.barre-mobile a.principal{flex:1.35 1 0;background:var(--vert);border-color:transparent;color:#fff;box-shadow:var(--ombre-btn)}
 .connexion{margin:20px auto}table.liste,.liste-defile table{border:0;box-shadow:none;background:none;border-radius:0}
 
 button,.bouton{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
-input,select,textarea,.mini input,.mini select{font-size:16px;min-height:44px}.mini button,.actions-ligne .bouton,.actions-ligne button{font-size:15px;min-height:44px;padding:8px 16px}
+input,select,textarea,.mini input,.mini select{font-size:16px;min-height:44px}.mini button,.actions-ligne .bouton,.actions-ligne button,.actions-page .bouton,.actions-page button{font-size:15px;min-height:44px;padding:8px 16px}
 input[type=checkbox],input[type=radio]{min-height:0;width:22px;height:22px}
 .recherche select,.recherche input,.cal-nav .bouton,.onglets{flex:1 1 auto}.recherche select{width:100%}
 .cal-jour{min-height:58px;padding:4px 3px}.cal-ligne{display:none}.cal-info{font-size:11px}.cal-info b{display:block;font-size:0}.cal-info b::first-letter{font-size:13px}.cal-tete{font-size:11px}
@@ -246,8 +263,9 @@ CONTEXTE = threading.local()
 STATIC = Path(__file__).resolve().parent / "static"       # logo.svg ou logo.png facultatif : voir docs/acces_a_distance.md
 
 SECTIONS = [(r"^/$", "tableau"), (r"^/(?:journee|tournee)", "journee"), (r"^/(?:client|secteurs)", "clients"),
-            (r"^/(?:chantier|nouveau)", "chantiers"), (r"^/utilisateurs", "admin")]
-NOMS_SECTIONS = {"tableau": "Tableau de bord", "journee": "Journée", "chantiers": "Chantiers", "clients": "Clients", "admin": "Administration"}
+            (r"^/(?:soumission|nouveau)", "soumissions"), (r"^/chantier", "chantiers"), (r"^/utilisateurs", "admin")]
+NOMS_SECTIONS = {"tableau": "Tableau de bord", "journee": "Journée", "chantiers": "Chantiers", "soumissions": "Soumissions",
+                 "clients": "Clients", "admin": "Administration"}
 
 
 def utilisateur_courant():
@@ -276,9 +294,10 @@ def logo_html():
 
 def _navigation(section):
     admin = est_admin()
-    liens = ([("/", "Tableau de bord"), ("/journee", "Journée")] if admin else []) + [("/chantiers", "Chantiers"), ("/clients", "Clients")]
+    liens = ([("/", "Tableau de bord"), ("/journee", "Journée")] if admin else []) + [("/chantiers", "Chantiers"), ("/soumissions", "Soumissions"),
+                                                                                       ("/clients", "Clients")]
     nav = "".join(f'<a href="{h}">{t}</a>' for h, t in liens)
-    actif = {"tableau": "/", "journee": "/journee", "chantiers": "/chantiers", "clients": "/clients"}.get(section, "")
+    actif = {"tableau": "/", "journee": "/journee", "chantiers": "/chantiers", "soumissions": "/soumissions", "clients": "/clients"}.get(section, "")
     surlignage = f'<style>.nav-bureau a[href="{actif}"]{{background:var(--vert-doux);color:var(--vert)}}</style>' if actif else ""
     u = utilisateur_courant()
     droite = etiquette_base()
@@ -286,7 +305,7 @@ def _navigation(section):
         droite += (f'<span class="qui">{esc(u["nom"])}</span>'
                    + ('<a class="admin-seul" href="/utilisateurs">Utilisateurs</a>' if u["role"] == "admin" else "")
                    + '<form method="post" action="/deconnexion"><button class="lien" type="submit">Se déconnecter</button></form>')
-    return (f'<header class="navbar"><div class="nav-contenu"><a class="marque" href="{"/" if admin else "/chantiers"}">{logo_html()}</a>'
+    return (f'<header class="navbar"><div class="nav-contenu"><a class="marque" href="{"/" if admin else "/soumissions"}">{logo_html()}</a>'
             f'<nav class="nav-bureau">{nav}</nav><div class="nav-droite">{droite}</div></div></header>{surlignage}')
 
 
@@ -294,14 +313,15 @@ def _barre_mobile(section):
     def lien(href, texte, classe=""):
         return f'<a href="{href}" class="{classe}">{texte}</a>'
     return ('<nav class="barre-mobile">' + lien("/chantiers", "Chantiers", "actif" if section == "chantiers" else "")
-            + lien("/clients", "Clients", "actif" if section == "clients" else "") + lien("/nouveau", "+ Chantier", "principal") + "</nav>")
+            + lien("/soumissions", "Soumissions", "actif" if section == "soumissions" else "")
+            + lien("/clients", "Clients", "actif" if section == "clients" else "") + lien("/nouveau", "+ Soumission", "principal") + "</nav>")
 
 
-def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False):
+def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False, section=None):
     msg = f'<div class="message">{esc(MESSAGES[message])}</div>' if message in MESSAGES else ""
     if erreur:
         msg += f'<div class="erreurs"><strong>Action refusée :</strong> {esc(erreur)}</div>'
-    section = section_de(getattr(CONTEXTE, "chemin", ""))
+    section = section or section_de(getattr(CONTEXTE, "chemin", ""))
     tete = f'<style>{CSS}</style></head><body>'
     entete = ('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">'
               f'<meta name="theme-color" content="#0e341d"><title>{esc(titre)} — SylvainCulteur</title>')
@@ -327,8 +347,16 @@ def heures(h):
     return f"{minutes // 60} h" + (f" {minutes % 60:02d}" if minutes % 60 else "")
 
 
+def case_taxes(nom, cochee):
+    """« Ajouter TPS et TVQ » : sur sa propre ligne de la grille (le libellé est trop long pour une colonne)."""
+    return (f'<div class="large"><label class="coche"><input type="checkbox" name="{nom}" value="1"{" checked" if cochee else ""}>'
+            'Ajouter TPS 5 % et TVQ 9,975 %</label></div>')
+
+
 def lien_maps(adresse_maps, texte):
-    """Lien vers Google Maps (ouvre l'itinéraire / la carte de l'adresse)."""
+    """Lien vers Google Maps (ouvre l'itinéraire / la carte de l'adresse). Sans adresse (soumission), le texte seul."""
+    if not adresse_maps:
+        return esc(texte) if texte else '<span class="doux">adresse à saisir</span>'
     url = "https://www.google.com/maps/search/?api=1&query=" + quote(adresse_maps)
     return f'<a href="{esc(url)}" target="_blank" rel="noopener" title="Ouvrir dans Google Maps">{esc(texte)}</a>'
 
@@ -349,6 +377,17 @@ def redirection(url):
 
 def badge(code, libelle):
     return f'<span class="badge b-{esc(code)}">{esc(libelle)}</span>'
+
+
+def url_fiche(chantier_id, genre):
+    """Adresse de la fiche : « soumission » (onglet Soumissions) ou « chantier » : même fiche, autre nom."""
+    return f"/{'soumission' if genre == 'soumission' else 'chantier'}/{chantier_id}"
+
+
+def badge_statut(statut, genre=None):
+    """Pastille du statut ; « Refusée » (rouge) pour une soumission refusée."""
+    refusee = statut == "annule" and genre == "soumission"
+    return badge("refusee" if refusee else statut, libelle_statut(statut, genre))
 
 
 def champ(nom, libelle, valeurs, type_="text", large=False, **attrs):
@@ -399,9 +438,9 @@ def select_secteur(secteurs, valeurs, nom="client_secteur", requis=True, tout=No
     return f'<select id="{nom}" name="{nom}"{" required" if requis else ""}>{choix}</select>', etoile
 
 
-def champ_secteur(secteurs, valeurs):
-    """Ville / secteur du client (liste déroulante obligatoire)."""
-    select, etoile = select_secteur(secteurs, valeurs)
+def champ_secteur(secteurs, valeurs, requis=True):
+    """Ville / secteur du client (liste déroulante ; obligatoire sauf dans une soumission)."""
+    select, etoile = select_secteur(secteurs, valeurs, requis=requis)
     ancienne = valeurs.get("ville") if not valeurs.get("client_secteur") and valeurs.get("ville") else ""
     rappel = f'<div class="doux">Ville actuelle : {esc(ancienne)} — choisis le secteur correspondant.</div>' if ancienne else ""
     return f'<div><label for="client_secteur">Ville / secteur{etoile}</label>{select}{rappel}</div>'
@@ -434,13 +473,16 @@ def puces_options(nacelle, debarrasser_bois, bois_format):
     return "".join(f'<span class="puce-opt">{esc(p)}</span>' for p in puces)
 
 
-def client_essentiel(valeurs, secteurs):
-    """Ce qu'il faut pour retrouver un client : nom, téléphone, adresse des travaux, ville / secteur (liste)."""
+def client_essentiel(valeurs, secteurs, exige=True):
+    """Ce qu'il faut pour retrouver un client : nom, téléphone, adresse des travaux, ville / secteur (liste).
+
+    exige=False (soumission, ou client qui n'a que des soumissions) : rien n'est obligatoire.
+    """
     return f"""<div class="carte"><h2>Client</h2><div class="grille">
 {champ("client_nom", "Nom", valeurs, autocomplete="off")}{champ("client_prenom", "Prénom", valeurs, autocomplete="off")}
 {champ("client_telephone", "Téléphone", valeurs, "tel", placeholder="450-555-0142")}
-{champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, required=True, placeholder="123 Rue des Érables")}
-{champ_secteur(secteurs, valeurs)}</div></div>"""
+{champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, placeholder="123 Rue des Érables", **({"required": True} if exige else {}))}
+{champ_secteur(secteurs, valeurs, requis=exige)}</div></div>"""
 
 
 def client_avance(valeurs):

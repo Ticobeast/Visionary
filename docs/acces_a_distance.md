@@ -24,8 +24,8 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 2. **Créer les comptes** : double-clic sur **`gerer_utilisateurs.bat`** (ou `python gerer_utilisateurs.py`). Choisir `A` (ajouter), taper le nom,
    répondre `o` pour un administrateur (ou `n`), puis le mot de passe (invisible pendant la saisie, à taper deux fois).
    - **Administrateur** : tout (tableau de bord, journée, PDF, finances, suppressions, comptes).
-   - **Soumission** : clients et chantiers seulement : liste, consultation, création et modification des soumissions. Ni finances, ni
-     Terminer, ni suppression, ni journée.
+   - **Soumission** : soumissions, chantiers et clients : ouvrir, remplir, **accepter** et **refuser** des soumissions, consulter les chantiers
+     et les clients. Ni finances, ni Terminer, ni suppression, ni journée.
 3. Double-cliquer **`lancer_reseau.bat`** (au lieu de `lancer_interface.bat`) et laisser la fenêtre ouverte.
 4. Si Windows demande d'autoriser le pare-feu : accepter. Si les téléphones n'arrivent pas à se connecter, ouvrir l'**Invite de commandes en
    administrateur** et taper (une ligne ; elle n'autorise que le réseau Tailscale) :
@@ -45,12 +45,15 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 3. **Ajouter à l'écran d'accueil** : iPhone / iPad : bouton Partager > « Sur l'écran d'accueil » ; Android : menu > « Ajouter à l'écran d'accueil ».
 
 ## Version téléphone : volontairement simple
-Sur un téléphone, il n'y a que ce qu'il faut pour une soumission, avec une barre en bas : **Chantiers**, **Clients** et **+ Chantier**.
-- **Chantiers** : la liste (une carte par chantier), avec recherche.
-- **Clients** : la liste, avec recherche ; la fiche d'un client permet d'ajouter un chantier.
-- **+ Chantier** : un nouveau client avec son chantier (le formulaire propose d'abord de chercher si le client existe déjà).
+Sur un téléphone, il n'y a que ce qu'il faut pour une soumission, avec une barre en bas : **Chantiers**, **Soumissions**, **Clients** et **+ Soumission**.
+- **Chantiers** : la liste (une carte par chantier accepté), avec les pastilles de raccourcis et la recherche.
+- **Soumissions** : la liste des soumissions en cours (une carte chacune) avec, sur chaque carte, les boutons **Accepter** et **Refuser** ; en bas, les refusées.
+  Si on appuie sur Accepter alors qu'il manque des renseignements, le programme demande seulement ceux qui manquent.
+- **Clients** : la liste, avec recherche ; la fiche d'un client permet d'ouvrir une nouvelle soumission.
+- **+ Soumission** : on ouvre une soumission dès que le client appelle (rien n'est obligatoire : on remplit ce qu'on sait ; le formulaire propose d'abord de
+  chercher si le client existe déjà).
 Le tableau de bord et la Journée n'apparaissent pas sur téléphone ; ils restent sur l'ordinateur (administrateur).
-Le compte « Soumission » n'a de toute façon jamais accès à ces pages.
+Le compte « Soumission » arrive directement sur **Soumissions** et n'a de toute façon jamais accès à ces pages.
 
 ## Deux personnes sur la même fiche
 La deuxième à enregistrer reçoit « Cette fiche vient d'être modifiée par quelqu'un d'autre » ; ses changements ne sont pas enregistrés, la fiche

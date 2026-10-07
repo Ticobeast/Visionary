@@ -8,11 +8,12 @@ import datetime
 import sqlite3
 from urllib.parse import urlencode
 
+from composants import retour_valide
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
-from vue import (est_admin, LIBELLES_STATUT, avance, badge, bloc_options_travaux, bloc_types, champ, champ_modalite, client_avance,
-                 client_essentiel, esc, gabarit, lien_maps, redirection, select_secteur, zone)
+from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, client_avance,
+                 client_essentiel, esc, gabarit, lien_maps, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
 
 def _types(conn):
@@ -24,7 +25,7 @@ def _nom_client(c):
     personne = " ".join(x for x in (c.get("prenom"), c.get("nom")) if x)
     if personne and c.get("entreprise"):
         return f"{personne} · {c['entreprise']}"
-    return personne or c.get("entreprise") or ""
+    return personne or c.get("entreprise") or "(client à identifier)"
 
 
 def _client(conn, client_id):
@@ -36,8 +37,13 @@ def _client(conn, client_id):
     cols = ["id", "prenom", "nom", "entreprise", "telephone", "telephone_2", "courriel", "sms_ok", "adresse", "ville",
             "province", "code_postal", "notes_acces", "notes", "geocode_statut", "secteur"]
     c = dict(zip(cols, r))
-    c["adresse_maps"] = f"{c['adresse']}, {c['ville']}, {c['province']}" + (f" {c['code_postal']}" if c["code_postal"] else "") + ", Canada"
+    c["adresse_texte"], c["adresse_maps"] = adresses(c["adresse"], c["ville"], c["province"], c["code_postal"])
     return c
+
+
+def a_des_chantiers(conn, client_id):
+    """Vrai si le client a au moins un chantier accepté : son nom, son adresse et son secteur sont alors obligatoires."""
+    return conn.execute("SELECT 1 FROM v_chantiers WHERE client_id = ? AND genre = 'chantier'", (client_id,)).fetchone() is not None
 
 
 def _introuvable():
@@ -66,7 +72,7 @@ def page_clients(conn, query):
         lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in (r[1:9] + (r[9],)) if x)) for m in mots)]
     corps = ""
     for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, libelle_secteur in lignes[:300]:
-        maps = f"{adresse}, {ville}, {prov}" + (f" {cp}" if cp else "") + ", Canada"
+        maps = adresses(adresse, ville, prov, cp)[1]
         corps += (f'<tr><td><a href="/client/{cid}">{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</a></td>'
                   f'<td>{esc(_tel(tel))}</td><td>{lien_maps(maps, adresse)}<div class="doux">{esc(libelle_secteur or ville)}</div></td></tr>')
     tableau = (f'<div class="liste-defile"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th></tr></thead>'
@@ -83,33 +89,37 @@ def page_client(conn, client_id, query):
     c = _client(conn, client_id)
     if c is None:
         return _introuvable()
-    chantiers = conn.execute(
-        "SELECT chantier_id, attente_depuis, type_libelle, statut, archive"
+    fiches = conn.execute(
+        "SELECT chantier_id, attente_depuis, type_libelle, statut, archive, genre"
         " FROM v_chantiers WHERE client_id = ? ORDER BY 2 DESC, chantier_id DESC", (client_id,)).fetchall()
     lignes = "".join(
-        f'<tr><td><a href="/chantier/{i}">{esc(d) or "sans date"}</a></td><td>{esc(t)}</td><td>{badge(st, LIBELLES_STATUT[st])}'
-        f'{" <span class=doux>archivé</span>" if arch else ""}</td></tr>'
-        for i, d, t, st, arch in chantiers)
-    historique = (f'<div class="liste-defile"><table><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
+        f'<tr><td><a href="{url_fiche(i, g)}">{esc(d) or "sans date"}</a></td><td>{esc(t) or "<span class=doux>à préciser</span>"}</td>'
+        f'<td>{badge_statut(st, g)}{" <span class=doux>archivé</span>" if arch and g == "chantier" else ""}</td></tr>'
+        for i, d, t, st, arch, g in fiches)
+    historique = (f'<div class="liste-defile" style="margin-bottom:16px"><table><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
                   f'<tbody>{lignes}</tbody></table></div>'
-                  if lignes else '<p class="doux">Aucun chantier pour ce client.</p>')
+                  if lignes else '<p class="doux">Aucune soumission ni chantier pour ce client.</p>')
     tels = " · ".join(esc(_tel(t)) for t in (c["telephone"], c["telephone_2"]) if t) or "—"
 
     def ligne(libelle, contenu_html):
         return f'<p style="margin:6px 0 0"><b>{libelle} :</b> {contenu_html}</p>'
     fiche = (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(_nom_client(c))}</h2></div>'
-             + ligne("Adresse", lien_maps(c["adresse_maps"], c["adresse_maps"].replace(", Canada", "")))
+             + ligne("Adresse", lien_maps(c["adresse_maps"], c["adresse_texte"]) if c["adresse"] else "<b>à saisir</b> (« Modifier le client »)")
              + ligne("Secteur", esc(c["secteur"]) if c["secteur"] else "<b>à choisir</b> (« Modifier le client »)")
              + ligne("Téléphone", tels + ("" if c["sms_ok"] else " · <b>pas de rappels par texto</b>"))
              + (ligne("Courriel", esc(c["courriel"])) if c["courriel"] else "")
              + (ligne("Accès", esc(c["notes_acces"])) if c["notes_acces"] else "")
              + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
-    actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/chantier/nouveau">+ Nouveau chantier</a>'
+    actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>'
                f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a></div>')
     n, termines, paiements = resume_suppression_client(conn, client_id)
+    nb_soumissions = sum(1 for f in fiches if f[5] == "soumission")
+    nb_chantiers = n - nb_soumissions
     efface = []
-    if n:
-        efface.append(f"{n} chantier{'s' if n > 1 else ''}" + (f" (dont {termines} terminé{'s' if termines > 1 else ''}, archives comprises)" if termines else ""))
+    if nb_chantiers:
+        efface.append(f"{nb_chantiers} chantier{'s' if nb_chantiers > 1 else ''}" + (f" (dont {termines} terminé{'s' if termines > 1 else ''}, archives comprises)" if termines else ""))
+    if nb_soumissions:
+        efface.append(f"{nb_soumissions} soumission{'s' if nb_soumissions > 1 else ''}")
     if paiements:
         efface.append(f"{paiements} paiement{'s' if paiements > 1 else ''}")
     detail = " et ".join(efface)
@@ -118,52 +128,61 @@ def page_client(conn, client_id, query):
                    + (f" : {esc(detail)}" if detail else "") + ". Définitif, y compris dans les archives.</p>"
                    f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
                    '<button class="danger" type="submit">Supprimer le client</button></form></div>')
-    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Chantiers</h2>{historique}{suppression if est_admin() else ""}', query.get("ok"), query.get("err"))
+    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}', query.get("ok"), query.get("err"))
 
 
 # ---------------------------------------------------------------------------
 # Modification du client (la seule façon de changer son nom ou son adresse)
 # ---------------------------------------------------------------------------
-def _form_client(conn, client_id, valeurs, erreurs=()):
+def _form_client(conn, client_id, valeurs, erreurs=(), retour=""):
     err = ""
     if erreurs:
         err = ('<div class="erreurs"><strong>À corriger :</strong><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>")
     actuel = valeurs_client(conn, client_id)
-    return (f'{err}<form method="post" action="/client/{client_id}/modifier"><input type="hidden" name="empreinte" value="{empreinte(actuel) if actuel else ""}">{client_essentiel(valeurs, lister_secteurs(conn))}{avance(client_avance(valeurs), ouvert=bool(erreurs))}'
-            f'<div class="barre"><button type="submit">Enregistrer</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>')
+    exige = a_des_chantiers(conn, client_id)         # tant que le client n'a que des soumissions, rien n'est obligatoire
+    annuler = retour or f"/client/{client_id}"
+    return (f'{err}<form method="post" action="/client/{client_id}/modifier"><input type="hidden" name="empreinte" value="{empreinte(actuel) if actuel else ""}">'
+            f'<input type="hidden" name="retour" value="{esc(retour)}">'
+            f'{client_essentiel(valeurs, lister_secteurs(conn), exige=exige)}{avance(client_avance(valeurs), ouvert=bool(erreurs))}'
+            f'<div class="barre"><button type="submit">Enregistrer</button><a class="bouton secondaire" href="{esc(annuler)}">Annuler</a></div></form>')
 
 
-def page_client_modifier(conn, client_id):
+def page_client_modifier(conn, client_id, query=None):
     valeurs = valeurs_client(conn, client_id)
     if valeurs is None:
         return _introuvable()
-    return gabarit("Modifier le client", f'<h1>Modifier le client</h1><p class="doux">Ces informations s\'appliquent à tous les chantiers de ce client.</p>{_form_client(conn, client_id, valeurs)}')
+    retour = retour_valide((query or {}).get("retour"), "")
+    note = ("Ces informations s\'appliquent à toutes les soumissions et à tous les chantiers de ce client."
+            + ("" if a_des_chantiers(conn, client_id) else " Rien n\'est obligatoire tant que le client n\'a que des soumissions."))
+    return gabarit("Modifier le client", f'<h1>Modifier le client</h1><p class="doux">{note}</p>{_form_client(conn, client_id, valeurs, retour=retour)}')
 
 
 def client_modifier(conn, client_id, form):
     actuel = valeurs_client(conn, client_id)
     if actuel is None:
         return _introuvable()
+    retour = retour_valide(form.get("retour"), "")
     if form.get("empreinte") and form["empreinte"] != empreinte(actuel):        # modifié par quelqu'un d'autre entre-temps
-        return gabarit("Modifier le client", f'<h1>Modifier le client</h1>{_form_client(conn, client_id, actuel, [MSG_MODIFIE_ENTRE_TEMPS])}')
+        return gabarit("Modifier le client", f'<h1>Modifier le client</h1>{_form_client(conn, client_id, actuel, [MSG_MODIFIE_ENTRE_TEMPS], retour)}')
+    exige = a_des_chantiers(conn, client_id)
     brut = {c: form.get(c, "") for c in COLONNES}
     brut["client_sms_ok"] = "1" if form.get("client_sms_ok") else "0"
-    erreurs_secteur = appliquer_secteur(conn, brut, requis=True)         # la ville vient du secteur choisi
-    v, erreurs = lire_client(brut)
+    erreurs_secteur = appliquer_secteur(conn, brut, requis=exige)         # la ville vient du secteur choisi
+    v, erreurs = lire_client(brut, exige=exige)
     if erreurs_secteur:
         erreurs = erreurs_secteur + [e for e in erreurs if "ville est obligatoire" not in e]
     if not erreurs:
         try:
             with transaction(conn):
                 mettre_a_jour_client(conn, client_id, v)
-            return redirection(f"/client/{client_id}?ok=client_maj")
+            return redirection((retour + ("&" if "?" in retour else "?") + "ok=client_maj") if retour else f"/client/{client_id}?ok=client_maj")
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]
-    return gabarit("Modifier le client", f'<h1>Modifier le client</h1>{_form_client(conn, client_id, brut, erreurs)}')
+    return gabarit("Modifier le client", f'<h1>Modifier le client</h1>{_form_client(conn, client_id, brut, erreurs, retour)}')
 
 
 # ---------------------------------------------------------------------------
-# Nouveau chantier depuis la fiche client : formulaire simplifié, nom et adresse verrouillés
+# Nouvelle soumission depuis la fiche client : formulaire simplifié, nom et adresse verrouillés, rien d'obligatoire
 # ---------------------------------------------------------------------------
 def _form_simplifie(conn, client_id, valeurs, erreurs=()):
     c = _client(conn, client_id)
@@ -171,29 +190,29 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
     if erreurs:
         err = ('<div class="erreurs"><strong>À corriger avant d\'enregistrer :</strong><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>")
     taxes = " checked" if valeurs.get("taxes_auto") else ""
-    verrou = (f'<div class="verrou"><b>{esc(_nom_client(c))}</b><br>{esc(c["adresse"])}, {esc(c["ville"])}'
-              f'{" " + esc(c["code_postal"]) if c["code_postal"] else ""}'
-              f'<div class="doux">Nom et adresse verrouillés. <a href="/client/{client_id}/modifier">Modifier la fiche client</a></div></div>')
-    return f"""{err}{verrou}<form method="post" action="/client/{client_id}/chantier/nouveau">
+    adresse = f'{esc(c["adresse"])}, {esc(c["ville"])}{" " + esc(c["code_postal"]) if c["code_postal"] else ""}' if c["adresse"] else "adresse à saisir"
+    verrou = (f'<div class="verrou"><b>{esc(_nom_client(c))}</b><br>{adresse}'
+              f'<div class="doux">Nom et adresse verrouillés. <a href="/client/{client_id}/modifier?retour=/client/{client_id}/soumission/nouveau">Modifier la fiche client</a></div></div>')
+    return f"""{err}{verrou}<form method="post" action="/client/{client_id}/soumission/nouveau">
 <div class="carte"><h2>Travaux à faire</h2><div class="grille">{bloc_types(_types(conn), valeurs)}
 {bloc_options_travaux(valeurs)}
-{champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5", required=True)}
+{champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5")}
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
-<div><label>&nbsp;</label><label class="coche"><input type="checkbox" name="taxes_auto" value="1"{taxes}>Ajouter TPS 5 % et TVQ 9,975 %</label></div>
-{zone("description", "Notes (description du chantier, imprimée sur la feuille de route)", valeurs)}</div>
-<p class="doux">La durée estimée est obligatoire (heures décimales : 2,5 = 2 h 30) ; elle sert à calculer les heures de la journée.</p></div>
+{case_taxes("taxes_auto", taxes)}
+{zone("description", "Notes (description, imprimée sur la feuille de route)", valeurs)}</div>
+<p class="doux">Rien n'est obligatoire : remplis ce que tu sais. Pour <b>accepter</b> la soumission, il faudra la durée, le prix, les travaux, le téléphone, l'adresse et le secteur.</p></div>
 {avance('<div class="carte"><h2>Demande et règlement</h2><div class="grille">' + champ("date_soumission", "Date de la demande de soumission", valeurs, "date") + champ_modalite(valeurs) + "</div></div>", ouvert=bool(erreurs))}
-<div class="barre"><button type="submit">Créer le chantier</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>
-<p class="doux">Le chantier est créé « À planifier ». La date des travaux et le statut se règlent ensuite depuis la page Journée ou le chantier.</p>"""
+<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>
+<p class="doux">La soumission est créée « en cours » : tu reviens à la fiche du client. Elle se règle ensuite dans l'onglet Soumissions (Accepter ou Refuser).</p>"""
 
 
-def page_chantier_nouveau(conn, client_id):
+def page_soumission_nouvelle(conn, client_id):
     if _client(conn, client_id) is None:
         return _introuvable()
-    return gabarit("Nouveau chantier", f'<h1>Nouveau chantier</h1>{_form_simplifie(conn, client_id, {"date_soumission": datetime.date.today().isoformat()})}')
+    return gabarit("Nouvelle soumission", f'<h1>Nouvelle soumission</h1>{_form_simplifie(conn, client_id, {"date_soumission": datetime.date.today().isoformat()})}', section="soumissions")
 
 
-def chantier_creer(conn, client_id, form):
+def soumission_creer(conn, client_id, form):
     if _client(conn, client_id) is None:
         return _introuvable()
     travaux, valeurs = travaux_depuis_formulaire(conn, form)
@@ -203,8 +222,9 @@ def chantier_creer(conn, client_id, form):
     brut = {c: "" for c in COLONNES}
     brut.update(valeurs_client(conn, client_id))
     brut.update({c: saisie[c] for c in ("prix_ht", "modalite_paiement", "description", "date_soumission", "duree_estimee_h")})
-    brut.update(statut="a_planifier", type_travaux=travaux)
-    erreurs_bois = appliquer_options(brut, form, travaux)
+    brut["date_soumission"] = brut["date_soumission"] or datetime.date.today().isoformat()
+    brut.update(statut="soumission", type_travaux=travaux)
+    erreurs_bois = appliquer_options(brut, form, travaux, exige=False)
     saisie.update({c: brut[c] for c in ("nacelle", "debarrasser_bois", "bois_format")})
     saisie["nacelle"] = "1" if brut["nacelle"] == "1" else ""
     saisie["debarrasser_bois"] = "1" if brut["debarrasser_bois"] == "1" else ""
@@ -213,11 +233,11 @@ def chantier_creer(conn, client_id, form):
     if not erreurs:
         try:
             with transaction(conn):
-                chantier_id = creer_chantier(conn, client_id, v, Resultat())
-            return redirection(f"/chantier/{chantier_id}?ok=client_cree")
+                creer_chantier(conn, client_id, v, Resultat(), cree_par=(utilisateur_courant() or {}).get("nom"))
+            return redirection(f"/client/{client_id}?ok=soumission_creee")
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]
-    return gabarit("Nouveau chantier", f'<h1>Nouveau chantier</h1>{_form_simplifie(conn, client_id, saisie, erreurs)}')
+    return gabarit("Nouvelle soumission", f'<h1>Nouvelle soumission</h1>{_form_simplifie(conn, client_id, saisie, erreurs)}', section="soumissions")
 
 
 # ---------------------------------------------------------------------------
@@ -276,9 +296,11 @@ ROUTES_CLIENTS = [
     ("POST", r"^/secteurs/([a-z0-9_]+)/supprimer$", lambda c, q, f, code: _secteur_action(c, lambda: supprimer_secteur(c, code), "secteur_supprime")),
     ("GET", r"^/clients$", lambda c, q, f, *g: page_clients(c, q)),
     ("GET", r"^/client/(\d+)$", lambda c, q, f, i: page_client(c, int(i), q)),
-    ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: page_client_modifier(c, int(i))),
+    ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: page_client_modifier(c, int(i), q)),
     ("POST", r"^/client/(\d+)/modifier$", lambda c, q, f, i: client_modifier(c, int(i), f)),
     ("POST", r"^/client/(\d+)/supprimer$", lambda c, q, f, i: client_supprimer(c, int(i))),
-    ("GET", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: page_chantier_nouveau(c, int(i))),
-    ("POST", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: chantier_creer(c, int(i), f)),
+    ("GET", r"^/client/(\d+)/soumission/nouveau$", lambda c, q, f, i: page_soumission_nouvelle(c, int(i))),
+    ("POST", r"^/client/(\d+)/soumission/nouveau$", lambda c, q, f, i: soumission_creer(c, int(i), f)),
+    ("GET", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: redirection(f"/client/{i}/soumission/nouveau")),      # ancien lien
+    ("POST", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: soumission_creer(c, int(i), f)),
 ]

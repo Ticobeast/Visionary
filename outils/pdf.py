@@ -15,7 +15,7 @@ import zlib
 from pathlib import Path
 from urllib.parse import quote
 
-from noyau import (DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, LIBELLES_BOIS, LIBELLES_MODE, LIBELLES_STATUT, calculer_horaire,
+from noyau import (DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, LIBELLES_BOIS, LIBELLES_MODE, LIBELLES_STATUT, adresses, calculer_horaire,
                    heure_texte, ids_de_la_journee)
 from vue import argent, heures
 
@@ -457,8 +457,8 @@ def _chantier(doc, rang, chantier, heure, travaux, paiements, client, dossier_ba
     doc.champ("Téléphone", tel)
     doc.champ("Rappels par texto", _oui_non(c["sms_ok"]) if tel else "")
     doc.champ("Courriel", c["courriel"])
-    adresse = f"{c['adresse']}, {c['ville']}, {c['province']}" + (f" {c['code_postal']}" if c["code_postal"] else "")
-    doc.champ("Adresse", adresse, lien="https://www.google.com/maps/search/?api=1&query=" + quote(c["adresse_maps"]))
+    adresse, adresse_maps = adresses(c["adresse"], c["ville"], c["province"], c["code_postal"])
+    doc.champ("Adresse", adresse, lien=("https://www.google.com/maps/search/?api=1&query=" + quote(adresse_maps)) if adresse_maps else None)
     doc.champ("Secteur", c["secteur"])
     doc.champ("Accès / à savoir", c["notes_acces"])
     doc.champ("Notes sur le client", client["notes"])
@@ -553,7 +553,7 @@ def journee_pdf(conn, jour, dossier_base=None):
     doc.espace(8)
     # aperçu : une ligne par chantier
     for rang, (c, h) in enumerate(zip(chantiers, horaire), 1):
-        doc.paragraphe(f"{rang}.  {heure_texte(h['debut'])} - {heure_texte(h['fin'])}   {c['client_nom_complet']}   -   {c['adresse']}, {c['ville']}"
+        doc.paragraphe(f"{rang}.  {heure_texte(h['debut'])} - {heure_texte(h['fin'])}   {c['client_nom_complet']}   -   {', '.join(x for x in (c['adresse'], c['ville']) if x)}"
                        f"   -   {argent(c['total_ttc']) if c['prix_ht'] is not None else 'prix à confirmer'}", 9.5)
     doc.espace(6)
     doc.separateur()

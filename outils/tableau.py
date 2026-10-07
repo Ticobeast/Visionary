@@ -86,11 +86,11 @@ def page_journee(conn, query):
     demain = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
     jour = _jour_valide(query.get("date")) or demain
     d = datetime.date.fromisoformat(jour)
-    f_statut = query.get("statut") if query.get("statut") in ("a_planifier", "en_attente", "soumission", "planifie") else "a_planifier"
+    f_statut = query.get("statut") if query.get("statut") in ("a_planifier", "planifie") else "a_planifier"
     f_attente = query.get("attente", "")
     f_secteur = query.get("secteur", "")
     tri = query.get("tri") if query.get("tri") in dict(TRIS) else "secteur"
-    toutes, aujourdhui = lignes_vue(conn, "statut IN ('soumission','en_attente','a_planifier','planifie')")
+    toutes, aujourdhui = lignes_vue(conn, "statut IN ('a_planifier','planifie')")      # une soumission ne se planifie qu'une fois acceptée
     for l in toutes:
         l["jours"] = jours_attente(l["attente_depuis"], aujourdhui)
 
@@ -122,8 +122,7 @@ def page_journee(conn, query):
     candidats.sort(key=cle_tri)
 
     opt_statut = "".join(f'<option value="{c}"{" selected" if c == f_statut else ""}>{t}</option>' for c, t in
-                         (("a_planifier", "À planifier"), ("en_attente", "En attente"), ("soumission", "Soumissions"),
-                          ("planifie", "Planifiés un autre jour (déplacer)")))
+                         (("a_planifier", "À planifier"), ("planifie", "Planifiés un autre jour (déplacer)")))
     opt_att = "".join(f'<option value="{c}"{" selected" if c == f_attente else ""}>{esc(t)}</option>' for c, t in FILTRES_ATTENTE)
     opt_sec = '<option value="">Tous les secteurs</option>' + "".join(f'<option value="{esc(s)}"{" selected" if s == f_secteur else ""}>{esc(s)}</option>' for s in secteurs)
     opt_tri = "".join(f'<option value="{c}"{" selected" if c == tri else ""}>{esc(t)}</option>' for c, t in TRIS)

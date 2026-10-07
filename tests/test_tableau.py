@@ -116,7 +116,8 @@ class TestSuiviSupprime(BaseTableau):
         page = self.get("/")[1]
         entete = page[page.index("<header"):page.index("</header>")]
         self.assertEqual(re.findall(r'<a href="([^"]+)">([^<]+)</a>', entete),
-                         [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/clients", "Clients")])
+                         [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/soumissions", "Soumissions"),
+                          ("/clients", "Clients")])
         self.assertNotIn("+ Nouveau</a>", entete)                                # le bouton est dans la page Clients
         self.assertIn('<a class="bouton" href="/nouveau">+ Nouveau client</a>', self.get("/clients")[1])
 
@@ -299,8 +300,10 @@ class TestJournee(BaseTableau):
         self.assertIn("durée à estimer : ouvrir le chantier", tous)         # « Normal » n'a pas de durée : impossible à cocher
         self.assertIn('class="montant"', tous)
         self.assertIn('name="sel_', tous)
+        # une soumission n'est jamais proposée : un critère « soumission » (ancien lien) retombe sur « À planifier »
         soumissions = self.get("/journee", {"date": dans(2), "statut": "soumission"})[1]
-        self.assertEqual(self.noms_dans(soumissions[soumissions.index('id="lot"'):]), ["Devis"])
+        self.assertNotIn("Devis", soumissions)
+        self.assertEqual(self.noms_dans(soumissions[soumissions.index('id="lot"'):]), self.noms_dans(tous[tous.index('id="lot"'):]))
 
     def test_planifier_plusieurs_chantiers_en_un_clic(self):
         a, b = self.ids["Urgent"], self.ids["Surveiller"]                     # 2,5 h et 1 h

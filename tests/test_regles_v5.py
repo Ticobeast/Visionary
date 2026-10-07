@@ -36,14 +36,16 @@ class Base(unittest.TestCase):
 
 class TestDureeEstimeeObligatoire(Base):
     def ligne(self, **perso):
-        base = {"client_nom": "X", "adresse": "1 A", "ville": "V", "type_travaux": "emondage", "statut": "soumission"}
+        base = {"client_nom": "X", "adresse": "1 A", "ville": "V", "type_travaux": "emondage", "statut": "a_planifier"}
         base.update(perso)
         return noyau.lire_ligne(base, {"emondage": "emondage"}, False)
 
     def test_lire_ligne(self):
+        # obligatoire pour un chantier (dès « À planifier »), facultative dans une soumission
         for vide in ("", None, "0", "-1", "24,5"):
             _, erreurs = self.ligne(duree_estimee_h=vide)
             self.assertTrue(any("duree_estimee_h" in e for e in erreurs), repr(vide))
+        self.assertEqual(self.ligne(statut="soumission", duree_estimee_h="")[1], [])
         v, erreurs = self.ligne(duree_estimee_h="2,5")
         self.assertEqual((erreurs, v["duree_estimee_h"]), ([], 2.5))
 

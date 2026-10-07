@@ -7,8 +7,9 @@
 
 Sert à s'entraîner et à tester avant de saisir tes vrais dossiers. Refuse de toucher à la
 vraie base (sylvainculteur.db). Les dates sont calculées par rapport à aujourd'hui : on y
-trouve des chantiers passés (payés, à recevoir), des chantiers planifiés et des
-soumissions. Téléphones en 555-01xx (réservés à la fiction).
+trouve des chantiers passés (payés, à recevoir), des chantiers planifiés, et des
+soumissions : complètes (prêtes à accepter), incomplètes, vide (un simple appel) et refusées.
+Téléphones en 555-01xx (réservés à la fiction).
 """
 import argparse
 import datetime
@@ -18,8 +19,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, lister_secteurs, taxes_pour,  # noqa: E402
-                   ouvrir_base, trouver_ou_creer_client)
+from noyau import (DB_DEFAUT, Index, Resultat, alias_types_travaux, creer_chantier, lire_ligne, lister_secteurs, refuser_soumission,  # noqa: E402
+                   taxes_pour, ouvrir_base, trouver_ou_creer_client)
 
 PRENOMS = ["Marie", "Jean", "Sylvie", "Luc", "Nathalie", "Pierre", "Isabelle", "Marc", "Julie", "André",
            "Chantal", "Daniel", "Josée", "Michel", "Louise", "Éric", "Francine", "Guy", "Manon", "Yves"]
@@ -36,6 +37,9 @@ TYPES = {  # code: (prix min, prix max, description)
     "essouchement": (150, 500, "{n} souches"),
 }
 MODES = ["interac", "interac", "cheque", "comptant", "carte"]
+# Fiches « pas encore planifiées », en alternance : on y trouve toujours des soumissions de chaque sorte, même avec peu de données.
+SORTES_A_VENIR = ["a_planifier", "soumission", "a_planifier", "incomplete", "a_planifier", "refusee", "a_planifier", "vide", "soumission",
+                  "a_planifier", "annule", "incomplete", "refusee"]
 
 
 def jour(d):
@@ -60,6 +64,7 @@ def generer(db, nombre=40, graine=2026):
             code_postal=f"{prefixe} {rnd.randint(1, 9)}{rnd.choice('ABCEGHJKLMNPRSTVXY')}{rnd.randint(1, 9)}",
             client_sms_ok="0" if rnd.random() < 0.1 else "1"))
     conn.execute("BEGIN")
+    rang_a_venir = 0
     for k in range(nombre):
         c = dict(rnd.choice(clients))
         type_ = rnd.choice(list(TYPES))
@@ -97,14 +102,24 @@ def generer(db, nombre=40, graine=2026):
                          date_prevue=jour(prevu))
             if rnd.random() < 0.3:
                 ligne.update(paiement_date=jour(aujourdhui), paiement_montant="100.00", paiement_mode="interac")
-        else:                  # soumissions, acceptés, refusés, annulés
-            # surtout des chantiers acceptés qui attendent d'être planifiés, avec des délais d'attente variés
-            ligne.update(statut=rnd.choice(["a_planifier"] * 5 + ["en_attente"] * 2 + ["soumission", "annule"]),
-                         date_soumission=jour(aujourdhui - datetime.timedelta(days=rnd.choice([1, 2, 4, 6, 9, 14, 20, 28, 33, 41, 55]))))
+        else:                  # pas encore planifié : chantiers acceptés qui attendent, et soumissions de toutes sortes
+            sorte = SORTES_A_VENIR[rang_a_venir % len(SORTES_A_VENIR)]
+            rang_a_venir += 1
+            demande = jour(aujourdhui - datetime.timedelta(days=rnd.choice([1, 2, 4, 6, 9, 14, 20, 28, 33, 41, 55])))
+            if sorte == "vide":                      # un appel : on a ouvert la soumission, rien d'autre
+                ligne = {"statut": "soumission", "date_soumission": demande}
+            else:
+                ligne.update(statut={"a_planifier": "a_planifier", "annule": "annule"}.get(sorte, "soumission"), date_soumission=demande)
+                if sorte == "incomplete":            # soit visite faite sans prix, soit simple appel (adresse pas encore prise)
+                    inconnus = ("prix_ht", "duree_estimee_h") if rnd.random() < 0.5 else ("adresse", "ville", "code_postal", "client_secteur")
+                    for champ in inconnus:
+                        ligne.pop(champ, None)
         v, erreurs = lire_ligne(ligne, alias, taxes_auto=True)
         assert not erreurs, (ligne, erreurs)
         client_id = trouver_ou_creer_client(conn, idx, v, res)
-        creer_chantier(conn, client_id, v, res)
+        chantier_id = creer_chantier(conn, client_id, v, res)
+        if sort >= 0.72 and sorte == "refusee":
+            assert refuser_soumission(conn, chantier_id) == []
     conn.execute("COMMIT")
     conn.close()
     return res

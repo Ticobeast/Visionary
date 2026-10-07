@@ -38,7 +38,7 @@ class TestSchema(unittest.TestCase):
 
     def test_version_et_integrite(self):
         self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
-        self.assertEqual(noyau.VERSION_SCHEMA, 9)
+        self.assertEqual(noyau.VERSION_SCHEMA, 10)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_dates_invalides_refusees(self):
@@ -72,9 +72,12 @@ class TestSchema(unittest.TestCase):
         self.c.execute("INSERT INTO chantiers (client_id, dossier_photos) VALUES (1,'photos/2026/x_y')")
 
     def test_clients(self):
-        self.refuse("INSERT INTO clients (prenom, adresse, ville) VALUES ('SansNom', '1 A', 'V')")
-        self.refuse("INSERT INTO clients (nom, adresse, ville) VALUES ('X', '', 'V')")
-        self.refuse("INSERT INTO clients (nom, ville) VALUES ('X', 'V')")  # adresse obligatoire
+        # rien n'est obligatoire : une soumission s'ouvre avec ce qu'on sait (l'application exige l'essentiel à l'acceptation)
+        self.c.execute("INSERT INTO clients (prenom, adresse, ville) VALUES ('SansNom', '1 A', 'V')")
+        self.c.execute("INSERT INTO clients (nom, adresse, ville) VALUES ('X', '', 'V')")
+        self.c.execute("INSERT INTO clients (nom) VALUES ('SansAdresse')")
+        self.c.execute("INSERT INTO clients (nom) VALUES (NULL)")                                     # même un client entièrement vide
+        self.assertEqual(self.c.execute("SELECT adresse, ville FROM clients WHERE nom = 'SansAdresse'").fetchone(), ("", ""))
         self.refuse("INSERT INTO clients (nom, adresse, ville, telephone) VALUES ('X', '1 A', 'V', '4505550142')")
         self.refuse("INSERT INTO clients (nom, adresse, ville, courriel) VALUES ('X', '1 A', 'V', 'pas un courriel')")
         self.refuse("INSERT INTO clients (nom, adresse, ville, code_postal) VALUES ('X', '2 A', 'V', 'j7z 1a1')")
@@ -144,10 +147,30 @@ class TestLecture(unittest.TestCase):
                         "longitude", "type_travaux", "statut"):
             self.assertTrue(any(attendu in e for e in erreurs), attendu)
 
-    def test_duree_estimee_obligatoire(self):
+    def test_duree_estimee_obligatoire_apres_la_soumission(self):
         for vide in ("", None, "0", "-1", "24,5"):
-            _, erreurs = self.lire(duree_estimee_h=vide)
+            _, erreurs = self.lire(statut="a_planifier", duree_estimee_h=vide)
             self.assertTrue(any("duree_estimee_h" in e for e in erreurs), repr(vide))
+        for vide in ("", None):                                        # une soumission n'exige rien
+            self.assertEqual(self.lire(duree_estimee_h=vide)[1], [], repr(vide))
+        for invalide in ("0", "-1", "24,5"):                           # mais une valeur écrite doit être valable
+            self.assertTrue(any("duree_estimee_h" in e for e in self.lire(duree_estimee_h=invalide)[1]), invalide)
+
+    def test_une_soumission_peut_etre_entierement_vide(self):
+        v, erreurs = noyau.lire_ligne({"statut": "soumission"}, ALIAS, False)
+        self.assertEqual(erreurs, [])
+        self.assertEqual((v["adresse"], v["ville"], v["travaux"], v["duree_estimee_h"], v["client_nom"]), ("", "", [], None, None))
+        for statut in ("en_attente", "Soumission"):
+            self.assertEqual(noyau.lire_ligne({"statut": statut}, ALIAS, False)[1], [], statut)
+
+    def test_un_chantier_exige_l_essentiel(self):
+        _, erreurs = noyau.lire_ligne({"statut": "a_planifier"}, ALIAS, False)
+        for attendu in ("client_nom ou client_entreprise", "adresse", "ville", "type_travaux", "duree_estimee_h"):
+            self.assertTrue(any(attendu in e for e in erreurs), attendu)
+
+    def test_les_formats_restent_verifies_dans_une_soumission(self):
+        _, erreurs = noyau.lire_ligne({"statut": "soumission", "client_telephone": "123", "prix_ht": "abc"}, ALIAS, False)
+        self.assertEqual(len(erreurs), 2)
 
     def test_modalite_un_seul_choix_parmi_cinq(self):
         for saisi, attendu in (("Comptant", "comptant"), ("chèque", "cheque"), ("INTERAC", "interac"), ("carte", "carte"), ("Autre", "autre")):
@@ -167,9 +190,12 @@ class TestLecture(unittest.TestCase):
         v, erreurs = self.lire(type_travaux="Élagage: érable argenté, côté garage + taille_haie : cèdres, 35 m + abattage")
         self.assertEqual(erreurs, [])
         self.assertEqual(v["travaux"], [("elagage", "érable argenté, côté garage"), ("taille_haie", "cèdres, 35 m"), ("abattage", None)])
-        for invalide in ("elagage + pizza", "elagage + élagage", "", "+"):
+        for invalide in ("elagage + pizza", "elagage + élagage"):
             _, erreurs = self.lire(type_travaux=invalide)
             self.assertTrue(erreurs, invalide)
+        for vide in ("", "+"):                       # aucun type : permis dans une soumission, pas dans un chantier
+            self.assertEqual(self.lire(type_travaux=vide)[1], [], vide)
+            self.assertTrue(self.lire(statut="a_planifier", type_travaux=vide)[1], vide)
 
     def test_statut_et_date(self):
         for statut in ("planifie", "termine"):
@@ -220,6 +246,12 @@ class TestClients(unittest.TestCase):
         self.assertEqual(d, a)
         e, _ = self.client(client_telephone="", client_nom="Dupont", client_prenom="Paul")       # autre personne, même adresse
         self.assertNotEqual(e, a)
+
+    def test_deux_clients_sans_adresse_ne_sont_jamais_regroupes(self):
+        a, _ = self.client(adresse="", ville="", client_nom="", client_prenom="", client_telephone="")
+        b, res = self.client(adresse="", ville="", client_nom="", client_prenom="", client_telephone="")
+        self.assertNotEqual(a, b)
+        self.assertEqual(res.clients_reutilises, 0)
 
     def test_un_client_existant_n_est_jamais_modifie(self):
         a, _ = self.client(client_notes="Original")

@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v7)
+# Dictionnaire de données (schéma v10)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -12,10 +12,11 @@ secteurs 1 ─── N clients (personne/entreprise + adresse) 1 ─── N cha
 | Table | Une ligne = | Pourquoi une table à part |
 |---|---|---|
 | `clients` | une personne ou une entreprise, **avec son adresse** | un client revient : on ne retape ni son téléphone ni son adresse ; l'adresse est géocodée une seule fois |
-| `chantiers` | un travail pour un client (environ 2 h : plusieurs par journée) | c'est l'unité que l'itinéraire, la feuille de route et le suivi des paiements manipulent ; garder les chantiers séparés conserve l'historique d'un client récurrent |
+| `chantiers` | un travail pour un client (environ 2 h : plusieurs par journée) **ou une soumission** (un chantier pas encore accepté : même fiche, autre nom) | c'est l'unité que l'itinéraire, la feuille de route et le suivi des paiements manipulent ; garder les chantiers séparés conserve l'historique d'un client récurrent |
 | `chantier_travaux` | un type de travaux d'un chantier, avec sa précision | un chantier peut combiner plusieurs types (élagage + taille de haie) |
 | `paiements` | une somme reçue | acompte + solde, chèque en deux versements… |
 | `utilisateurs`, `sessions` | les comptes de l'équipe et leurs connexions ouvertes | accès par mot de passe (voir ci-dessous) ; absents du reste du modèle |
+| `raccourcis` | une pastille en haut de la page Chantiers ou Soumissions, pour une personne | chaque compte choisit ses raccourcis (voir ci-dessous) |
 | `types_travaux` | un type de travaux | on ajoute un type avec un `INSERT`, sans modifier le schéma |
 | `secteurs` | un secteur desservi (liste fermée) : `code`, `libelle`, `ville` (inscrite sur l'adresse), `ordre` | une ville s'écrit toujours de la même façon (liste déroulante) ; sert à classer / filtrer les clients. Se gère dans la page *Secteurs* |
 
@@ -39,15 +40,15 @@ Un client qui possède deux propriétés = **deux fiches clients** (une par adre
 |---|---|---|---|---|
 | `id` | entier | auto | clé primaire | `1` |
 | `prenom` | texte | non | | `Marie` |
-| `nom` | texte | **nom ou entreprise** | | `Gagnon` |
-| `entreprise` | texte | **nom ou entreprise** | syndicat, ferme, commerce | `Syndicat Les Jardins du Lac` |
+| `nom` | texte | non en base ; **nom ou entreprise exigé pour accepter une soumission** | | `Gagnon` |
+| `entreprise` | texte | non en base ; idem | syndicat, ferme, commerce | `Syndicat Les Jardins du Lac` |
 | `telephone` | texte | non (recommandé) | E.164 ; sert aux textos (étape 4) | `+14505550142` |
 | `telephone_2` | texte | non | idem | |
 | `courriel` | texte | non | forme `x@y.z`, sans espace | `marie.gagnon@example.com` |
 | `sms_ok` | 0/1 | oui, défaut `1` | `0` = ne jamais envoyer de texto à ce client | `1` |
-| `adresse` | texte | **oui** | numéro + type + nom de rue, comme sur une enveloppe | `123 Rue des Érables` |
-| `ville` | texte | **oui** | nom officiel ; **dans l'interface elle vient du secteur choisi** (jamais saisie à la main) | `Trois-Rivières` |
-| `secteur` | texte | non en base, **obligatoire dans l'interface** | → `secteurs.code` (liste fermée) ; vide pour d'anciens clients (à choisir dans leur fiche). Importé via la colonne `client_secteur` (code ou libellé) | `cap_de_la_madeleine` |
+| `adresse` | texte | oui en base (`''` tant qu'elle est inconnue) ; **exigée pour accepter** | numéro + type + nom de rue, comme sur une enveloppe ; **texte vide, jamais `NULL`** | `123 Rue des Érables` |
+| `ville` | texte | idem (`''` tant que le secteur est inconnu) | nom officiel ; **dans l'interface elle vient du secteur choisi** (jamais saisie à la main) | `Trois-Rivières` |
+| `secteur` | texte | non en base ; **exigé pour accepter une soumission** | → `secteurs.code` (liste fermée) ; vide pour d'anciens clients ou une soumission en préparation (à choisir dans la fiche). Importé via la colonne `client_secteur` (code ou libellé) | `cap_de_la_madeleine` |
 | `province` | texte | oui, défaut `QC` | 2 lettres majuscules | `QC` |
 | `code_postal` | texte | non (recommandé) | `A1A 1A1` | `J7Z 1A1` |
 | `latitude`, `longitude` | réel | non | les deux ou aucune ; remplies par le script de géocodage (étape 2) ou à la main | `45.6480`, `-74.0920` |
@@ -65,6 +66,10 @@ copier les coordonnées → les mettre dans `latitude`/`longitude` (statut `manu
 **Changer l'adresse d'un client** (dans l'interface) efface ses coordonnées si elles étaient celles de
 l'ancienne adresse : elles seront recalculées au prochain géocodage.
 
+**Un client sans renseignements** (soumission ouverte dès le premier appel) est permis : la base n'exige ni nom, ni adresse. Les vues le montrent
+comme `(client à identifier)` et `adresse_maps` est alors vide. L'application, elle, exige un nom (ou une entreprise), un téléphone, une adresse et un
+secteur **au moment d'accepter** la soumission, et pour modifier un client qui a au moins un chantier (accepté).
+
 ## `chantiers`
 
 | Colonne | Type | Oblig. | Règle | Exemple |
@@ -72,7 +77,7 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `id` | entier | auto | | |
 | `client_id` | entier | oui | → `clients.id` ; la base refuse de supprimer un client qui a encore des chantiers (l'interface le supprime avec tout son historique, dans une seule transaction) | `1` |
 | `description` | texte | non | **la** description du chantier (une seule), imprimée sur la feuille de route ; le détail par type est dans `chantier_travaux` | `Résidus ramassés. Prévenir le gardien la veille.` |
-| `statut` | texte | oui, défaut `soumission` | voir ci-dessous | `planifie` |
+| `statut` | texte | oui, défaut `soumission` | voir ci-dessous ; **ne se choisit jamais à la main** | `planifie` |
 | `date_soumission` | date | non | date de la **demande ou de la soumission** : sert à calculer le délai d'attente (à défaut, la date de création de la fiche) | `2026-05-28` |
 | `date_prevue` | date | **si `planifie` ou `termine`** | **la** date des travaux : prévue d'abord, puis réalisée. Si le chantier change de jour, on la met simplement à jour. C'est elle que le script d'itinéraire filtre | `2026-10-14` |
 | `ordre_jour` | entier | auto | rang du chantier dans sa journée (1, 2, 3…), géré par l'application (boutons Monter / Descendre) ; vide si le chantier n'est ni planifié ni terminé. **Les heures de passage n'y sont pas stockées : elles sont calculées** (début 7 h 30, dîner 12 h - 12 h 30, d'après l'ordre et `duree_estimee_h`) | `2` |
@@ -87,6 +92,8 @@ l'ancienne adresse : elles seront recalculées au prochain géocodage.
 | `modalite_paiement` | texte | non | **un seul choix** : `comptant`, `cheque`, `interac`, `carte`, `autre` (CHECK) ; imprimée sur la feuille de route pour savoir quoi encaisser sur place. Pas de paiement en plusieurs versements : les acomptes se saisissent comme paiements | `interac` |
 | `dossier_photos` | chemin | non | **un dossier par chantier** ; les photos qu'il contient seront lues par le script (miniatures) | `photos/2026/2026-06-14_gagnon` |
 | `cree_le` | texte | auto | | |
+| `accepte_le` | date | non | `AAAA-MM-JJ` : **jour où la soumission a été acceptée** (posé par le bouton Accepter). Vide : soumission en cours ou refusée. Rempli : c'est un chantier (même annulé plus tard). C'est ce qui distingue une soumission refusée d'un chantier annulé | `2026-10-07` |
+| `cree_par` | texte | non | **nom du compte** qui a ouvert la soumission (pour « Mes soumissions »). Vide : interface ouverte sans comptes, ou fiche d'avant les comptes | `Marc` |
 
 ### Types de travaux d'un chantier : `chantier_travaux`
 
@@ -107,18 +114,26 @@ Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depui
 
 | `statut` | Signification | Contrainte |
 |---|---|---|
-| `soumission` | estimé à donner ou en préparation | |
-| `en_attente` | soumission remise, **on attend la réponse du client** | date effacée |
-| `a_planifier` | accepté, pas encore de date (file d'attente classée par délai) | date effacée |
+| `soumission` | **soumission en cours** : demande ouverte, estimé à donner, remis ou en attente de la réponse du client (onglet *Soumissions*) | `accepte_le` vide |
+| `en_attente` | ancien statut, **traité comme `soumission`** et n'est plus offert (les anciennes fiches « En attente » sont devenues des soumissions à la migration v10) | date effacée |
+| `a_planifier` | **soumission acceptée** (renseignements complets), pas encore de date (file d'attente classée par délai) | date effacée ; `accepte_le` rempli |
 | `planifie` | date fixée, rang dans la journée | `date_prevue` obligatoire |
 | `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) ; garde son rang dans la journée |
-| `annule` | abandonné : refus du client, annulation… (il n'existe plus de statut « Refusé ») | |
+| `annule` | **soumission refusée** (`accepte_le` vide) ou **chantier annulé** (`accepte_le` rempli) | |
 
-**Terminé = définitivement verrouillé** : des déclencheurs de la base (`trg_chantiers_termine_verrouille`, `trg_chantiers_termine_non_supprimable`, `trg_travaux_termine_*`) refusent toute modification du chantier terminé (statut, client, description, dates, durées, prix, taxes, modalité, fichiers), de ses types de travaux et sa suppression. Restent permis : la **facturation** (`numero_facture`, `date_facture`), les **paiements** et la **duplication**. Le verrou est donc garanti même pour un autre outil (DB Browser…). Limite connue : l'ajout d'un type de travaux à un chantier déjà terminé n'est pas bloqué par la base (nécessaire à la création d'un chantier directement terminé, par import) ; l'interface ne l'offre pas.
+**Genre** (colonne `genre` de la vue `v_chantiers`, calculée) : `soumission` pour `soumission`, `en_attente`, et `annule` quand `accepte_le` est vide ;
+`chantier` pour tout le reste. Les pages Chantiers, Journée et le tableau de bord ne lisent que le genre `chantier` ; la page Soumissions, que le genre
+`soumission` (les refusées dans leur section du bas).
 
-Parcours normal : *Soumission, En attente, À planifier, Planifié, Terminé* ; *Annulé* à tout moment (sauf après Terminé).
-**Le statut est automatique** : ajouter à une journée = `planifie` ; Retirer = `a_planifier` ; Annuler = `annule` ; Terminer = `termine`. Seuls
-`soumission`, `en_attente` et `a_planifier` se choisissent à la main (page du chantier).
+**Terminé = définitivement verrouillé** : des déclencheurs de la base (`trg_chantiers_termine_verrouille`, `trg_chantiers_termine_non_supprimable`, `trg_travaux_termine_*`) refusent toute modification du chantier terminé (statut, client, description, dates, durées, prix, taxes, modalité, fichiers), de ses types de travaux et sa suppression. Restent permis : les **paiements** et la **duplication**. Le verrou est donc garanti même pour un autre outil (DB Browser…). Limite connue : l'ajout d'un type de travaux à un chantier déjà terminé n'est pas bloqué par la base (nécessaire à la création d'un chantier directement terminé, par import) ; l'interface ne l'offre pas.
+
+Parcours normal : *Soumission, À planifier, Planifié, Terminé* ; *Refusée* (soumission) ou *Annulé* (chantier) à tout moment (sauf après Terminé).
+**Le statut est automatique** : Créer = `soumission` ; **Accepter** = `a_planifier` (si les conditions sont remplies : `noyau.CONDITIONS_ACCEPTATION`, et `accepte_le` = aujourd'hui) ;
+**Refuser** = `annule` (sans `accepte_le`) ; ajouter à une journée = `planifie` ; Retirer = `a_planifier` ; Annuler = `annule` ; Terminer = `termine`.
+**Rouvrir** une soumission refusée = `soumission` ; **Remettre en soumission** (chantier `a_planifier` seulement) = `soumission`, `accepte_le` effacée.
+
+Conditions pour **accepter** (vérifiées par l'application, pas par la base : une soumission se remplit librement) : nom ou entreprise, téléphone, adresse,
+secteur, au moins un type de travaux, sort du bois (abattage ou élagage seulement : débarrassé, ou format précisé), durée estimée, prix (0 est un prix).
 
 Un travail de plusieurs jours = un chantier par journée.
 
@@ -134,7 +149,7 @@ colonne : la vue `v_chantiers` le calcule à partir du statut des travaux et de 
 | `partiel` | une partie reçue (acompte...), solde > 0 | |
 | `paye` | somme reçue >= total | |
 | `a_venir` | `a_planifier` / `planifie`, pas encore fait | |
-| `sans_objet` | `soumission`, `en_attente`, `annule`, ou travail gratuit | |
+| `sans_objet` | soumission (`soumission`, `en_attente`), `annule`, ou travail gratuit | |
 
 Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiements`, `solde = total_ttc − paye`.
 
@@ -142,9 +157,9 @@ Colonnes calculées : `total_ttc = prix_ht + tps + tvq`, `paye = somme des paiem
 
 ### Archives — calculées, jamais saisies
 
-`v_chantiers.archive = 1` quand le chantier est **Annulé** (archivé aussitôt), ou **Terminé ET payé** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Le chantier passe tout seul des « Actifs » aux « Archives » (section en bas de la page *Chantiers*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent.
+`v_chantiers.archive = 1` quand la fiche est **Annulée** (archivée aussitôt), ou **Terminée ET payée** (`statut_paiement` = `paye`, ou `sans_objet` pour un travail gratuit). Un chantier passe tout seul des « Actifs » aux « Archives » (section en bas de la page *Chantiers*) au moment du dernier paiement ; rien à cliquer. Les archives restent en lecture seule et se **dupliquent** pour un travail récurrent. Une **soumission refusée** a aussi `archive = 1`, mais elle est présentée dans la section « Refusées » de la page *Soumissions* (genre `soumission`), pas dans les archives des chantiers.
 
-### Dupliquer un chantier
+### Dupliquer une fiche
 
 Crée une **nouvelle soumission** pour le même client : travaux (avec précisions), description, durée estimée, prix, taxes et modalité sont repris ; la date de la demande repart d'aujourd'hui ; pas de date de travaux, ni de paiement, ni de facture, ni de durée réelle, ni de fichiers. Le prix et la durée sont ajustables dans le formulaire.
 
@@ -165,7 +180,7 @@ Crée une **nouvelle soumission** pour le même client : travaux (avec précisio
 | Colonne | Type | Rôle |
 |---|---|---|
 | `utilisateurs.nom` | texte unique (sans égard à la casse) | nom de connexion |
-| `utilisateurs.role` | `admin` ou `soumission` | `admin` : tout ; `soumission` : clients et chantiers (ni finances, ni journée, ni suppressions) |
+| `utilisateurs.role` | `admin` ou `soumission` | `admin` : tout ; `soumission` : soumissions, chantiers et clients (ni finances, ni journée, ni suppressions) |
 | `utilisateurs.mot_de_passe` | texte | `pbkdf2_sha256$itérations$sel$empreinte` : jamais le mot de passe lui-même |
 | `utilisateurs.actif` | 0 ou 1 | 0 : connexion impossible, sessions coupées |
 | `sessions.jeton_hash` | texte | empreinte SHA-256 du jeton du cookie (le jeton n'est jamais stocké) |
@@ -173,6 +188,30 @@ Crée une **nouvelle soumission** pour le même client : travaux (avec précisio
 
 Tant qu'aucun compte actif n'existe, l'interface reste ouverte sur l'ordinateur seulement ; dès qu'il y en a un, la connexion est exigée partout.
 Le format v9 a été ajouté à un format v8 par une migration automatique (`schema/migration_v8_v9.sql`), sans toucher aux données.
+
+## `raccourcis` (les pastilles du haut)
+
+| Colonne | Type | Règle |
+|---|---|---|
+| `utilisateur_id` | entier | → `utilisateurs.id` (supprimé avec le compte) ; **vide** : interface ouverte sans comptes (raccourcis communs) |
+| `page` | texte | `chantiers` ou `soumissions` |
+| `libelle` | texte | le nom de la pastille, jamais vide |
+| `filtre` | texte | les critères sous forme de requête, dans un ordre stable : `statut`, `paiement`, `secteur`, `attente`, `par`, `q` (ex. `secteur=centre_ville&statut=planifie`) |
+| `ordre` | entier | rang d'affichage |
+
+Au premier passage d'une personne sur une page, ses raccourcis de départ sont enregistrés (l'administrateur : À recevoir, Planifiés, À planifier ; le compte
+Soumission : À planifier, Planifiés ; Soumissions : Mes soumissions, À relancer). Une ligne spéciale (`filtre` = `__vide__`, invisible) retient qu'une
+personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendraient.
+
+## Migration v9 vers v10 (automatique)
+
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v9…`), puis, dans une
+seule transaction (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) : assouplit la table `clients` (nom, adresse et ville ne sont
+plus obligatoires en base ; adresse et ville vides deviennent `''`), ajoute `chantiers.accepte_le` et `chantiers.cree_par`, crée la table `raccourcis`,
+recrée la vue `v_chantiers` (colonnes `genre`, `accepte_le`, `cree_par`) et reprend les données : les anciens statuts `en_attente` deviennent
+`soumission` ; les autres fiches (`a_planifier`, `planifie`, `termine`, `annule`) sont des **chantiers acceptés** (`accepte_le` = leur date de demande, à défaut leur
+date de création) : d'anciennes fiches « Annulé » restent donc dans les archives des chantiers, pas dans les soumissions refusées. Rien n'est
+perdu ; en cas d'échec, la base reste telle quelle (v9). Un test automatique vérifie que la base migrée est identique à une base neuve.
 
 ## `types_travaux`
 
@@ -185,7 +224,7 @@ Ajouter un type : `INSERT INTO types_travaux (code, libelle) VALUES ('haubanage'
 
 ## La vue `v_chantiers` (ce que les scripts Python liront)
 
-Une ligne par chantier, tout déjà joint : client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
+Une ligne par fiche (soumission ou chantier), tout déjà joint : `genre` (`soumission` ou `chantier`), `accepte_le`, `cree_par`, client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
 (`adresse_maps`, `latitude`, `longitude`, `notes_acces`), travaux (`type_libelle`, `travaux_detail`,
 `description`, `date_prevue`, `duree_estimee_h`, `dossier_photos`…) et finances (`total_ttc`, `paye`, `solde`,
 `statut_paiement`). Exemple — le travail de la journée pour l'étape 2 :

@@ -1,3 +1,4 @@
+-- Schéma figé du format v9 (avant les soumissions) : sert uniquement à tester la migration v9 -> v10. Ne pas modifier.
 -- =============================================================================
 -- SylvainCulteur — noyau de données local (v1)
 -- Base : SQLite (compatible SQLite >= 3.8.3, donc tous les outils courants)
@@ -28,7 +29,7 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 10;
+PRAGMA user_version = 9;
 
 
 -- -----------------------------------------------------------------------------
@@ -84,8 +85,6 @@ INSERT INTO secteurs (code, libelle, ville, ordre) VALUES
 
 -- -----------------------------------------------------------------------------
 -- Clients : une personne ou une entreprise, directement reliée à son adresse.
--- Rien n'est obligatoire (ni nom, ni adresse) : une soumission s'ouvre dès que le client appelle, avec ce qu'on sait.
--- Les renseignements indispensables sont exigés par l'application au moment d'ACCEPTER la soumission.
 -- -----------------------------------------------------------------------------
 CREATE TABLE clients (
     id          INTEGER PRIMARY KEY,
@@ -99,8 +98,8 @@ CREATE TABLE clients (
 
     -- Adresse "à la Postes Canada" : numéro + type + nom de rue, ville officielle.
     -- Google Maps l'accepte telle quelle : voir adresse_maps dans v_chantiers.
-    adresse        TEXT NOT NULL DEFAULT '',  -- ex. 123 Rue des Érables ; vide tant qu'on ne la connaît pas (soumission)
-    ville          TEXT NOT NULL DEFAULT '',  -- ex. Trois-Rivières (déduite du secteur choisi dans l'interface)
+    adresse        TEXT NOT NULL,             -- ex. 123 Rue des Érables
+    ville          TEXT NOT NULL,             -- ex. Trois-Rivières (déduite du secteur choisi dans l'interface)
     secteur        TEXT REFERENCES secteurs(code) ON UPDATE CASCADE ON DELETE RESTRICT,
                                               -- secteur desservi (liste fermée) ; vide pour d'anciens clients
     province       TEXT NOT NULL DEFAULT 'QC',
@@ -117,6 +116,8 @@ CREATE TABLE clients (
     notes       TEXT,                         -- préférences, historique utile
     cree_le     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
+    CONSTRAINT ck_clients_identite
+        CHECK ((nom IS NOT NULL AND trim(nom) <> '') OR (entreprise IS NOT NULL AND trim(entreprise) <> '')),
     CONSTRAINT ck_clients_telephone
         CHECK (telephone IS NULL
                OR telephone GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
@@ -127,7 +128,7 @@ CREATE TABLE clients (
         CHECK (courriel IS NULL OR (courriel LIKE '_%@_%._%' AND courriel NOT LIKE '% %')),
     CONSTRAINT ck_clients_sms_ok
         CHECK (typeof(sms_ok) = 'integer' AND sms_ok IN (0, 1)),
-    CONSTRAINT ck_clients_adresse CHECK (typeof(adresse) = 'text' AND typeof(ville) = 'text'),
+    CONSTRAINT ck_clients_adresse CHECK (trim(adresse) <> '' AND trim(ville) <> ''),
     CONSTRAINT ck_clients_province CHECK (province GLOB '[A-Z][A-Z]'),
     CONSTRAINT ck_clients_code_postal
         CHECK (code_postal IS NULL OR code_postal GLOB '[A-Z][0-9][A-Z] [0-9][A-Z][0-9]'),
@@ -157,12 +158,12 @@ CREATE TABLE chantiers (
                               -- le détail par type de travaux est dans chantier_travaux
 
     -- Statuts (dans l'ordre du parcours d'un chantier) :
-    --   soumission  = soumission ouverte (rien n'est obligatoire) ; onglet « Soumissions »
-    --   en_attente  = ancien statut, traité comme « soumission » (n'est plus offert)
-    --   a_planifier = soumission ACCEPTÉE (renseignements complets), pas encore de date ; onglet « Chantiers »
+    --   soumission  = estimé à donner / en préparation
+    --   en_attente  = soumission remise, on attend la réponse du client
+    --   a_planifier = accepté, pas encore de date
     --   planifie    = date fixée
     --   termine     = fait
-    --   annule      = soumission refusée (accepte_le vide) ou chantier annulé (accepte_le rempli)
+    --   annule      = abandonné (refus du client, annulation...)
     statut          TEXT NOT NULL DEFAULT 'soumission',
 
     date_soumission TEXT,     -- AAAA-MM-JJ
@@ -190,11 +191,6 @@ CREATE TABLE chantiers (
     dossier_photos  TEXT,     -- ex. photos/2026/2026-06-14_gagnon
 
     cree_le         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
-
-    -- Une soumission est un chantier pas encore accepté : même fiche, autre nom (voir genre dans v_chantiers).
-    accepte_le      TEXT CONSTRAINT ck_chantiers_accepte_le CHECK (accepte_le IS NULL OR date(accepte_le, '+0 days') IS accepte_le),
-                              -- AAAA-MM-JJ : jour où la soumission a été acceptée (vide : soumission en cours ou refusée)
-    cree_par        TEXT,     -- nom du compte qui a ouvert la soumission (vide : interface ouverte sans comptes)
 
     CONSTRAINT ck_chantiers_modalite
         CHECK (modalite_paiement IS NULL OR modalite_paiement IN ('comptant','cheque','interac','carte','autre')),
@@ -311,23 +307,6 @@ CREATE INDEX idx_sessions_utilisateur ON sessions(utilisateur_id);
 
 
 -- -----------------------------------------------------------------------------
--- Raccourcis (pastilles en haut des pages Chantiers et Soumissions) : chaque personne garde les siens.
--- `filtre` = les critères de la liste sous forme de requête (ex. « statut=a_planifier&secteur=centre_ville »).
--- utilisateur_id vide : interface ouverte sans comptes.
--- -----------------------------------------------------------------------------
-CREATE TABLE raccourcis (
-    id             INTEGER PRIMARY KEY,
-    utilisateur_id INTEGER REFERENCES utilisateurs(id) ON DELETE CASCADE,
-    page           TEXT NOT NULL CONSTRAINT ck_raccourcis_page CHECK (page IN ('chantiers', 'soumissions')),
-    libelle        TEXT NOT NULL CONSTRAINT ck_raccourcis_libelle CHECK (trim(libelle) <> ''),
-    filtre         TEXT NOT NULL DEFAULT '',
-    ordre          INTEGER NOT NULL DEFAULT 100
-);
-
-CREATE INDEX idx_raccourcis_utilisateur ON raccourcis(utilisateur_id, page);
-
-
--- -----------------------------------------------------------------------------
 -- Règle financière : JAMAIS de solde négatif. Le total des paiements d'un chantier ne peut pas dépasser son
 -- total (prix + TPS + TVQ), et on ne peut pas baisser le prix sous ce qui est déjà payé.
 -- -----------------------------------------------------------------------------
@@ -411,10 +390,6 @@ base AS (
     SELECT
         c.id AS chantier_id,
         c.statut,
-        -- genre : « soumission » (ouverte ou refusée, onglet Soumissions) ou « chantier » (accepté, onglet Chantiers)
-        CASE WHEN c.statut IN ('soumission', 'en_attente') OR (c.statut = 'annule' AND c.accepte_le IS NULL)
-             THEN 'soumission' ELSE 'chantier' END AS genre,
-        c.accepte_le, c.cree_par,
         (SELECT group_concat(code, '+') FROM (SELECT ct.type_travaux AS code FROM chantier_travaux ct
             WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS types_codes,
         (SELECT group_concat(libelle, ' + ') FROM (SELECT t.libelle FROM chantier_travaux ct
@@ -425,22 +400,17 @@ base AS (
             WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS travaux_detail,
         c.description,
         c.date_soumission, c.date_prevue, c.ordre_jour,
-        -- Depuis quand le client attend : une soumission, depuis la date de la demande ; un chantier accepté, depuis le jour
-        -- où la soumission a été acceptée (à défaut, la date de la demande, puis la création de la fiche)
-        CASE WHEN c.statut IN ('soumission', 'en_attente') OR (c.statut = 'annule' AND c.accepte_le IS NULL)
-             THEN COALESCE(c.date_soumission, date(c.cree_le))
-             ELSE COALESCE(c.accepte_le, c.date_soumission, date(c.cree_le)) END AS attente_depuis,
+        -- Depuis quand le client attend : date de la demande/soumission, à défaut date de création de la fiche
+        COALESCE(c.date_soumission, date(c.cree_le)) AS attente_depuis,
         c.duree_estimee_h, c.duree_reelle_h,
 
         cl.id AS client_id, cl.prenom, cl.nom, cl.entreprise,
-        COALESCE(NULLIF(trim(COALESCE(cl.prenom, '') || ' ' || COALESCE(cl.nom, '')), ''), NULLIF(trim(cl.entreprise), ''),
-                 '(client à identifier)') AS client_nom_complet,
+        COALESCE(NULLIF(trim(COALESCE(cl.prenom, '') || ' ' || COALESCE(cl.nom, '')), ''), cl.entreprise) AS client_nom_complet,
         cl.telephone, cl.telephone_2, cl.courriel, cl.sms_ok,
         cl.adresse, cl.ville, cl.province, cl.code_postal,
         cl.secteur AS secteur_code, sec.libelle AS secteur,
-        CASE WHEN trim(cl.adresse) = '' THEN ''
-             ELSE cl.adresse || CASE WHEN trim(cl.ville) = '' THEN '' ELSE ', ' || cl.ville END || ', ' || cl.province
-                  || COALESCE(' ' || cl.code_postal, '') || ', Canada' END AS adresse_maps,
+        cl.adresse || ', ' || cl.ville || ', ' || cl.province
+            || COALESCE(' ' || cl.code_postal, '') || ', Canada' AS adresse_maps,
         cl.latitude, cl.longitude, cl.geocode_statut, cl.notes_acces,
 
         c.nacelle, c.debarrasser_bois, c.bois_format,

@@ -13,11 +13,11 @@ sans retranscription.
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
 - **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**
-  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), les fiches clients, la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
+  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / Refuser), des **raccourcis** à ton goût en haut des listes, les fiches clients, la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
 **Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
-(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. Connexion par nom et mot de passe (`gerer_utilisateurs.bat`), droits « administrateur » et « soumission », affichage simplifié sur téléphone (Chantiers, Clients, + Chantier).
+(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. Connexion par nom et mot de passe (`gerer_utilisateurs.bat`), droits « administrateur » et « soumission », affichage simplifié sur téléphone (Chantiers, Soumissions, Clients, + Soumission).
 
 ## Modèle
 
@@ -26,29 +26,38 @@ clients (personne ou entreprise + son adresse)  1 ─── N  chantiers  1 ─�
                                                               └── N  types de travaux (avec précision)
 ```
 
-Un client = une personne **et** son adresse. Un client qui revient = un nouveau chantier sur sa fiche. Un
+Un client = une personne **et** son adresse. Un client qui revient = une nouvelle soumission sur son dossier. **Une soumission est un chantier pas encore
+accepté** (même fiche, autre nom) : on l'ouvre dès que le client appelle, **sans rien d'obligatoire** ; le bouton **Accepter** la place dans les chantiers
+(« À planifier ») seulement si tout ce qu'il faut est rempli (nom, téléphone, adresse, secteur, travaux, durée, prix : sinon le programme demande ce qui
+manque), **Refuser** la range dans les soumissions refusées. Un
 chantier dure en moyenne 2 h : plusieurs par journée ; il peut combiner plusieurs types de travaux, et il n'a
 qu'**une seule date** de travaux (prévue, puis réalisée ; elle se change dans la page Journée). Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
 
 Règles appliquées par l'application **et** par la base : le client ne se modifie que depuis sa fiche ; un chantier **Terminé** est
 verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : il n'y a pas de système de facture) ; **jamais de solde négatif** ; un seul mode
-de règlement parmi cinq ; durée estimée obligatoire ; le statut est **automatique** (Journée = Planifié, Retirer = À planifier, Annuler = archivé, Terminer = Terminé avec « payé ou pas ») ; un
+de règlement parmi cinq ; durée estimée obligatoire pour accepter une soumission ; le statut est **automatique** (Accepter = À planifier, Refuser = Refusée, Journée = Planifié, Retirer = À planifier, Annuler = archivé, Terminer = Terminé avec « payé ou pas ») ; un
 chantier annulé, ou terminé **et payé**, passe seul dans les *Archives* ; la ville d'un client se choisit dans une **liste de secteurs** (pas de doublons
 d'écriture) ; nacelle et sort du bois sont des options du travail.
 
 ## Contenu
 
 ```
-schema/schema.sql                       schéma SQLite prêt à exécuter (tables, règles, vue v_chantiers)
-outils/interface.py                     serveur local + saisie complète (nouveau client, modification d'un chantier)
+schema/schema.sql                       schéma SQLite prêt à exécuter (tables, règles, vue v_chantiers) ; schema/migration_v8_v9.sql : migration automatique
+outils/interface.py                     serveur local, page Chantiers, nouvelle soumission
+outils/pages_soumissions.py             onglet Soumissions : liste, boutons Accepter / Refuser, page « Accepter » qui ne demande que ce qui manque
+outils/raccourcis.py                    pastilles de raccourcis en haut de Chantiers et Soumissions (chaque compte garde les siennes)
+outils/listes.py                        sélections des listes Chantiers et Soumissions (filtres, recherche, délais)
 outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)
 outils/tableau.py                       page Journée (créer / gérer une journée) et actions rapides (terminer, retirer, annuler, ordre)
 outils/composants.py                    cellules (client, adresse, travaux, montant) partagées, bouton Terminer et sa fenêtre de confirmation
-outils/pages_clients.py                 liste des clients, fiche client, secteurs desservis, formulaire simplifié de nouveau chantier
-outils/pages_chantier.py                page d'un chantier (client en lecture seule, verrou « Terminé », paiements, duplication)
+outils/pages_clients.py                 liste des clients, fiche client, secteurs desservis, nouvelle soumission pour un client
+outils/pages_chantier.py                page d'une soumission ou d'un chantier (client en lecture seule, verrou « Terminé », paiements, duplication)
+outils/pdf.py                           PDF de la journée (feuilles de route, sans rien installer)
+outils/auth.py, outils/reseau.py        comptes et connexion ; accès par téléphone / iPad (Tailscale)
 outils/vue.py                           composants d'affichage partagés
-outils/noyau.py                         règles de validation et d'écriture partagées
+outils/noyau.py                         règles de validation et d'écriture partagées, migrations
 outils/donnees_test.py                  crée une base d'ESSAI avec de fausses données
+gerer_utilisateurs.bat / .py            créer les comptes (administrateur, soumission) ; lancer_reseau.bat / .py : accès à distance
 lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
 lancer_essai.bat / .command / .py       double-clic (ou bouton « Exécuter » de VS Code) : base d'ESSAI (fausses données)
 lancer_interface.py                     idem, sur la VRAIE base
@@ -73,7 +82,7 @@ python3 outils/interface.py                            # la VRAIE base (créée 
 Le coin supérieur droit de l'interface indique toujours la base ouverte : **« BASE D’ESSAI »** en orange pour
 les fausses données, « Base : sylvainculteur.db » pour la vraie.
 
-**Mises à jour du programme.** Tant qu'il n'y a pas de vraies données, il n'y a aucun outil de conversion : si une nouvelle version change le format de la base, le programme le dit et il suffit de supprimer le fichier de base (`data/sylvainculteur.db`, ou `data/test.db`, qui est recréée toute seule par `--essai`). Dès que tes vraies données existeront, un changement de format devra être accompagné d’un outil de migration (l’ancien est dans l’historique Git).
+**Mises à jour du programme.** Une base des formats v8 et v9 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien est refusé : tant qu'il n'y a pas de vraies données, il suffit de supprimer le fichier de base (`data/sylvainculteur.db`). La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
 
 Pas à pas : [`docs/plan_de_tests.md`](docs/plan_de_tests.md). Sous Windows, remplacer `python3` par `python`
 ou `py`. Outil graphique gratuit pour consulter la base : [DB Browser for SQLite](https://sqlitebrowser.org/).

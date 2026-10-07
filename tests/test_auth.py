@@ -269,11 +269,13 @@ class TestDroits(BaseAuth):
             self.assertIn(lien, page)
 
     def test_soumission_pages_permises(self):
-        for chemin in ("/chantiers", "/clients", "/client/1", "/chantier/3", "/nouveau", "/client/1/chantier/nouveau", "/client/1/modifier"):
+        for chemin in ("/chantiers", "/soumissions", "/clients", "/client/1", "/chantier/3", "/nouveau", "/client/1/soumission/nouveau",
+                       "/client/1/modifier", "/raccourcis"):
             self.assertTrue(self.req("GET", chemin, cookie=self.soum)[0].startswith("200"), chemin)
         page = self.req("GET", "/chantiers", cookie=self.soum)[2]
         entete = page[page.index("<header"):page.index("</header>")]
         self.assertIn('href="/chantiers"', entete)
+        self.assertIn('href="/soumissions"', entete)
         self.assertIn('href="/clients"', entete)
         for absent in ('href="/journee"', 'href="/utilisateurs"', "Tableau de bord"):
             self.assertNotIn(absent, entete)
@@ -314,15 +316,19 @@ class TestDroits(BaseAuth):
                 "client_secteur": "centre_ville", "province": "QC", "type_emondage": "1", "statut": "soumission", "duree_estimee_h": "2", "prix_ht": "300"}
         statut, en_tetes, _ = self.req("POST", "/nouveau", form, cookie=self.soum)
         self.assertTrue(statut.startswith("303"))
-        self.assertRegex(en_tetes["Location"], r"^/chantier/\d+\?ok=cree$")
-        nouveau = int(re.search(r"/chantier/(\d+)", en_tetes["Location"]).group(1))
-        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (nouveau,)), [("soumission",)])
-        page = self.req("GET", f"/chantier/{nouveau}", cookie=self.soum)[2]
+        self.assertRegex(en_tetes["Location"], r"^/client/\d+\?ok=soumission_creee$")
+        nouveau = self.sql("SELECT max(id) FROM chantiers")[0][0]
+        self.assertEqual(self.sql("SELECT statut, cree_par FROM chantiers WHERE id = ?", (nouveau,)), [("soumission", "Soumission")])   # qui l'a ouverte
+        page = self.req("GET", f"/soumission/{nouveau}", cookie=self.soum)[2]
         self.assertIn("Enregistrer les modifications", page)
+        self.assertIn("Accepter", page)
+        statut, en_tetes, _ = self.req("POST", f"/soumission/{nouveau}/accepter", {"retour": "/soumissions"}, cookie=self.soum)    # complète : acceptée
+        self.assertEqual(en_tetes["Location"], "/soumissions?ok=soumission_acceptee")
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (nouveau,)), [("a_planifier",)])
 
     def test_accueil_redirige_le_telephone_et_le_compte_soumission(self):
         statut, en_tetes, _ = self.req("GET", "/", cookie=self.soum)
-        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/chantiers"))
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/soumissions"))               # le soumissionneur arrive sur ses soumissions
         statut, en_tetes, _ = self.req("GET", "/", cookie=self.admin, agent=TELEPHONE)
         self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/chantiers"))
         self.assertTrue(self.req("GET", "/", cookie=self.admin, agent=BUREAU)[0].startswith("200"))
@@ -401,36 +407,22 @@ class TestServeurReel(BaseAuth):
 
 
 class TestMigration(BaseAuth):
-    def test_migration_v8_vers_v9_garde_les_donnees(self):
-        ancien = Path(self._tmp.name) / "data" / "v8.db"
-        fixtures.creer_exemples(ancien)
-        c = sqlite3.connect(ancien, isolation_level=None)             # autocommit : le numéro de version est bien écrit
-        c.executescript("DROP TABLE sessions; DROP TABLE utilisateurs;")
-        c.execute("PRAGMA user_version = 8")
-        nb = c.execute("SELECT count(*) FROM chantiers").fetchone()[0]
-        c.close()
-        conn, existait = noyau.ouvrir_base(ancien)
-        self.assertTrue(existait)
-        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 9)
-        self.assertEqual(conn.execute("SELECT count(*) FROM chantiers").fetchone()[0], nb)
-        self.assertEqual(auth.creer_utilisateur(conn, "Admin", "1234", "admin"), [])
-        conn.close()
+    """La migration v8 -> v9 (comptes) ; la suite v9 -> v10 est testée dans test_soumissions.py."""
 
-    def test_la_migration_est_identique_au_schema(self):
-        def definitions(chemin):
-            c = sqlite3.connect(chemin)
+    def test_la_migration_8_9_est_identique_au_schema_v9(self):
+        def definitions(c):
             rows = c.execute("SELECT name, sql FROM sqlite_master WHERE name IN ('utilisateurs', 'sessions', 'idx_sessions_utilisateur')").fetchall()
-            c.close()
-            return {n: re.sub(r"\s+", " ", s.replace("IF NOT EXISTS ", "")) for n, s in rows}
-        ancien = Path(self._tmp.name) / "data" / "v8.db"
-        fixtures.creer_exemples(ancien)
-        c = sqlite3.connect(ancien, isolation_level=None)             # autocommit : le numéro de version est bien écrit
-        c.executescript("DROP TABLE sessions; DROP TABLE utilisateurs;")
-        c.execute("PRAGMA user_version = 8")
-        c.close()
-        noyau.ouvrir_base(ancien)[0].close()
-        self.assertEqual(len(definitions(self.db)), 3)
-        self.assertEqual(definitions(ancien), definitions(self.db))
+            return {n: re.sub(r"\s+", " ", sql.replace("IF NOT EXISTS ", "")) for n, sql in rows}
+        schema_v9 = (RACINE / "tests" / "schema_v9.sql").read_text(encoding="utf-8")
+        neuve = sqlite3.connect(":memory:")
+        neuve.executescript(schema_v9)
+        migree = sqlite3.connect(":memory:", isolation_level=None)
+        migree.executescript(schema_v9)
+        migree.executescript("DROP TABLE sessions; DROP TABLE utilisateurs;")
+        migree.executescript(noyau.MIGRATION_8_9.read_text(encoding="utf-8"))
+        self.assertEqual(len(definitions(neuve)), 3)
+        self.assertEqual(definitions(migree), definitions(neuve))
+        self.assertEqual(migree.execute("PRAGMA user_version").fetchone()[0], 9)
 
     def test_les_versions_plus_anciennes_restent_refusees(self):
         ancien = Path(self._tmp.name) / "data" / "v7.db"

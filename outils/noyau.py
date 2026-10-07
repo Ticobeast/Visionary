@@ -15,9 +15,10 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
-MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"   # ajout des comptes : seule migration conservée (des données réelles peuvent exister)
+MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"   # ajout des comptes
+# Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions, voir _migrer_9_10).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 9
+VERSION_SCHEMA = 10
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -52,15 +53,45 @@ LIBELLES_STATUT = {"soumission": "Soumission", "en_attente": "En attente", "a_pl
                    "planifie": "Planifié", "termine": "Terminé", "annule": "Annulé"}
 # Statuts sans date : le chantier n'est pas (encore) placé dans une journée.
 STATUTS_SANS_DATE = ("soumission", "en_attente", "a_planifier")
+# Une SOUMISSION est un chantier pas encore accepté (même fiche, autre nom) : onglet « Soumissions », rien d'obligatoire.
+# « en_attente » est un ancien statut, traité comme « soumission » et qui n'est plus offert.
+STATUTS_SOUMISSION = ("soumission", "en_attente")
+# Ce qu'il faut pour ACCEPTER une soumission (elle devient alors un chantier « À planifier »). Pour changer la règle,
+# modifier cette liste et manques_pour_accepter().
+CONDITIONS_ACCEPTATION = (
+    ("nom", "le nom du client (ou son entreprise)"),
+    ("telephone", "un numéro de téléphone"),
+    ("adresse", "l'adresse des travaux"),
+    ("secteur", "le secteur (ville)"),
+    ("travaux", "au moins un type de travaux"),
+    ("bois", "ce qu'on fait du bois (le débarrasser, ou son format : 16 pouces / 4 pieds)"),   # seulement pour un abattage ou un élagage
+    ("duree", "la durée estimée"),
+    ("prix", "le prix"),
+)
 MODES = ("comptant", "cheque", "interac", "carte", "autre")
 LIBELLES_MODE = {"comptant": "Comptant", "cheque": "Chèque", "interac": "Interac", "carte": "Carte", "autre": "Autre"}
 # Bois qui reste sur place (abattage / élagage) : format des morceaux.
 FORMATS_BOIS = ("16_pouces", "4_pieds")
 LIBELLES_BOIS = {"16_pouces": "16 pouces", "4_pieds": "4 pieds"}
 TYPES_AVEC_BOIS = ("abattage", "elagage")        # types de travaux où le sort du bois doit être précisé
-# Statuts qu'on choisit à la main (la suite du parcours est automatique : Journée -> Planifié, Retirer -> À planifier,
-# Annuler -> Annulé + archives, Terminer -> Terminé).
-STATUTS_MANUELS = ("soumission", "en_attente", "a_planifier")
+# Plus aucun statut ne se choisit à la main : Soumission (création) -> Accepter -> À planifier -> Journée -> Planifié ->
+# Terminer -> Terminé ; Refuser / Annuler -> Annulé (archives).
+
+
+def libelle_statut(statut, genre=None):
+    """« Refusée » pour une soumission refusée (annulée sans avoir été acceptée), sinon le libellé du statut."""
+    if statut == "annule" and genre == "soumission":
+        return "Refusée"
+    return LIBELLES_STATUT.get(statut, statut)
+
+
+def adresses(adresse, ville, province, code_postal):
+    """(texte affiché, texte pour Google Maps) ; deux textes vides tant que l'adresse n'est pas connue.
+    Les morceaux vides sont sautés : jamais « 9 Rue des Lilas, , QC »."""
+    if not adresse:
+        return "", ""
+    texte = ", ".join(x for x in (adresse, ville, province) if x) + (f" {code_postal}" if code_postal else "")
+    return texte, texte + ", Canada"
 
 RE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 RE_CODE_POSTAL = re.compile(r"^[A-Z]\d[A-Z]\d[A-Z]\d$")
@@ -213,7 +244,7 @@ class Ligne:
             self.erreurs.append(f"{col} « {v} » inconnu (valeurs permises : {', '.join(sorted(set(valides)))})")
         return trouve
 
-    def travaux(self, col, alias):
+    def travaux(self, col, alias, obligatoire=True):
         """Liste [(code, précision ou None)].
 
         Reçoit soit une liste déjà prête (interface), soit un texte (CSV) du genre
@@ -236,7 +267,7 @@ class Ligne:
             else:
                 vus.add(code)
                 resultat.append((code, re.sub(r"\s+", " ", (precision or "").strip()) or None))
-        if not morceaux:
+        if not morceaux and obligatoire:
             self.erreurs.append(f"{col} est obligatoire (au moins un type de travaux)")
         return resultat
 
@@ -254,12 +285,15 @@ class Ligne:
         return v
 
 
-def _lire_client(L, v):
-    """Champs du client et de son adresse (communs à la fiche chantier et à la fiche client)."""
+def _lire_client(L, v, exige=True):
+    """Champs du client et de son adresse (communs à la fiche chantier et à la fiche client).
+
+    exige=False (soumission) : rien n'est obligatoire, seuls les formats sont vérifiés ; adresse et ville vides = « ».
+    """
     v["client_nom"] = L.texte("client_nom")
     v["client_prenom"] = L.texte("client_prenom")
     v["client_entreprise"] = L.texte("client_entreprise")
-    if not (v["client_nom"] or v["client_entreprise"]):
+    if exige and not (v["client_nom"] or v["client_entreprise"]):
         L.erreurs.append("client_nom ou client_entreprise est obligatoire")
     v["client_telephone"] = L.telephone("client_telephone")
     v["client_telephone_2"] = L.telephone("client_telephone_2")
@@ -270,8 +304,8 @@ def _lire_client(L, v):
     v["client_sms_ok"] = L.booleen("client_sms_ok")
     v["client_notes"] = L.texte("client_notes", multiligne=True)
 
-    v["adresse"] = L.requis("adresse")
-    v["ville"] = L.requis("ville")
+    v["adresse"] = (L.requis("adresse") if exige else L.texte("adresse")) or ""
+    v["ville"] = (L.requis("ville") if exige else L.texte("ville")) or ""
     v["secteur"] = L.texte("client_secteur")        # code du secteur (résolu par appliquer_secteur)
     prov = L.texte("province")
     v["province"] = prov.upper() if prov else "QC"
@@ -285,11 +319,11 @@ def _lire_client(L, v):
     v["notes_acces"] = L.texte("notes_acces", multiligne=True)
 
 
-def lire_client(brut):
-    """Valide la fiche d'un client seule. Retourne (valeurs, erreurs)."""
+def lire_client(brut, exige=True):
+    """Valide la fiche d'un client seule. Retourne (valeurs, erreurs). exige=False : rien d'obligatoire (client d'une soumission)."""
     L = Ligne(brut)
     v = {}
-    _lire_client(L, v)
+    _lire_client(L, v, exige)
     return v, L.erreurs
 
 
@@ -297,11 +331,12 @@ def lire_ligne(brut, alias_types, taxes_auto):
     """Retourne (valeurs, erreurs) pour une ligne brute (CSV ou formulaire) : client + chantier."""
     L = Ligne(brut)
     v = {}
-    _lire_client(L, v)
-
-    v["travaux"] = L.travaux("type_travaux", alias_types)
     alias_statuts = {**{cle(c): c for c in STATUTS}, **{cle(l): c for c, l in LIBELLES_STATUT.items()}}
     v["statut"] = L.choix("statut", STATUTS, alias_statuts, obligatoire=True)
+    exige = v["statut"] not in STATUTS_SOUMISSION        # une soumission se remplit comme on veut ; la suite exige l'essentiel
+    _lire_client(L, v, exige)
+
+    v["travaux"] = L.travaux("type_travaux", alias_types, obligatoire=exige)
     v["nacelle"] = L.booleen("nacelle") or 0
     v["debarrasser_bois"] = L.booleen("debarrasser_bois") or 0
     alias_bois = {**{cle(c): c for c in FORMATS_BOIS}, **{cle(l): c for c, l in LIBELLES_BOIS.items()}}
@@ -312,7 +347,7 @@ def lire_ligne(brut, alias_types, taxes_auto):
     v["date_soumission"] = L.jour("date_soumission")
     v["date_prevue"] = L.jour("date_prevue")
     v["duree_estimee_h"] = L.duree("duree_estimee_h")
-    if v["duree_estimee_h"] is None and not any("duree_estimee_h" in e for e in L.erreurs):
+    if exige and v["duree_estimee_h"] is None and not any("duree_estimee_h" in e for e in L.erreurs):
         L.erreurs.append("duree_estimee_h est obligatoire (durée estimée en heures, ex. 2,5 pour 2 h 30)")
     v["duree_reelle_h"] = L.duree("duree_reelle_h")
     if v["statut"] == "termine" and v["duree_reelle_h"] is None:   # à la clôture, la durée réelle reprend l'estimée
@@ -366,16 +401,70 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version == 8 and VERSION_SCHEMA == 9:          # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
-            conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
-            conn.execute("PRAGMA foreign_keys = ON")
-            version = VERSION_SCHEMA
+        if version in (8, 9):                               # migrations automatiques, précédées d'une copie de sécurité
+            try:
+                sauvegarder(db_path, f"avant_migration_v{version}")
+                if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
+                    conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
+                    conn.execute("PRAGMA foreign_keys = ON")
+                    version = 9
+                if version == 9:                            # v9 -> v10 : soumissions, clients sans champs obligatoires, raccourcis
+                    _migrer_9_10(conn)
+                    version = 10
+            except BaseException:
+                conn.close()
+                raise
         if version != VERSION_SCHEMA:
             conn.close()
             raise SystemExit(f"La base {db_path} a été créée par une version précédente du programme (format v{version}, attendu v{VERSION_SCHEMA}).\n"
                              "Comme il n'y a pas encore de vraies données, supprime simplement ce fichier : il sera recréé au prochain lancement "
                              "(pour la base d'essai, relance lancer_essai).")
     return conn, existait
+
+
+def _migrer_9_10(conn):
+    """Format v9 -> v10, en une seule transaction (tout ou rien) :
+
+      * table `clients` reconstruite sans les champs obligatoires (nom, adresse) : une soumission s'ouvre avec ce qu'on sait ;
+      * `chantiers` reçoit `accepte_le` et `cree_par` ; les chantiers existants sont considérés comme déjà acceptés ;
+        l'ancien statut « en attente » devient « soumission » ;
+      * tables `raccourcis` et vue `v_chantiers` reprises telles que dans schema.sql.
+    Les définitions viennent de schema.sql lui-même : la base migrée est identique à une base neuve (un test le vérifie).
+    """
+    schema = SCHEMA.read_text(encoding="utf-8")
+    table_clients = re.search(r"CREATE TABLE clients \(.*?\n\);\n", schema, re.S).group(0).replace("CREATE TABLE clients (", "CREATE TABLE clients_nouveau (", 1)
+    table_raccourcis = re.search(r"CREATE TABLE raccourcis \(.*?\n\);\n", schema, re.S).group(0)
+    index_raccourcis = re.search(r"CREATE INDEX idx_raccourcis_utilisateur[^;]*;", schema).group(0)
+    vue = schema[schema.index("CREATE VIEW v_chantiers"):]          # dernière instruction du fichier
+    colonnes = ("id, prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville, secteur, province, code_postal,"
+                " latitude, longitude, geocode_statut, notes_acces, notes, cree_le")
+    conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
+    try:
+        conn.execute("BEGIN")
+        conn.execute("DROP VIEW IF EXISTS v_chantiers")
+        conn.execute(table_clients)
+        conn.execute(f"INSERT INTO clients_nouveau ({colonnes}) SELECT {colonnes} FROM clients")
+        conn.execute("DROP TABLE clients")
+        conn.execute("ALTER TABLE clients_nouveau RENAME TO clients")
+        conn.execute("ALTER TABLE chantiers ADD COLUMN accepte_le TEXT CONSTRAINT ck_chantiers_accepte_le "
+                     "CHECK (accepte_le IS NULL OR date(accepte_le, '+0 days') IS accepte_le)")
+        conn.execute("ALTER TABLE chantiers ADD COLUMN cree_par TEXT")
+        conn.execute("UPDATE chantiers SET statut = 'soumission' WHERE statut = 'en_attente'")
+        conn.execute("UPDATE chantiers SET accepte_le = COALESCE(date_soumission, date(cree_le)) WHERE statut <> 'soumission'")
+        conn.execute(table_raccourcis)
+        conn.execute(index_raccourcis)
+        conn.execute(vue.rstrip().rstrip(";"))
+        problemes = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if problemes:
+            raise sqlite3.IntegrityError(f"la migration laisserait des liens brisés : {problemes[:3]}")
+        conn.execute("PRAGMA user_version = 10")
+        conn.execute("COMMIT")
+    except BaseException:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def alias_types_travaux(conn):
@@ -433,6 +522,8 @@ class Index:
 
     def trouver(self, v):
         """(id, "nom"|"telephone") d'un client déjà présent à cette adresse, sinon (None, None)."""
+        if not cle(v["adresse"]):                    # adresse inconnue (soumission) : jamais regroupé avec un autre client
+            return None, None
         tels = {t for t in (v["client_telephone"], v["client_telephone_2"]) if t}
         nom = (cle(v["client_prenom"]), cle(v["client_nom"]), cle(v["client_entreprise"]))
         for id_ in self.par_adresse.get((cle(v["adresse"]), cle(v["ville"])), []):
@@ -510,11 +601,16 @@ def _ecrire_travaux(conn, chantier_id, travaux):
                      [(chantier_id, code, precision) for code, precision in travaux])
 
 
-def creer_chantier(conn, client_id, v, res):
-    """Crée le chantier (et son paiement éventuel). Retourne son id."""
+def creer_chantier(conn, client_id, v, res, cree_par=None):
+    """Crée la fiche (soumission, ou chantier déjà accepté pour un import) et son paiement éventuel. Retourne son id.
+
+    cree_par : nom du compte qui l'ouvre. Une fiche créée directement « acceptée » reçoit sa date d'acceptation.
+    """
+    accepte_le = None if v["statut"] in STATUTS_SOUMISSION else (v["date_soumission"] or datetime.date.today().isoformat())
+    colonnes = COLONNES_CHANTIER + ["accepte_le", "cree_par"]
     cur = conn.execute(
-        f"INSERT INTO chantiers (client_id, {', '.join(COLONNES_CHANTIER)}) VALUES (?{',?' * len(COLONNES_CHANTIER)})",
-        (client_id, *_valeurs_chantier(v)))
+        f"INSERT INTO chantiers (client_id, {', '.join(colonnes)}) VALUES (?{',?' * len(colonnes)})",
+        (client_id, *_valeurs_chantier(v), accepte_le, cree_par))
     _ecrire_travaux(conn, cur.lastrowid, v["travaux"])
     ajuster_ordre(conn, cur.lastrowid)
     res.chantiers += 1
@@ -541,8 +637,9 @@ def mettre_a_jour_fiche(conn, chantier_id, v):
     if statut == "termine":
         return [VERROU]
     _ecrire_travaux(conn, chantier_id, v["travaux"])      # avant l'UPDATE : une fois « Terminé », les travaux sont verrouillés
-    conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in COLONNES_CHANTIER)} WHERE id = ?",
-                 (*_valeurs_chantier(v), chantier_id))
+    a_ecrire = [(c, val) for c, val in zip(COLONNES_CHANTIER, _valeurs_chantier(v)) if c not in ("statut", "date_prevue")]
+    conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c, _ in a_ecrire)} WHERE id = ?",
+                 (*(val for _, val in a_ecrire), chantier_id))      # statut et date : seulement par les boutons (accepter, Journée...)
     ajuster_ordre(conn, chantier_id, ancienne_date)
     return []
 
@@ -669,14 +766,16 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
     d, h, hr = L.jour("date_prevue"), L.duree("duree_estimee_h"), L.duree("duree_reelle_h")
     if statut not in STATUTS:
         L.erreurs.append(f"statut « {statut} » inconnu")
-    actuel = conn.execute("SELECT date_prevue, statut, duree_estimee_h, duree_reelle_h FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    actuel = conn.execute("SELECT date_prevue, statut, duree_estimee_h, duree_reelle_h, accepte_le, date_soumission FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if actuel is None:
         L.erreurs.append(f"chantier #{chantier_id} introuvable")
     if L.erreurs:
         return L.erreurs
-    ancienne_date, ancien_statut, duree_actuelle, reelle_actuelle = actuel
+    ancienne_date, ancien_statut, duree_actuelle, reelle_actuelle, accepte_actuel, demande = actuel
     if ancien_statut == "termine":
         return [VERROU]
+    if ancien_statut in STATUTS_SOUMISSION and statut in ("a_planifier", "planifie", "termine"):
+        return ["une soumission doit d'abord être acceptée (bouton Accepter) : le programme vérifie alors que tout ce qu'il faut est rempli"]
     duree_finale = float(h) if h is not None else duree_actuelle
     if statut in ("planifie", "termine"):
         d = d or ancienne_date
@@ -689,6 +788,10 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
     else:
         d = ancienne_date
     colonnes = {"statut": statut, "date_prevue": d}
+    if statut in STATUTS_SOUMISSION:                      # redevenue une soumission : plus acceptée
+        colonnes["accepte_le"] = None
+    elif not accepte_actuel and (statut in ("a_planifier", "planifie", "termine") or (statut == "annule" and ancien_statut in ("a_planifier", "planifie"))):
+        colonnes["accepte_le"] = demande or datetime.date.today().isoformat()      # un chantier a toujours été accepté
     if h is not None:
         colonnes["duree_estimee_h"] = float(h)
     if statut == "termine":
@@ -753,7 +856,7 @@ def planifier_lot(conn, ids, date_prevue, durees=None):
     a_ecrire = []
     for i in ids:
         r = conn.execute("SELECT statut, duree_estimee_h FROM chantiers WHERE id = ?", (i,)).fetchone()
-        if r is None or r[0] not in ("soumission", "en_attente", "a_planifier", "planifie"):
+        if r is None or r[0] not in ("a_planifier", "planifie"):
             L.erreurs.append(f"chantier #{i} : ne peut pas être planifié (statut {r[0] if r else 'introuvable'})")
             continue
         Lh = Ligne({"duree_estimee_h": durees.get(i, "")})
@@ -859,7 +962,7 @@ def calculer_horaire(durees_h):
 # ---------------------------------------------------------------------------
 # Duplication (travaux récurrents)
 # ---------------------------------------------------------------------------
-def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=None, description=None):
+def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=None, description=None, cree_par=None):
     """Crée une nouvelle SOUMISSION d'après un chantier existant (de n'importe quel statut).
 
     Copie : client, types de travaux et précisions, description, durée estimée, prix, modalité de paiement.
@@ -877,17 +980,15 @@ def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=N
     if L.erreurs:
         return None, L.erreurs
     prix = prix if prix is not None else (Decimal(str(prix_src)) if prix_src is not None else None)
-    duree_finale = float(h) if h is not None else duree_src
-    if not duree_finale:
-        return None, ["la durée estimée est obligatoire (en heures, ex. 2,5)"]
+    duree_finale = float(h) if h is not None else duree_src       # facultative : c'est une soumission
     if avec_taxes is None:
         avec_taxes = (tps_src or 0) + (tvq_src or 0) > 0
     tps, tvq = taxes_pour(prix) if (avec_taxes and prix is not None) else (Decimal("0"), Decimal("0"))
     cur = conn.execute(
         "INSERT INTO chantiers (client_id, description, statut, date_soumission, duree_estimee_h, prix_ht, tps, tvq, modalite_paiement,"
-        " nacelle, debarrasser_bois, bois_format) VALUES (?, ?, 'soumission', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " nacelle, debarrasser_bois, bois_format, cree_par) VALUES (?, ?, 'soumission', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (client_id, (description if description is not None else desc), datetime.date.today().isoformat(), duree_finale,
-         _num(prix), float(tps), float(tvq), modalite, nacelle, bois, format_bois))
+         _num(prix), float(tps), float(tvq), modalite, nacelle, bois, format_bois, cree_par))
     conn.execute("INSERT INTO chantier_travaux (chantier_id, type_travaux, precision) "
                  "SELECT ?, type_travaux, precision FROM chantier_travaux WHERE chantier_id = ?", (cur.lastrowid, chantier_id))
     return cur.lastrowid, []
@@ -903,13 +1004,74 @@ def annuler_chantier(conn, chantier_id):
 
 
 def rouvrir_chantier(conn, chantier_id):
-    """Un chantier annulé par erreur redevient « À planifier »."""
-    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    """Une fiche annulée par erreur est rouverte : un chantier annulé redevient « À planifier », une soumission refusée
+    redevient une soumission en cours."""
+    r = conn.execute("SELECT statut, accepte_le FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     if r is None:
         return [f"chantier #{chantier_id} introuvable"]
     if r[0] != "annule":
-        return ["seul un chantier annulé peut être rouvert"]
-    return changer_statut(conn, chantier_id, "a_planifier")
+        return ["seul un chantier annulé (ou une soumission refusée) peut être rouvert"]
+    return changer_statut(conn, chantier_id, "a_planifier" if r[1] else "soumission")
+
+
+def manques_pour_accepter(conn, chantier_id):
+    """Ce qui manque encore pour accepter la soumission : liste de codes de CONDITIONS_ACCEPTATION (vide : tout est là)."""
+    r = conn.execute("SELECT cl.nom, cl.entreprise, cl.telephone, cl.adresse, cl.secteur, c.duree_estimee_h, c.prix_ht,"
+                     " (SELECT count(*) FROM chantier_travaux WHERE chantier_id = c.id),"
+                     " (SELECT count(*) FROM chantier_travaux WHERE chantier_id = c.id AND type_travaux IN ('abattage', 'elagage')),"
+                     " c.debarrasser_bois, c.bois_format"
+                     " FROM chantiers c JOIN clients cl ON cl.id = c.client_id WHERE c.id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return []
+    nom, entreprise, tel, adresse, secteur, duree, prix, n_travaux, n_bois, debarrasse, format_bois = r
+    presents = {"nom": bool((nom or "").strip() or (entreprise or "").strip()), "telephone": bool(tel), "adresse": bool((adresse or "").strip()),
+                "secteur": bool(secteur), "travaux": n_travaux > 0, "bois": not n_bois or bool(debarrasse) or bool(format_bois),
+                "duree": bool(duree), "prix": prix is not None}
+    return [code for code, _ in CONDITIONS_ACCEPTATION if not presents[code]]
+
+
+def libelles_manques(codes):
+    noms = dict(CONDITIONS_ACCEPTATION)
+    return [noms[c] for c in codes]
+
+
+def accepter_soumission(conn, chantier_id):
+    """Soumission acceptée : elle devient un chantier « À planifier », à condition que tout ce qu'il faut soit rempli
+    (CONDITIONS_ACCEPTATION). Retourne la liste des erreurs ; vide = acceptée. À appeler dans une transaction."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"fiche #{chantier_id} introuvable"]
+    if r[0] not in STATUTS_SOUMISSION:
+        return ["seule une soumission en cours peut être acceptée"]
+    manques = manques_pour_accepter(conn, chantier_id)
+    if manques:
+        return ["il manque encore : " + ", ".join(libelles_manques(manques))]
+    conn.execute("UPDATE chantiers SET statut = 'a_planifier', date_prevue = NULL, accepte_le = ? WHERE id = ?",
+                 (datetime.date.today().isoformat(), chantier_id))
+    ajuster_ordre(conn, chantier_id)
+    return []
+
+
+def refuser_soumission(conn, chantier_id):
+    """Soumission refusée par le client : « Annulé » (sans date d'acceptation : elle reste dans les soumissions, section Refusées)."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"fiche #{chantier_id} introuvable"]
+    if r[0] not in STATUTS_SOUMISSION:
+        return ["seule une soumission en cours peut être refusée (un chantier se règle avec « Annuler »)"]
+    return changer_statut(conn, chantier_id, "annule")
+
+
+def remettre_en_soumission(conn, chantier_id):
+    """Un chantier accepté par erreur (pas encore placé dans une journée) redevient une soumission."""
+    r = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    if r is None:
+        return [f"fiche #{chantier_id} introuvable"]
+    if r[0] != "a_planifier":
+        return ["seul un chantier « À planifier » peut être remis en soumission (retire-le d'abord de sa journée)"]
+    conn.execute("UPDATE chantiers SET statut = 'soumission', accepte_le = NULL, date_prevue = NULL WHERE id = ?", (chantier_id,))
+    ajuster_ordre(conn, chantier_id)
+    return []
 
 
 def terminer_chantier(conn, chantier_id, duree_reelle=None, paye=False, mode=None):

@@ -42,7 +42,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 
 | # | Scénario | Résultat attendu |
 |---|---|---|
-| 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, Clients ; **aucun emoji** nulle part |
+| 1 | Regarder le menu du haut | seulement : Tableau de bord, Journée, Chantiers, **Soumissions**, Clients ; **aucun emoji** nulle part |
 | 2 | **Tableau de bord** | un calendrier du mois ; **dans chaque case** d'un jour planifié : « N chantiers », « Temps total : X h », « Montant total : XXX $ » ; les jours de plus de 8 h sont en rouge |
 | 3 | Cliquer sur une **date** du calendrier | la journée s'affiche dessous : durée totale, montant total, chantiers dans l'ordre avec heures, temps, options (nacelle, bois) et **montant à droite** ; **aucun statut ni paiement** ; un seul bouton **Terminer**, en bas de chaque chantier |
 | 4 | Dîner : un chantier de plus de 2 h qui commence à 10 h 30 | il est prolongé de 30 min (« dîner inclus ») ; un chantier qui finit à 12 h 00 pile est suivi d'une ligne « Dîner 12 h 00 - 12 h 30 » |
@@ -54,11 +54,11 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 10 | Journée : **Retirer** un chantier | il redevient « À planifier » (sans date) et disparaît de la journée |
 | 11 | Page d'un chantier planifié, « Paramètres avancés », « Annuler le chantier » (confirmation) | il disparaît de la journée et apparaît dans les **archives** (bas de la page Chantiers) |
 | 12 | Journée : choisir demain, filtrer par secteur, cocher 3 chantiers, « Ajouter à la journée » | ils s'ajoutent **à la fin** de la journée, dans l'ordre affiché, et deviennent planifiés ; le total d'heures et de dollars se met à jour en cochant ; un chantier sans durée ne peut pas être coché |
-| 13 | **Chantiers** | une seule page : chantiers actifs en haut (date de la **demande**, délai d'attente en pastille, temps, options, **montant à droite**), « Archives » plus bas ; filtres statut / paiement / secteur |
-| 14 | **Clients > + Nouveau client**, client neuf : nom, adresse, secteur (liste), un type, durée, prix | « Chantier créé » ; « Paramètres avancés » reste replié ; la date de la demande est celle d'aujourd'hui |
-| 15 | Même formulaire : ville / secteur | **liste déroulante** obligatoire (pas de champ texte) ; la ville de l'adresse en découle |
-| 16 | Cocher « Nacelle requise » ; cocher un abattage **sans** « Débarrasser le bois » | refusé tant que le format du bois (16 pouces / 4 pieds) n'est pas précisé ; ces options sont visibles **sans** ouvrir « Paramètres avancés » |
-| 17 | Ouvrir le chantier créé | résumé avec la **valeur à droite**, client en lecture seule, paiements ; le statut et la date sont **affichés** (« géré automatiquement », « se change dans la page Journée ») |
+| 13 | **Chantiers** | une seule page : **raccourcis** (pastilles) en haut, chantiers actifs (date d'attente, pastille de délai, temps, **montant à droite**), « Archives » plus bas ; filtres statut / paiement / secteur ; **aucune soumission** |
+| 14 | **Clients > + Nouveau client**, client neuf : nom, adresse, secteur (liste), un type, durée, prix | « Soumission créée » et on **revient à la fiche du client** ; « Paramètres avancés » reste replié ; la date de la demande est celle d'aujourd'hui |
+| 15 | Même formulaire : ville / secteur | **liste déroulante** (pas de champ texte), jamais obligatoire à l'ouverture d'une soumission ; la ville de l'adresse en découle |
+| 16 | Cocher « Nacelle requise » ; cocher un abattage **sans** « Débarrasser le bois » | la soumission s'enregistre ; mais **Accepter** demande le format du bois (16 pouces / 4 pieds) ; ces options sont visibles **sans** ouvrir « Paramètres avancés » |
+| 17 | Ouvrir la soumission créée (onglet Soumissions) | résumé avec la **valeur à droite**, boutons **Accepter / Refuser / Dupliquer**, ce qui manque encore pour accepter, client en lecture seule ; **aucune liste « Statut »** nulle part |
 | 18 | Page d'un chantier : chercher un champ pour changer le nom ou l'adresse du client | il n'y en a pas : le client est en lecture seule ; « Modifier le client » mène à sa fiche |
 | 19 | **Clients** : la liste | seulement Nom, Téléphone, Adresse (le secteur sous l'adresse) ; filtre par secteur ; la fiche d'un client n'affiche aucun montant |
 | 20 | **Clients**, « Gérer les secteurs desservis » : ajouter « Cap de la Madeleine » ; ajouter un vrai nouveau secteur ; renommer ; supprimer un secteur utilisé | le doublon (accent, tiret ou casse près) est refusé ; un secteur utilisé ne se supprime pas ; la liste déroulante suit |
@@ -76,8 +76,18 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 32 | **Deux appareils** : ouvrir le même chantier sur deux appareils, modifier la description sur le 1er et enregistrer, puis modifier sur le 2e et enregistrer | le 2e voit « Cette fiche vient d'être modifiée par quelqu'un d'autre », ses changements ne sont pas enregistrés, la fiche à jour s'affiche |
 | 33 | **Refus** : depuis un appareil qui n'est PAS dans ton Tailscale (ex. un ordinateur du Wi-Fi), ouvrir `http://adresse-de-l'atelier:8765` | la page ne s'ouvre pas (« Accès refusé » ou aucune réponse) |
 | 34 | **Comptes** : `gerer_utilisateurs.bat`, créer un administrateur et un compte « Soumission » ; relancer l'application | la page de connexion s'affiche partout (même sur l'ordinateur) ; un mauvais mot de passe est refusé ; 5 essais ratés bloquent 15 minutes |
-| 35 | **Compte Soumission** sur un téléphone | arrive sur la liste des Chantiers ; barre du bas : Chantiers, Clients, + Chantier ; pas de Journée, de PDF, de paiements, de bouton Terminer ni Supprimer ; peut créer et modifier une soumission |
+| 35 | **Compte Soumission** sur un téléphone | arrive sur les **Soumissions** ; barre du bas : Chantiers, Soumissions, Clients, + Soumission ; pas de Journée, de PDF, de paiements, de bouton Terminer ni Supprimer ; peut créer, modifier, accepter et refuser une soumission |
 | 36 | **Administrateur** : page Utilisateurs : changer le mot de passe du compte Soumission | l'appareil de cette personne est déconnecté ; elle se reconnecte avec le nouveau mot de passe |
+| 37 | **Soumissions > + Nouvelle soumission**, ne **rien remplir**, « Créer la soumission » | acceptée (rien n'est obligatoire) ; retour à la fiche du client ; dans Soumissions elle s'affiche « (client à identifier) » avec en rouge « Il manque : nom, téléphone, adresse, ... » |
+| 38 | Soumission à moitié remplie (nom, téléphone, un type de travaux), bouton **Accepter** | le programme **ne l'accepte pas** : il ouvre « Accepter la soumission » avec **seulement les champs manquants** (adresse, secteur, durée, prix) ; « Enregistrer et accepter » la place dans **Chantiers, À planifier** et elle quitte Soumissions |
+| 39 | Soumission complète, bouton **Accepter** (liste ou page de la fiche) | elle devient tout de suite un chantier « À planifier » (message « Soumission acceptée ») ; dans la page du chantier : « Remettre en soumission » la ramène dans Soumissions |
+| 40 | **Refuser** une soumission (confirmation) | elle disparaît de la liste et va dans la section **Refusées** (bas de la page) ; elle n'est ni dans Chantiers ni dans ses archives ; « Rouvrir » la remet en cours |
+| 41 | Regarder Chantiers, Journée et le tableau de bord après avoir ouvert 3 soumissions | **aucune soumission** n'y apparaît ; les compteurs et les journées sont inchangés |
+| 42 | Chantiers : cliquer une **pastille** (par ex. « Planifiés »), puis la même pastille | le premier clic filtre la liste (pastille surlignée), le second retire le filtre |
+| 43 | **Modifier les raccourcis** (lien à côté des pastilles) : ajouter « Terminés », créer « Planifiés du centre-ville » (statut + secteur), monter / descendre, retirer, « Rétablir ceux du départ » | chaque action se voit tout de suite dans les pastilles ; on peut tout retirer (ceux du départ ne reviennent pas seuls) ; un doublon est refusé |
+| 44 | Deux comptes : ajouter un raccourci avec un compte, regarder avec l'autre | chacun garde **ses** raccourcis ; « Mes soumissions » ne compte que celles que le compte a ouvertes ; le compte Soumission **ne voit aucune pastille de paiement** |
+| 45 | Fiche d'un client créé par une soumission vide : « Modifier le client » sans rien remplir | accepté tant que le client n'a que des soumissions ; avec un chantier, le nom, l'adresse et le secteur redeviennent obligatoires ; depuis une soumission, « Modifier le client » **ramène à la soumission** |
+| 46 | *(si tu as déjà une base d'une version précédente)* Lancer la nouvelle version | une copie « avant_migration » apparaît dans `data/sauvegardes` ; tes chantiers sont toujours là (anciens « En attente » devenus des soumissions) |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -92,7 +102,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 28 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 46 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

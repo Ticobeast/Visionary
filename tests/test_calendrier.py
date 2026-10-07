@@ -61,7 +61,8 @@ class BaseJour(unittest.TestCase):
         for nom, ville, statut, jour, duree in [
             ("Alpha", "Blainville", "planifie", dans(1), 2.0), ("Bravo", "Mirabel", "planifie", dans(1), 3.0),
             ("Charlie", "Mirabel", "planifie", dans(1), 1.5), ("Delta", "Blainville", "a_planifier", None, 2.0),
-            ("Echo", "Blainville", "en_attente", None, 1.0), ("Fox", "Mirabel", "termine", dans(-3), 2.0)]:
+            ("Echo", "Blainville", "a_planifier", None, 1.0), ("Fox", "Mirabel", "termine", dans(-3), 2.0),
+            ("Golf", "Mirabel", "soumission", None, 1.0)]:
             conn.execute("INSERT INTO clients (nom, adresse, ville, secteur, telephone) VALUES (?, ?, ?, ?, '+14505550100')",
                          (nom, f"1 Rue {nom}", ville, {"Blainville": "cap_de_la_madeleine", "Mirabel": "trois_rivieres_ouest"}[ville]))
             cid = conn.execute("SELECT max(id) FROM clients").fetchone()[0]
@@ -104,36 +105,42 @@ class TestStatuts(BaseJour):
         self.assertEqual(noyau.STATUTS, ("soumission", "en_attente", "a_planifier", "planifie", "termine", "annule"))
         self.assertEqual([noyau.LIBELLES_STATUT[s] for s in noyau.STATUTS],
                          ["Soumission", "En attente", "À planifier", "Planifié", "Terminé", "Annulé"])
-        # le statut se choisit seulement avant la planification : « À planifier » propose les trois statuts d'avant ; « Planifié » n'en propose aucun
-        page = self.get("/chantier/%d" % self.ids["Delta"])[1]
-        options = re.findall(r'<option value="([a-z_]+)"[^>]*>([^<]+)</option>', page[page.index('name="statut"'):page.index('name="statut"') + 400])
-        self.assertEqual([c for c, _ in options], list(noyau.STATUTS_MANUELS))
-        self.assertNotIn("Refusé", page)
-        planifie = self.get("/chantier/%d" % self.ids["Alpha"])[1]
-        self.assertNotIn('name="statut"', planifie)
-        self.assertIn("géré automatiquement", planifie)
+        # le statut ne se choisit JAMAIS dans un formulaire : il change avec les boutons (Accepter, Refuser, Journée, Terminer, Annuler)
+        for nom in ("Delta", "Alpha", "Golf"):
+            page = self.get("/chantier/%d" % self.ids[nom], {})[1] if nom != "Golf" else self.get("/soumission/%d" % self.ids[nom])[1]
+            self.assertNotIn('name="statut"', page, nom)
+            self.assertNotIn("Refusé", page)
 
-    def test_en_attente_et_a_planifier_n_ont_pas_de_date(self):
+    def test_a_planifier_et_soumission_n_ont_pas_de_date(self):
         conn, _ = noyau.ouvrir_base(self.db)
-        for statut in ("en_attente", "a_planifier", "soumission"):
-            self.assertEqual(noyau.changer_statut(conn, self.ids["Alpha"], statut), [])
-            self.assertEqual(conn.execute("SELECT statut, date_prevue, ordre_jour FROM chantiers WHERE id = ?", (self.ids["Alpha"],)).fetchone(), (statut, None, None))
-            noyau.changer_statut(conn, self.ids["Alpha"], "planifie", dans(1))
+        for nom, statut in (("Alpha", "a_planifier"), ("Bravo", "soumission"), ("Charlie", "en_attente")):
+            self.assertEqual(noyau.changer_statut(conn, self.ids[nom], statut), [])
+            self.assertEqual(conn.execute("SELECT statut, date_prevue, ordre_jour FROM chantiers WHERE id = ?", (self.ids[nom],)).fetchone(), (statut, None, None))
+        # une soumission ne revient pas à « Planifié » par ce chemin : elle passe par Accepter
+        self.assertTrue(noyau.changer_statut(conn, self.ids["Bravo"], "planifie", dans(1)))
         conn.close()
 
-    def test_en_attente_peut_etre_planifie_en_lot_mais_pas_un_chantier_termine(self):
+    def test_seul_un_chantier_a_planifier_se_planifie_en_lot(self):
         conn, _ = noyau.ouvrir_base(self.db)
         self.assertEqual(noyau.planifier_lot(conn, [self.ids["Echo"]], dans(2)), [])
-        self.assertTrue(noyau.planifier_lot(conn, [self.ids["Fox"]], dans(2)))
+        self.assertTrue(noyau.planifier_lot(conn, [self.ids["Golf"]], dans(2)))        # une soumission : il faut d'abord l'accepter
+        self.assertTrue(noyau.planifier_lot(conn, [self.ids["Fox"]], dans(2)))         # un chantier terminé : jamais
         conn.close()
 
-    def test_paiement_sans_objet_pour_en_attente(self):
-        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Echo"],)), [("sans_objet",)])
+    def test_paiement_sans_objet_pour_une_soumission(self):
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Golf"],)), [("sans_objet",)])
         self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Delta"],)), [("a_venir",)])
 
-    def test_filtre_en_attente_de_la_journee(self):
-        page = self.get("/journee", {"date": dans(2), "statut": "en_attente"})[1]
-        self.assertEqual(re.findall(r'<a href="/client/\d+">([^<]+)</a>', page[page.index('id="lot"'):]), ["Echo"])
+    def test_la_journee_ne_propose_que_des_chantiers_acceptes(self):
+        page = self.get("/journee", {"date": dans(2)})[1]
+        self.assertEqual(sorted(re.findall(r'<a href="/client/\d+">([^<]+)</a>', page[page.index('id="lot"'):])), ["Delta", "Echo"])
+        self.assertNotIn("Golf", page)                                                 # une soumission n'est jamais proposée
+        options = re.findall(r'<option value="([a-z_]+)"[^>]*>', page[page.index('name="statut"'):page.index('name="statut"') + 300])
+        self.assertEqual(options[:2], ["a_planifier", "planifie"])
+        self.assertNotIn('value="soumission"', page)
+        self.assertNotIn('value="en_attente"', page)
+        autre = self.get("/journee", {"date": dans(2), "statut": "soumission"})[1]      # un critère périmé retombe sur « À planifier »
+        self.assertNotIn("Golf", autre)
 
 
 class TestPageJournee(BaseJour):
@@ -244,13 +251,16 @@ class TestOrdreDeLaJournee(BaseJour):
         self.assertEqual(self.sql("SELECT statut, date_prevue, ordre_jour FROM chantiers WHERE id = ?", (self.ids["Bravo"],)), [("a_planifier", None, None)])
 
     def test_creation_depuis_le_formulaire_complet_obtient_un_rang(self):
-        # un nouveau chantier ne se planifie pas à la création (statut et date envoyés ignorés) : on l'ajoute à une journée ensuite
-        form = {"client_nom": "Nouveau", "adresse": "9 Rue N", "client_secteur": "trois_rivieres_ouest", "client_sms_ok": "1", "type_emondage": "1",
-                "statut": "planifie", "date_prevue": dans(1), "duree_estimee_h": "1"}
+        # une nouvelle fiche est une soumission (statut et date envoyés ignorés) : on l'accepte, puis on l'ajoute à une journée
+        form = {"client_nom": "Nouveau", "client_telephone": "450-555-0188", "adresse": "9 Rue N", "client_secteur": "trois_rivieres_ouest",
+                "client_sms_ok": "1", "type_emondage": "1", "statut": "planifie", "date_prevue": dans(1), "duree_estimee_h": "1", "prix_ht": "100"}
         self.post("/nouveau", form)
         self.assertEqual(self.ordre(), ["Alpha", "Bravo", "Charlie"])
         nouveau = self.sql("SELECT id, statut, date_prevue FROM chantiers WHERE description IS NULL ORDER BY id DESC LIMIT 1")[0]
         self.assertEqual(nouveau[1:], ("soumission", None))
+        self.post("/journee/planifier", {"date": dans(1), f"sel_{nouveau[0]}": "1", "retour": "/journee"})      # refusé : pas encore acceptée
+        self.assertEqual(self.ordre(), ["Alpha", "Bravo", "Charlie"])
+        self.post(f"/soumission/{nouveau[0]}/accepter", {"retour": "/soumissions"})
         self.post("/journee/planifier", {"date": dans(1), f"sel_{nouveau[0]}": "1", "retour": "/journee"})
         self.assertEqual(self.ordre()[-1], "Nouveau")
 
