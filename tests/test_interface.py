@@ -79,7 +79,7 @@ class TestPages(BaseInterface):
         self.assertNotIn("à facturer", page)
         self.assertIn("1 437,19 $", actifs)                      # Lavoie : 1250 + taxes, non facturé
         self.assertNotIn('class="onglet', page)                        # plus d'onglets : une seule section principale
-        entete = page[page.index("<header>"):page.index("</header>")]
+        entete = page[page.index("<header"):page.index("</header>")]
         self.assertNotIn("Archives", entete)                     # et pas d'entrée « Archives » dans le menu
 
     def test_un_chantier_termine_et_paye_rejoint_les_archives_tout_seul(self):

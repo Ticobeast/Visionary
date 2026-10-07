@@ -15,8 +15,9 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 SCHEMA = RACINE / "schema" / "schema.sql"
+MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"   # ajout des comptes : seule migration conservée (des données réelles peuvent exister)
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 8
+VERSION_SCHEMA = 9
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -365,6 +366,10 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if version == 8 and VERSION_SCHEMA == 9:          # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
+            conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
+            conn.execute("PRAGMA foreign_keys = ON")
+            version = VERSION_SCHEMA
         if version != VERSION_SCHEMA:
             conn.close()
             raise SystemExit(f"La base {db_path} a été créée par une version précédente du programme (format v{version}, attendu v{VERSION_SCHEMA}).\n"

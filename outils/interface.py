@@ -22,6 +22,8 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
+import auth  # noqa: E402
+import vue  # noqa: E402
 from noyau import (DB_DEFAUT, STATUTS, Index, Resultat, cle, creer_chantier, jours_attente, lister_secteurs, ouvrir_base,  # noqa: E402
                    priorite, sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
@@ -175,12 +177,13 @@ def creer(conn, form):
 # ---------------------------------------------------------------------------
 # Routage (indépendant du réseau : facile à tester)
 # ---------------------------------------------------------------------------
+from auth import ROUTES_AUTH, controler  # noqa: E402
 from pages_clients import ROUTES_CLIENTS  # noqa: E402
 from tableau import ROUTES_TABLEAU  # noqa: E402
 from calendrier import page_calendrier  # noqa: E402
 from composants import fenetre_terminer  # noqa: E402
 
-ROUTES = ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_CHANTIER + [
+ROUTES = ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_CHANTIER + [
     ("GET", r"^/$", lambda c, q, f, *g: page_calendrier(c, q)),
     ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
@@ -188,10 +191,15 @@ ROUTES = ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_CHANTIER + [
 ]
 
 
-def repondre(db_path, methode, chemin, query=None, form=None):
-    """Retourne (statut HTTP, en-têtes, corps en bytes)."""
+def repondre(db_path, methode, chemin, query=None, form=None, requete=None):
+    """Retourne (statut HTTP, en-têtes, corps en bytes).
+
+    `requete` (cookie, ip, agent, https) vient du serveur : elle déclenche le contrôle d'accès (connexion, droits).
+    Sans elle (tests, appels internes), aucun contrôle : le code appelant est déjà de confiance.
+    """
     query, form = query or {}, form or {}
     _BASE["db"] = str(db_path)
+    vue.CONTEXTE.utilisateur, vue.CONTEXTE.requete, vue.CONTEXTE.chemin = None, requete, chemin
     for m, motif, gestionnaire in ROUTES:
         correspondance = re.match(motif, chemin)
         if m == methode and correspondance:
@@ -201,6 +209,10 @@ def repondre(db_path, methode, chemin, query=None, form=None):
     conn = None
     try:
         conn, _ = ouvrir_base(db_path)
+        if requete is not None:
+            refus = controler(conn, requete, methode, chemin, query)
+            if refus is not None:
+                return refus
         resultat = gestionnaire(conn, query, form, *correspondance.groups())
         if isinstance(resultat, str):
             page, code = resultat, 200
@@ -209,7 +221,7 @@ def repondre(db_path, methode, chemin, query=None, form=None):
         else:
             page, code = resultat
         statut = {200: "200 OK", 404: "404 Not Found"}[code]
-        if methode == "GET" and code == 200 and query.get("terminer", "").isdigit():
+        if methode == "GET" and code == 200 and query.get("terminer", "").isdigit() and vue.est_admin():
             # après un encaissement sur un chantier « Planifié » : fenêtre « Voulez-vous passer ce chantier à Terminé ? »
             page = page.replace("</main>", fenetre_terminer(conn, int(query["terminer"]), chemin, query) + "</main>", 1)
         return statut, [("Content-Type", "text/html; charset=utf-8")], page.encode("utf-8")
@@ -253,7 +265,9 @@ class Gestionnaire(BaseHTTPRequestHandler):
         if methode == "POST":
             taille = min(int(self.headers.get("Content-Length") or 0), 1_000_000)
             form = {k: v[0] for k, v in parse_qs(self.rfile.read(taille).decode("utf-8", "replace"), keep_blank_values=True).items()}
-        self._envoyer(*repondre(self.db_path, methode, url.path, query, form))
+        requete = {"cookie": self.headers.get("Cookie", ""), "ip": self.client_address[0], "agent": self.headers.get("User-Agent", ""),
+                   "https": self.headers.get("X-Forwarded-Proto", "") == "https" and self.client_address[0] in ("127.0.0.1", "::1")}
+        self._envoyer(*repondre(self.db_path, methode, url.path, query, form, requete))
 
     def _envoyer(self, statut, en_tetes, corps):
         code, _, texte = statut.partition(" ")
@@ -320,6 +334,11 @@ def main(argv=None):
             print("Sur les téléphones / iPads :  " + "   ou   ".join(f"http://{ip}:{a.port}/" for ip in adresses))
         else:
             print("Tailscale n'a pas été trouvé sur cet ordinateur : installe-le (voir docs/acces_a_distance.md).")
+        c_auth, _ = ouvrir_base(db)
+        sans_compte = auth.nombre_actifs(c_auth) == 0
+        c_auth.close()
+        if sans_compte:
+            print("ATTENTION : aucun compte n'existe encore : l'accès à distance reste FERMÉ. Lance gerer_utilisateurs.bat pour créer les comptes.")
         print("Laisse cette fenêtre ouverte et l'ordinateur allumé (mise en veille désactivée).\n")
     if db.name == DB_DEFAUT.name:
         print("Pour t'entraîner sur de fausses données, lance plutôt :  python outils/interface.py --essai")

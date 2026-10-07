@@ -114,7 +114,7 @@ class TestSuiviSupprime(BaseTableau):
 
     def test_navigation_sans_suivi_ni_tournee_ni_archives(self):
         page = self.get("/")[1]
-        entete = page[page.index("<header>"):page.index("</header>")]
+        entete = page[page.index("<header"):page.index("</header>")]
         self.assertEqual(re.findall(r'<a href="([^"]+)">([^<]+)</a>', entete),
                          [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/clients", "Clients")])
         self.assertNotIn("+ Nouveau</a>", entete)                                # le bouton est dans la page Clients

@@ -15,6 +15,7 @@ secteurs 1 ─── N clients (personne/entreprise + adresse) 1 ─── N cha
 | `chantiers` | un travail pour un client (environ 2 h : plusieurs par journée) | c'est l'unité que l'itinéraire, la feuille de route et le suivi des paiements manipulent ; garder les chantiers séparés conserve l'historique d'un client récurrent |
 | `chantier_travaux` | un type de travaux d'un chantier, avec sa précision | un chantier peut combiner plusieurs types (élagage + taille de haie) |
 | `paiements` | une somme reçue | acompte + solde, chèque en deux versements… |
+| `utilisateurs`, `sessions` | les comptes de l'équipe et leurs connexions ouvertes | accès par mot de passe (voir ci-dessous) ; absents du reste du modèle |
 | `types_travaux` | un type de travaux | on ajoute un type avec un `INSERT`, sans modifier le schéma |
 | `secteurs` | un secteur desservi (liste fermée) : `code`, `libelle`, `ville` (inscrite sur l'adresse), `ordre` | une ville s'écrit toujours de la même façon (liste déroulante) ; sert à classer / filtrer les clients. Se gère dans la page *Secteurs* |
 
@@ -158,6 +159,20 @@ Crée une **nouvelle soumission** pour le même client : travaux (avec précisio
 | `mode` | texte | oui | `comptant`, `cheque`, `interac`, `carte`, `autre` | `interac` |
 | `reference` | texte | non | n° de chèque, référence Interac | `#0418` |
 | `notes` | texte | non | | |
+
+## `utilisateurs` et `sessions` (accès par mot de passe)
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `utilisateurs.nom` | texte unique (sans égard à la casse) | nom de connexion |
+| `utilisateurs.role` | `admin` ou `soumission` | `admin` : tout ; `soumission` : clients et chantiers (ni finances, ni journée, ni suppressions) |
+| `utilisateurs.mot_de_passe` | texte | `pbkdf2_sha256$itérations$sel$empreinte` : jamais le mot de passe lui-même |
+| `utilisateurs.actif` | 0 ou 1 | 0 : connexion impossible, sessions coupées |
+| `sessions.jeton_hash` | texte | empreinte SHA-256 du jeton du cookie (le jeton n'est jamais stocké) |
+| `sessions.expire_le` | date-heure | 30 jours, prolongée à l'usage |
+
+Tant qu'aucun compte actif n'existe, l'interface reste ouverte sur l'ordinateur seulement ; dès qu'il y en a un, la connexion est exigée partout.
+Le format v9 a été ajouté à un format v8 par une migration automatique (`schema/migration_v8_v9.sql`), sans toucher aux données.
 
 ## `types_travaux`
 

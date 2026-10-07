@@ -75,6 +75,9 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 31 | **Téléphone** (après l'installation de `docs/acces_a_distance.md`) : ouvrir l'adresse sur un téléphone, parcourir Tableau de bord, Journée, Chantiers, Clients | aucune barre de défilement horizontale ; une carte par chantier ; boutons faciles à toucher ; « Terminer » et « Retirer » côte à côte |
 | 32 | **Deux appareils** : ouvrir le même chantier sur deux appareils, modifier la description sur le 1er et enregistrer, puis modifier sur le 2e et enregistrer | le 2e voit « Cette fiche vient d'être modifiée par quelqu'un d'autre », ses changements ne sont pas enregistrés, la fiche à jour s'affiche |
 | 33 | **Refus** : depuis un appareil qui n'est PAS dans ton Tailscale (ex. un ordinateur du Wi-Fi), ouvrir `http://adresse-de-l'atelier:8765` | la page ne s'ouvre pas (« Accès refusé » ou aucune réponse) |
+| 34 | **Comptes** : `gerer_utilisateurs.bat`, créer un administrateur et un compte « Soumission » ; relancer l'application | la page de connexion s'affiche partout (même sur l'ordinateur) ; un mauvais mot de passe est refusé ; 5 essais ratés bloquent 15 minutes |
+| 35 | **Compte Soumission** sur un téléphone | arrive sur la liste des Chantiers ; barre du bas : Chantiers, Clients, + Chantier ; pas de Journée, de PDF, de paiements, de bouton Terminer ni Supprimer ; peut créer et modifier une soumission |
+| 36 | **Administrateur** : page Utilisateurs : changer le mot de passe du compte Soumission | l'appareil de cette personne est déconnecté ; elle se reconnecte avec le nouveau mot de passe |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

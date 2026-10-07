@@ -114,7 +114,9 @@ class TestServeur(unittest.TestCase):
             def _envoyer(self, statut, en_tetes, corps):
                 self.reponse = statut
         self_db = str(self.db)
-        for ip, attendu in (("192.168.1.50", "403 Forbidden"), ("8.8.8.8", "403 Forbidden"), ("100.90.80.70", "200 OK")):
+        # (« Aucun compte » : un appareil Tailscale passe la porte du réseau mais l'application reste fermée tant qu'aucun
+        # compte n'existe ; voir test_auth pour la suite)
+        for ip, attendu in (("192.168.1.50", "403 Forbidden"), ("8.8.8.8", "403 Forbidden"), ("100.90.80.70", "403 Forbidden")):
             Faux.reseau, Faux.port = True, 8765
             f = Faux(ip, 8765)
             f._traiter("GET")

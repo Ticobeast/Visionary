@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
-from vue import (LIBELLES_STATUT, avance, badge, bloc_options_travaux, bloc_types, champ, champ_modalite, client_avance,
+from vue import (est_admin, LIBELLES_STATUT, avance, badge, bloc_options_travaux, bloc_types, champ, champ_modalite, client_avance,
                  client_essentiel, esc, gabarit, lien_maps, redirection, select_secteur, zone)
 
 
@@ -118,7 +118,7 @@ def page_client(conn, client_id, query):
                    + (f" : {esc(detail)}" if detail else "") + ". Définitif, y compris dans les archives.</p>"
                    f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
                    '<button class="danger" type="submit">Supprimer le client</button></form></div>')
-    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Chantiers</h2>{historique}{suppression}', query.get("ok"), query.get("err"))
+    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Chantiers</h2>{historique}{suppression if est_admin() else ""}', query.get("ok"), query.get("err"))
 
 
 # ---------------------------------------------------------------------------

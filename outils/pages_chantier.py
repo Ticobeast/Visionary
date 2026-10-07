@@ -14,7 +14,7 @@ import sqlite3
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_MANUELS, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
                    dupliquer_chantier, empreinte, encaisser, lire_ligne, lister_secteurs, mettre_a_jour_fiche,
                    supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire, valeurs_client)
-from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, MODES, argent, avance, badge, bloc_options_travaux,
+from vue import (est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, MODES, argent, avance, badge, bloc_options_travaux,
                  bloc_types, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps,
                  redirection, zone)
 
@@ -253,7 +253,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                                    f"Durée {heures(duree)}" if duree else "") if x)
     montants = (f'<div class="montant">{argent(total) if total is not None and total else "prix à saisir"}'
                 + (f'<small>{argent(prix)} + TPS {argent(tps)} + TVQ {argent(tvq)}</small>' if total else "")
-                + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total else "") + "</div>")
+                + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and est_admin() else "") + "</div>")
     resume = (f'<div class="carte resume-chantier"><div><div class="barre"><h2 style="margin:0">{esc(nom)}</h2>{badges}</div>'
               f'<p style="margin:10px 0 0"><b>Travaux :</b> {esc(detail)}</p>'
               f'{f"<p class=doux style=margin-bottom:0>{esc(infos)}</p>" if infos else ""}</div>{montants}</div>')
@@ -262,15 +262,15 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         return (f'<form class="mini" method="post" action="/action/{action}"{confirmer}><input type="hidden" name="chantier_id" value="{chantier_id}">'
                 f'<input type="hidden" name="retour" value="/chantier/{chantier_id}"><button type="submit"{f" class={classe}" if classe else ""}>{texte}</button></form>')
     boutons = f'<a class="bouton secondaire" href="/chantier/{chantier_id}/dupliquer">Dupliquer le chantier</a>'
-    if statut == "planifie":
+    if statut == "planifie" and est_admin():
         boutons = f'<a class="bouton" href="/chantier/{chantier_id}?terminer={chantier_id}">Terminer</a>' + boutons
-    if statut == "annule":
+    if statut == "annule" and est_admin():
         boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="barre" style="margin-bottom:16px">{boutons}</div>'
     bandeau = ('<div class="verrou-termine">Chantier <b>annulé</b> : il est dans les archives. Il disparaît des journées ; '
                'tu peux le rouvrir si l\'annulation était une erreur.</div>' if statut == "annule" else "")
     corps = carte_client_lecture(conn, client_id)
-    paiements = _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement)
+    paiements = _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement) if est_admin() else ""     # finances : administrateur seulement
     autres = _autres_chantiers(conn, client_id, chantier_id)
 
     if termine:
@@ -290,7 +290,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                       f'<input type="hidden" name="empreinte" value="{empreinte(depuis_base)}">{essentiel}'
                       '<div class="barre" style="margin-bottom:16px"><button type="submit">Enregistrer les modifications</button>'
                       '<a class="bouton secondaire" href="/">Fermer</a></div>'
-                      f'{avance(avance_chantier + autres + danger, ouvert=bool(erreurs))}</form>'
+                      f'{avance(avance_chantier + autres + (danger if est_admin() else ""), ouvert=bool(erreurs))}</form>'
                       f'<form id="supprimer-chantier" method="post" action="/chantier/{chantier_id}/supprimer"></form>'
                       f'<form id="annuler-chantier" method="post" action="/action/annuler"><input type="hidden" name="chantier_id" value="{chantier_id}">'
                       f'<input type="hidden" name="retour" value="/chantier/{chantier_id}"></form>')

@@ -17,7 +17,7 @@ sans retranscription.
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
 **Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
-(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. L'affichage s'adapte aux petits écrans.
+(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. Connexion par nom et mot de passe (`gerer_utilisateurs.bat`), droits « administrateur » et « soumission », affichage simplifié sur téléphone (Chantiers, Clients, + Chantier).
 
 ## Modèle
 

@@ -1,5 +1,7 @@
 """Éléments d'affichage partagés par toutes les pages : styles, gabarit, composants de formulaire."""
 import html
+import re
+import threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -28,18 +30,20 @@ MESSAGES = {
     "deplace": "Ordre de passage mis à jour : les heures sont recalculées.",
     "client_maj": "Fiche client enregistrée.",
     "client_supprime": "Client supprimé.",
+    "utilisateur_cree": "Compte créé.",
+    "mdp_change": "Mot de passe changé : l'appareil de cette personne devra se reconnecter.",
+    "utilisateur_maj": "Compte mis à jour.",
     "client_cree": "Chantier créé pour ce client.",
     "duplique": "Nouvelle soumission créée d'après le chantier précédent : ajuste le prix si besoin.",
 }
 
 CSS = """
-:root{--fond:#f5f6f4;--carte:#fff;--texte:#1d2a22;--doux:#5b6b61;--trait:#d9ded9;--accent:#2f6b3f;--accent-fonce:#245232;
---alerte:#9b2c2c;--alerte-fond:#fbeaea;--ok-fond:#e7f3ea}
-@media (prefers-color-scheme:dark){:root{--fond:#161b18;--carte:#1f2622;--texte:#e8eee9;--doux:#a3b0a7;--trait:#34403a;
---accent:#6fbf86;--accent-fonce:#8fd3a3;--alerte:#f2a0a0;--alerte-fond:#3a2323;--ok-fond:#1f3326}}
+:root{--vert-fonce:#0e341d;--vert:#4a7a28;--vert-doux:#f4f8f2;--vert-bord:#d4e8cb;
+--fond:#fbfbf9;--carte:#fff;--texte:#0e341d;--doux:#64748b;--para:#334155;--trait:#dbe2d6;--trait-leger:#ecefe9;--puce:#f3f5f1;
+--accent:#4a7a28;--accent-fonce:#0e341d;--alerte:#b42318;--alerte-fond:#fef3f2;--alerte-bord:#fecdca;--ok-fond:#f4f8f2;
+--ombre-sm:0 2px 8px rgba(15,23,42,.04);--ombre-md:0 12px 24px rgba(15,23,42,.07);--ombre-btn:0 4px 14px rgba(74,122,40,.25);
+--ease:cubic-bezier(.16,1,.3,1)}
 *{box-sizing:border-box}body{margin:0;background:var(--fond);color:var(--texte);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
-header{background:var(--carte);border-bottom:1px solid var(--trait);padding:12px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-header strong{font-size:18px}header a{color:var(--accent-fonce);text-decoration:none;font-weight:600}
 main a{color:var(--accent-fonce)}main{max-width:1100px;margin:0 auto;padding:16px}h1{font-size:22px;margin:8px 0 16px}h2{font-size:17px;margin:0 0 12px}
 .carte{background:var(--carte);border:1px solid var(--trait);border-radius:10px;padding:16px;margin-bottom:16px}
 .grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
@@ -48,7 +52,6 @@ input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--trait);
 input[type=checkbox]{width:auto;margin-right:6px}textarea{min-height:70px}
 .large{grid-column:1/-1}
 button,.bouton{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
-@media (prefers-color-scheme:dark){button,.bouton{color:#0d1a11}}
 button.secondaire,.bouton.secondaire{background:transparent;color:var(--accent-fonce);border:1px solid var(--accent)}
 button.danger{background:transparent;color:var(--alerte);border:1px solid var(--alerte)}
 .puces{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
@@ -66,7 +69,7 @@ td:first-child,td.droite{white-space:nowrap}th{font-size:13px;color:var(--doux);
 .recherche{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}.recherche input{flex:1;min-width:180px}.recherche select{width:auto}
 .type{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px;align-items:center;margin-bottom:8px}
 .type label.coche{display:flex;align-items:center;margin:0;color:var(--texte);font-size:16px}
-.base{margin-left:auto;font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
+.base{font-size:13px;color:var(--doux)}.base.essai{background:#fff1d6;color:#7a4b00;border:1px solid #e8c675;border-radius:99px;padding:2px 10px;font-weight:600}
 @media (max-width:600px){.type{grid-template-columns:1fr}}
 main.large{max-width:1500px}.liste-defile{overflow-x:auto}table.tableau .mini{flex-wrap:nowrap}table.tableau td.col-actions{min-width:200px}.actions-ligne{display:flex;gap:8px;align-items:center;flex-wrap:nowrap}.actions-ligne form{margin:0}.actions-ligne .bouton,.actions-ligne button{padding:7px 14px;font-size:14px;white-space:nowrap}table.tableau th,table.tableau td{font-size:14px;padding:8px}table.tableau td:first-child{white-space:normal}
 .attente{display:inline-block;border-radius:6px;padding:2px 8px;font-weight:700;font-size:13px;white-space:nowrap;border:1px solid var(--trait)}
@@ -78,16 +81,15 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .mini{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:0 0 4px}.mini select,.mini input{width:auto;padding:5px 6px;font-size:13px;min-width:0}
 .mini input[type=date]{width:128px}.mini input.court{width:64px}.mini button{padding:5px 10px;font-size:13px}
 .onglets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.onglet{padding:7px 14px;border:1px solid var(--trait);border-radius:99px;text-decoration:none;color:var(--texte);background:var(--carte)}
-.onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}@media (prefers-color-scheme:dark){.onglet.actif{color:#0d1a11}}
+.onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
 .verrou{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}.verrou b{font-size:17px}
-.verrou .doux::before{content:"\1F512  "}.total{font-weight:700}.sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
+.total{font-weight:700}.sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
 .cal-nav{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.cal-nav h2{margin:0;flex:1;text-align:center;font-size:20px;min-width:140px}
 .cal-grille{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-tete{font-size:13px;color:var(--doux);text-align:center;font-weight:600;padding:4px 0;text-transform:capitalize}
 .cal-jour{min-height:124px;padding:6px 8px;border:1px solid var(--trait);border-radius:8px;text-decoration:none;color:var(--texte);display:flex;flex-direction:column;gap:2px;background:var(--carte)}
 .cal-jour:hover{border-color:var(--accent-fonce)}.cal-jour.autre-mois{opacity:.45}.cal-jour.weekend{background:var(--fond)}
 .cal-jour .cal-n{font-weight:700}.cal-jour.aujourdhui .cal-n{background:var(--accent);color:#fff;border-radius:99px;padding:0 7px;align-self:flex-start}
-@media (prefers-color-scheme:dark){.cal-jour.aujourdhui .cal-n{color:#0d1a11}}
 .cal-jour.occupe{border-color:var(--accent);background:var(--ok-fond)}.cal-jour.chargee{border-color:var(--alerte);background:var(--alerte-fond)}
 .cal-jour.selection{outline:3px solid var(--accent-fonce);outline-offset:-1px}.cal-info{font-size:12px;line-height:1.35}.cal-ligne{display:block}
 form.encaisser{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}form.encaisser select{width:auto;max-width:130px}.cal-alerte{font-size:11px;color:var(--alerte);font-weight:700}
@@ -117,9 +119,80 @@ label.coche,span.coche{display:inline-flex;align-items:center;gap:6px;color:var(
 .montant{font-size:18px;font-weight:700;text-align:right;white-space:nowrap}.montant small{display:block;font-size:12px;font-weight:400;color:var(--doux)}
 .total-jour .total,.resume-jour .total{font-weight:700}
 @media (max-width:700px){table.liste th:nth-child(n+5),table.liste td:nth-child(n+5){display:none}}
+
+/* Style de sylvainculteur.ca : vert forêt et vert signature, cartes blanches arrondies, titres lourds, étiquettes en capitales */
+*{-webkit-font-smoothing:antialiased}
+body{font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--fond);color:var(--texte)}
+.navbar{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--trait-leger)}
+.nav-contenu{max-width:1500px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.marque{display:inline-flex;align-items:center;text-decoration:none;color:var(--vert-fonce)}.marque img{height:40px;width:auto;display:block}
+.logotype{font-size:1.3rem;font-weight:800;letter-spacing:-.02em;color:var(--vert-fonce)}.logotype span{color:var(--vert)}
+.nav-bureau{display:flex;align-items:center;gap:6px;flex:1}.nav-bureau a{padding:8px 12px;border-radius:8px;text-decoration:none;color:var(--vert-fonce);font-weight:600;font-size:.92rem;transition:color .2s,background-color .2s}
+.nav-bureau a.actif{background:var(--vert-doux);color:var(--vert)}
+.nav-droite{display:flex;align-items:center;gap:12px;margin-left:auto;font-size:.88rem}.nav-droite a{color:var(--vert-fonce);font-weight:600;text-decoration:none}
+.nav-droite .qui{color:var(--doux);font-weight:600}.nav-droite form{margin:0}
+button.lien{background:none;border:0;box-shadow:none;color:var(--doux);padding:4px 6px;min-height:0;font-weight:600;font-size:.88rem;text-decoration:underline;cursor:pointer}
+@media (hover:hover) and (pointer:fine){.nav-bureau a:hover{color:var(--vert)}.nav-droite a:hover{color:var(--vert)}}
+.bandeau-page{background:var(--vert-doux);border-bottom:1px solid var(--vert-bord);padding:30px 0 24px}
+.conteneur{max-width:1100px;margin:0 auto;padding:0 20px}.conteneur.large{max-width:1500px}main.conteneur{padding:24px 20px 44px}
+.tag-badge{display:inline-flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--vert);margin-bottom:6px}
+.tag-badge::before{content:"";display:inline-block;width:24px;height:1.8px;background:var(--vert);border-radius:2px}
+h1{font-size:clamp(1.6rem,4.5vw,2.3rem);font-weight:800;line-height:1.15;letter-spacing:-.02em;color:var(--vert-fonce);margin:0}
+.bandeau-page h1 a{font-size:.9rem;font-weight:600;letter-spacing:0}
+main{padding:22px 20px 40px}main>h1{margin:6px 0 18px}
+h2{font-size:1.1rem;font-weight:800;letter-spacing:-.01em;color:var(--vert-fonce);margin:0 0 12px}
+main a{color:var(--vert);font-weight:600}
+.carte{border:1px solid var(--trait-leger);border-radius:18px;padding:22px;box-shadow:var(--ombre-sm)}
+label{font-size:.88rem;font-weight:700;color:var(--texte);margin-bottom:6px}
+input,select,textarea{border:1px solid var(--trait);border-radius:8px;padding:11px 14px;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--vert)}
+button,.bouton{background:var(--vert);color:#fff;border-radius:10px;padding:12px 20px;font-weight:700;font-size:.95rem;box-shadow:var(--ombre-btn);transition:transform .2s,box-shadow .2s,background-color .2s}
+@media (hover:hover) and (pointer:fine){button:hover,.bouton:hover{background:var(--vert-fonce);transform:translateY(-1px)}}
+button.secondaire,.bouton.secondaire{background:#fff;color:var(--vert-fonce);border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
+@media (hover:hover) and (pointer:fine){button.secondaire:hover,.bouton.secondaire:hover{background:#fff;box-shadow:var(--ombre-md)}}
+button.danger{background:#fff;color:var(--alerte);border:1px solid var(--alerte-bord);box-shadow:none}
+@media (hover:hover) and (pointer:fine){button.danger:hover{background:var(--alerte-fond)}}
+button.plein{width:100%;padding:15px 20px;font-size:1.02rem;border-radius:12px;margin-top:6px}
+button.lien{background:none;box-shadow:none;color:var(--doux)}
+@media (hover:hover) and (pointer:fine){button.lien:hover{background:none;transform:none;color:var(--vert)}}
+button:disabled{box-shadow:none}
+table{border:1px solid var(--trait-leger);border-radius:14px;box-shadow:var(--ombre-sm)}
+th{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--doux);background:var(--fond)}
+th,td{border-bottom:1px solid var(--trait-leger)}
+td a{color:var(--vert-fonce)}
+.badge{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 10px;border-radius:12px;background:var(--fond);border:1px solid var(--trait-leger);color:var(--vert)}
+.b-prix_manquant{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.b-a_payer{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
+.b-partiel{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.b-paye,.b-termine{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
+.attente{border-radius:8px}.a-normale{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
+.a-surveiller{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.a-urgente{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
+.erreurs{background:var(--alerte-fond);border:1px solid var(--alerte-bord);border-radius:12px}.message,.verrou-termine{background:var(--vert-doux);border:1px solid var(--vert-bord);border-radius:12px}
+.verrou,.lecture-seule{background:var(--fond);border:1px dashed var(--trait);border-radius:12px}
+.puce{border:1px solid var(--trait-leger);border-radius:14px;box-shadow:var(--ombre-sm);padding:12px 16px}.puce b{font-size:1.4rem;font-weight:800;color:var(--vert-fonce)}
+.onglet{border-color:var(--trait);font-weight:600}.onglet.actif{background:var(--vert);border-color:var(--vert)}
+.puce-opt{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert-fonce);font-weight:600}
+.cal-jour{border-radius:12px;border-color:var(--trait-leger)}.cal-jour.occupe{border-color:var(--vert);background:var(--vert-doux)}.cal-jour.chargee{border-color:var(--alerte);background:var(--alerte-fond)}
+.cal-jour.selection{outline:3px solid var(--vert);outline-offset:-1px}.cal-jour.aujourdhui .cal-n{background:var(--vert)}
+.modale{background:rgba(14,52,29,.65);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.modale-carte{border-radius:20px;padding:30px;box-shadow:0 20px 45px rgba(0,0,0,.25)}
+details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow:var(--ombre-sm)}details summary{color:var(--vert);font-weight:700}
+.montant{color:var(--vert-fonce);font-weight:800}
+.base.essai{background:#fff7e6;color:#92400e;border:1px solid #fcd9a0;border-radius:12px;padding:2px 10px;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+.connexion{max-width:420px;margin:48px auto;padding:0 16px}.connexion .carte{padding:30px 26px;text-align:left}
+.connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
+.champ{margin-bottom:16px}
+.pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
+.barre-mobile{display:none}
 /* Téléphone : cibles tactiles de 44 px, champs à 16 px (sinon l'iPhone zoome), tableaux de la journée en cartes */
 @media (max-width:700px){
-main,main.large{padding:12px}header{gap:4px 12px;padding:8px 12px}header a{padding:8px 4px}.base{margin-left:0}
+main,main.large,main.conteneur{padding:16px 12px 24px}.navbar{position:static}.nav-contenu{padding:10px 14px;gap:10px}.nav-bureau{display:none}.nav-droite .admin-seul{display:none}.nav-droite{gap:8px}
+.bandeau-page{padding:18px 0 14px}.conteneur{padding:0 14px}.bandeau-page h1{font-size:1.5rem}
+body{padding-bottom:84px}.pied{display:none}.puces{display:none}.recherche select{display:none}
+.barre-mobile{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:1000;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--trait-leger)}
+.barre-mobile a{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.92rem;text-decoration:none;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
+.barre-mobile a.actif{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
+.barre-mobile a.principal{background:var(--vert);border-color:transparent;color:#fff;box-shadow:var(--ombre-btn)}
+.connexion{margin:20px auto}table.liste,.liste-defile table{border:0;box-shadow:none;background:none;border-radius:0}
+
 button,.bouton{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
 input,select,textarea,.mini input,.mini select{font-size:16px;min-height:44px}.mini button,.actions-ligne .bouton,.actions-ligne button{font-size:15px;min-height:44px;padding:8px 16px}
 input[type=checkbox],input[type=radio]{min-height:0;width:22px;height:22px}
@@ -168,15 +241,82 @@ def etiquette_base():
     return f'<span class="base essai" title="{esc(_BASE["db"])}">BASE D’ESSAI : {esc(nom)}</span>'
 
 
-def gabarit(titre, contenu, message=None, erreur=None, large=False):
+# Qui fait la requête (rempli par interface.repondre pour chaque requête ; vide dans les tests qui appellent les pages directement)
+CONTEXTE = threading.local()
+STATIC = Path(__file__).resolve().parent / "static"       # logo.svg ou logo.png facultatif : voir docs/acces_a_distance.md
+
+SECTIONS = [(r"^/$", "tableau"), (r"^/(?:journee|tournee)", "journee"), (r"^/(?:client|secteurs)", "clients"),
+            (r"^/(?:chantier|nouveau)", "chantiers"), (r"^/utilisateurs", "admin")]
+NOMS_SECTIONS = {"tableau": "Tableau de bord", "journee": "Journée", "chantiers": "Chantiers", "clients": "Clients", "admin": "Administration"}
+
+
+def utilisateur_courant():
+    return getattr(CONTEXTE, "utilisateur", None)
+
+
+def est_admin():
+    """Vrai pour l'administrateur, et aussi quand il n'y a pas de comptes (accès local ouvert, tests)."""
+    u = utilisateur_courant()
+    return u is None or u.get("role") == "admin"
+
+
+def section_de(chemin):
+    for motif, nom in SECTIONS:
+        if re.match(motif, chemin or ""):
+            return nom
+    return ""
+
+
+def logo_html():
+    for ext in ("svg", "png"):
+        if (STATIC / f"logo.{ext}").exists():
+            return f'<img src="/logo.{ext}" alt="Sylvainculteur">'
+    return '<span class="logotype">Sylvain<span>culteur</span></span>'
+
+
+def _navigation(section):
+    admin = est_admin()
+    liens = ([("/", "Tableau de bord"), ("/journee", "Journée")] if admin else []) + [("/chantiers", "Chantiers"), ("/clients", "Clients")]
+    nav = "".join(f'<a href="{h}">{t}</a>' for h, t in liens)
+    actif = {"tableau": "/", "journee": "/journee", "chantiers": "/chantiers", "clients": "/clients"}.get(section, "")
+    surlignage = f'<style>.nav-bureau a[href="{actif}"]{{background:var(--vert-doux);color:var(--vert)}}</style>' if actif else ""
+    u = utilisateur_courant()
+    droite = etiquette_base()
+    if u:
+        droite += (f'<span class="qui">{esc(u["nom"])}</span>'
+                   + ('<a class="admin-seul" href="/utilisateurs">Utilisateurs</a>' if u["role"] == "admin" else "")
+                   + '<form method="post" action="/deconnexion"><button class="lien" type="submit">Se déconnecter</button></form>')
+    return (f'<header class="navbar"><div class="nav-contenu"><a class="marque" href="{"/" if admin else "/chantiers"}">{logo_html()}</a>'
+            f'<nav class="nav-bureau">{nav}</nav><div class="nav-droite">{droite}</div></div></header>{surlignage}')
+
+
+def _barre_mobile(section):
+    def lien(href, texte, classe=""):
+        return f'<a href="{href}" class="{classe}">{texte}</a>'
+    return ('<nav class="barre-mobile">' + lien("/chantiers", "Chantiers", "actif" if section == "chantiers" else "")
+            + lien("/clients", "Clients", "actif" if section == "clients" else "") + lien("/nouveau", "+ Chantier", "principal") + "</nav>")
+
+
+def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False):
     msg = f'<div class="message">{esc(MESSAGES[message])}</div>' if message in MESSAGES else ""
     if erreur:
         msg += f'<div class="erreurs"><strong>Action refusée :</strong> {esc(erreur)}</div>'
-    return f"""<!doctype html><html lang="fr-CA"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(titre)} — SylvainCulteur</title>
-<style>{CSS}</style></head><body>
-<header><strong>SylvainCulteur</strong><a href="/">Tableau de bord</a><a href="/journee">Journée</a><a href="/chantiers">Chantiers</a><a href="/clients">Clients</a>{etiquette_base()}</header>
-<main{" class=large" if large else ""}>{msg}{contenu}</main></body></html>"""
+    section = section_de(getattr(CONTEXTE, "chemin", ""))
+    tete = f'<style>{CSS}</style></head><body>'
+    entete = ('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">'
+              f'<meta name="theme-color" content="#0e341d"><title>{esc(titre)} — SylvainCulteur</title>')
+    if public:           # page de connexion et refus : pas de menu
+        return f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}<main class="connexion-page">{msg}{contenu}</main></body></html>'
+    classe_large = " large" if large else ""
+    bandeau = ""
+    m = re.match(r"\s*(<h1[^>]*>.*?</h1>)", contenu, re.S)
+    if m:              # le titre de la page va dans un bandeau vert pâle, comme le haut du site
+        bandeau = (f'<section class="bandeau-page"><div class="conteneur{classe_large}"><span class="tag-badge">{esc(NOMS_SECTIONS.get(section, "Sylvainculteur"))}</span>{m.group(1)}</div></section>')
+        contenu = contenu[m.end():]
+    return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
+            f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
+            '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
+            f'{_barre_mobile(section)}</body></html>')
 
 
 def heures(h):
