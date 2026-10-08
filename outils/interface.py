@@ -98,7 +98,7 @@ def page_chantiers(conn, query):
     opt_statut = '<option value="">Tous les statuts</option>' + "".join(
         f'<option value="{s}"{" selected" if s == f.get("statut") else ""}>{LIBELLES_STATUT[s]}</option>'
         for s in ("a_planifier", "en_attente", "planifie", "termine", "annule"))
-    paiements = [("a_recevoir", "À recevoir (terminé non payé, ou acompte)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k != "sans_objet"]
+    paiements = [("a_recevoir", "À recevoir (terminé non payé, ou acompte)")] + [(k, v) for k, v in LIBELLES_PAIEMENT.items() if k not in ("sans_objet", "a_payer")]
     opt_paiement = ('<select name="paiement"><option value="">Tous les paiements</option>' + "".join(
         f'<option value="{k}"{" selected" if k == f.get("paiement") else ""}>{esc(v)}</option>' for k, v in paiements) + "</select>") if admin else ""
     select_sect, _ = select_secteur(lister_secteurs(conn), {"secteur": f.get("secteur", "")}, nom="secteur", requis=False, tout="Tous les secteurs")

@@ -186,7 +186,7 @@ main, mode de règlement. **Après la création, on revient à la fiche du clien
 
 Les soumissions en cours, **la plus récente en haut** ; chaque ligne montre la date de la demande avec la **pastille d'attente** (verte moins de
 7 jours, jaune 7 à 30, rouge plus de 30) et « par » le compte qui l'a ouverte, le client, l'adresse, les travaux, le montant, et **ce qui manque encore
-pour l'accepter** (en rouge). À droite : les trois **boutons rapides Accepter, En attente et Refuser**, suivis de **Voir PDF** et **Télécharger PDF** (la soumission pour le client :
+pour l'accepter** (en rouge). À droite : les trois **boutons rapides Accepter, En attente et Refuser**, suivis du bouton **Soumission** (le PDF pour le client :
 voir plus bas). Un lien « En attente (N) » à côté du titre mène aux chantiers qui ont été mis en attente.
 
 Au-dessus : les **raccourcis** (par défaut « Mes soumissions » et « À relancer (7 jours et plus) »), une recherche (nom, téléphone, adresse,
@@ -249,10 +249,10 @@ Deux documents à l'allure professionnelle (logo, numéro d'entreprise, coordonn
 
 | Document | Où le trouver | Qui |
 |---|---|---|
-| **Soumission** | sur chaque ligne de la liste Soumissions, à côté d'Accepter / En attente / Refuser ; sur la fiche d'une soumission (même rangée de boutons) ; sur la fiche d'un chantier, carte « **Documents pour le client** » | tous les comptes |
+| **Soumission** | sur chaque ligne de la liste Soumissions, à côté d'Accepter / En attente / Refuser ; sur la fiche d'une soumission ou d'un chantier, carte « **Documents pour le client** » | tous les comptes |
 | **Facture** | carte « **Documents pour le client** » de la fiche d'un chantier accepté ; bouton **Facture** à côté de **Terminer** (tableau de bord et Journée) ; bouton **Facture (PDF)** dans la fenêtre « Terminer » | administrateur seulement (elle montre les paiements et le solde) |
 
-Chaque document a deux boutons : **Voir PDF** (s'ouvre dans un nouvel onglet : on regarde, on imprime) et **Télécharger PDF** (enregistre le fichier, nommé par
+Chaque document a **un seul bouton** (« Soumission » ou « Facture ») : le PDF s'ouvre dans un nouvel onglet, où l'on imprime ou enregistre (nom proposé, par
 exemple `Soumission-0042-Jean-Tremblay.pdf`). Rien n'est enregistré dans la base : le PDF est refait avec les données du moment.
 
 **La soumission** : numéro (celui de la fiche), date (**le jour où on la produit**), « valide jusqu'au » (30 jours après cette date), **client** (nom, téléphone, courriel), **lieu des travaux**, **description des

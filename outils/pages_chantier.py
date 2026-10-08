@@ -248,7 +248,7 @@ def _formulaire_action(retour, action, chantier_id, texte, classe="", confirmati
 CONFIRMATION_REFUS = "Refuser cette soumission ? Elle ira dans les soumissions refusées (en bas de la liste) ; tu pourras la rouvrir."
 
 
-def boutons_soumission(chantier_id, retour, retour_accepter=None):
+def boutons_soumission(chantier_id, retour, retour_accepter=None, pdf=True):
     """Accepter / En attente / Refuser : les boutons rapides d'une soumission en cours (la page qui les place les enveloppe).
     `retour` : où l'on revient après avoir refusé ; `retour_accepter` (par défaut le même) : où l'on revient après avoir accepté
     ou mis en attente. « En attente » ouvre une petite page (date de reprise, ou jusqu'à nouvel ordre)."""
@@ -257,7 +257,7 @@ def boutons_soumission(chantier_id, retour, retour_accepter=None):
             f'<a class="bouton secondaire" href="/soumission/{chantier_id}/attente?retour={quote(retour_accepter or retour, safe="")}">En attente</a>'
             f'<form class="mini" method="post" action="/soumission/{chantier_id}/refuser" onsubmit="return confirm({esc(repr(CONFIRMATION_REFUS))})">'
             f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire">Refuser</button></form>'
-            + liens_pdf(chantier_id, "soumission"))
+            + (liens_pdf(chantier_id, "soumission") if pdf else ""))
 
 
 def _bloc_documents(chantier_id, statut, genre):
@@ -308,12 +308,11 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if soumission and not refusee:
         manques = manques_pour_accepter(conn, chantier_id)
         # depuis la fiche : accepter mène au nouveau chantier ; refuser reste sur la fiche (on peut la rouvrir tout de suite)
-        boutons = boutons_soumission(chantier_id, f"/soumission/{chantier_id}", f"/chantier/{chantier_id}") + dupliquer
+        boutons = boutons_soumission(chantier_id, f"/soumission/{chantier_id}", f"/chantier/{chantier_id}", pdf=False) + dupliquer
         if manques:
             manque = f'<p class="manque">Pour accepter, il manque encore : {esc(", ".join(libelles_manques(manques)))}.</p>'
     elif refusee:
-        boutons = (_formulaire_action(f"{base}/{chantier_id}", f"/soumission/{chantier_id}/rouvrir", chantier_id, "Rouvrir la soumission")
-                   + liens_pdf(chantier_id, "soumission") + dupliquer)
+        boutons = _formulaire_action(f"{base}/{chantier_id}", f"/soumission/{chantier_id}/rouvrir", chantier_id, "Rouvrir la soumission") + dupliquer
     else:
         boutons = dupliquer
         if statut == "planifie" and est_admin():
@@ -329,7 +328,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         if statut == "annule" and est_admin():
             boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="actions-bloc"><div class="actions-page">{boutons}</div>{manque}</div>'
-    documents_client = "" if soumission else _bloc_documents(chantier_id, statut, genre)
+    documents_client = _bloc_documents(chantier_id, statut, genre)
     bandeau = ""
     if refusee:
         bandeau = ('<div class="verrou-termine">Soumission <b>refusée</b> : elle est dans la section « Refusées » de l\'onglet Soumissions. '
@@ -357,7 +356,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         suppression = (f'<div class="carte"><h2>Supprimer</h2><form method="post" action="/soumission/{chantier_id}/supprimer" '
                        f'onsubmit="return confirm({esc(repr(msg_suppr))})"><button class="danger" type="submit">Supprimer cette soumission</button></form></div>'
                        if est_admin() else "")
-        contenu = f'<h1>Soumission #{chantier_id}</h1>{resume}{bandeau}{actions}{corps}{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres + suppression)}'
+        contenu = f'<h1>Soumission #{chantier_id}</h1>{resume}{bandeau}{actions}{documents_client}{corps}{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres + suppression)}'
     else:
         essentiel, avance_chantier = cartes_chantier(conn, valeurs if valeurs is not None else depuis_base, creation=False, soumission=soumission)
         annuler = ('<button class="danger" type="submit" form="annuler-chantier" onclick="return confirm(\'Annuler ce chantier ? Il disparaît de sa journée '

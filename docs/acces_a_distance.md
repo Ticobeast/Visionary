@@ -49,7 +49,7 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 Sur un téléphone, il n'y a que ce qu'il faut pour une soumission, avec une barre en bas : **Chantiers**, **Soumissions**, **Clients** et **+ Soumission**.
 - **Chantiers** : la liste (une carte par chantier accepté), avec les pastilles de raccourcis et la recherche.
 - **Soumissions** : la liste des soumissions en cours (une carte chacune) avec, sur chaque carte, les boutons **Accepter**, **En attente** et **Refuser**, puis
-  **Voir PDF** et **Télécharger PDF** (la soumission à envoyer au client : sur téléphone, le PDF s'ouvre et se partage avec les boutons de l'appareil) ; en bas, les refusées.
+  le bouton **Soumission** (le PDF à envoyer au client à envoyer au client : sur téléphone, le PDF s'ouvre et se partage avec les boutons de l'appareil) ; en bas, les refusées.
   Si on appuie sur Accepter (ou En attente) alors qu'il manque des renseignements, le programme demande seulement ceux qui manquent.
 - **Clients** : la liste, avec recherche ; la fiche d'un client permet d'ouvrir une nouvelle soumission.
 - **+ Soumission** : on ouvre une soumission dès que le client appelle (rien n'est obligatoire : on remplit ce qu'on sait ; le formulaire propose d'abord de

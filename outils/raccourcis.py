@@ -231,7 +231,7 @@ def page_raccourcis(conn, query, erreurs=(), saisie=None):
     if page == "chantiers":
         champs.append(liste("statut", "Statut", [(s, LIBELLES_STATUT[s]) for s in STATUTS_CHANTIER], v, vide="Tous"))
         if admin:
-            champs.append(liste("paiement", "Paiement", [("a_recevoir", "À recevoir")] + [(c, l) for c, l in LIBELLES_PAIEMENT.items() if c != "sans_objet"], v, vide="Tous"))
+            champs.append(liste("paiement", "Paiement", [("a_recevoir", "À recevoir")] + [(c, l) for c, l in LIBELLES_PAIEMENT.items() if c not in ("sans_objet", "a_payer")], v, vide="Tous"))
     elif _uid() is not None:
         champs.append(liste("par", "Ouverte par", [("moi", "Moi")], v, vide="Tous"))
     champs.append(liste("secteur", "Secteur", [(c, l) for c, l, _ in secteurs], v, vide="Tous"))

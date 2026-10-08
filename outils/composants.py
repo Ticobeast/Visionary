@@ -103,12 +103,10 @@ def lien_facture(chantier_id, texte="Facture"):
 
 
 def liens_pdf(chantier_id, document="soumission"):
-    """« Voir PDF » (nouvel onglet) et « Télécharger PDF » (enregistre le fichier) d'un document du client : soumission ou facture."""
-    nom = "la facture" if document == "facture" else "la soumission"
-    return (f'<span class="groupe-actions"><a class="bouton secondaire" href="/{document}/{chantier_id}/pdf" target="_blank" rel="noopener" '
-            f'title="Ouvrir {nom} en PDF (nouvel onglet)">Voir PDF</a>'
-            f'<a class="bouton secondaire" href="/{document}/{chantier_id}/pdf?telecharger=1" download '
-            f'title="Enregistrer {nom} en PDF sur cet appareil">Télécharger PDF</a></span>')
+    """Un seul bouton, au nom du document (« Soumission » ou « Facture ») : ouvre le PDF dans un nouvel onglet (on l'y imprime ou l'enregistre)."""
+    nom, titre = ("Facture", "la facture") if document == "facture" else ("Soumission", "la soumission")
+    return (f'<a class="bouton secondaire" href="/{document}/{chantier_id}/pdf" target="_blank" rel="noopener" '
+            f'title="Ouvrir {titre} en PDF (nouvel onglet)">{nom}</a>')
 
 
 def bouton_terminer(l, retour):

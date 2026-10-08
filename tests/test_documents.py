@@ -605,18 +605,21 @@ class TestBoutons(BaseDocuments):
         for i in (a, b):
             ligne = self.ligne_de(page, i)
             self.assertIn(f'<a class="bouton secondaire" href="/soumission/{i}/pdf" target="_blank" rel="noopener"', ligne)
-            self.assertIn(f'href="/soumission/{i}/pdf?telecharger=1" download', ligne)
-            ordre = [ligne.index(x) for x in (">Accepter<", ">En attente<", ">Refuser<", ">Voir PDF<", ">Télécharger PDF<")]
+            self.assertNotIn("telecharger", ligne)                                    # un seul bouton, pas de « Télécharger »
+            ordre = [ligne.index(x) for x in (">Accepter<", ">En attente<", ">Refuser<", ">Soumission<")]
             self.assertEqual(ordre, sorted(ordre))                                    # dans cet ordre, sur la même ligne de boutons
             self.assertEqual(ligne.count("actions-ligne"), 1)
 
-    def test_fiche_d_une_soumission_et_d_une_soumission_refusee(self):
+    def test_fiche_d_une_soumission_carte_documents_sans_encombrer_les_boutons_du_haut(self):
         i = self.soumission_complete()
         page = self.get(f"/soumission/{i}")
-        self.assertIn(f'href="/soumission/{i}/pdf"', page)
-        self.assertIn(f'href="/soumission/{i}/pdf?telecharger=1"', page)
+        haut = page[:page.index("Documents pour le client")]
+        self.assertNotIn("/pdf", haut)                                                # rien dans la rangée Accepter / En attente / Refuser
+        carte = page[page.index("Documents pour le client"):]
+        self.assertIn(f'href="/soumission/{i}/pdf" target="_blank"', carte)
+        self.assertIn(">Soumission<", carte)
         self.assertNotIn("/facture/", page)                                           # pas de facture avant l'acceptation
-        self.assertNotIn("Documents pour le client", page)
+        self.assertNotIn("telecharger", page)
         self.post(f"/soumission/{i}/refuser", {"retour": "/soumissions"})
         page = self.get(f"/soumission/{i}")
         self.assertIn(f'href="/soumission/{i}/pdf"', page)
@@ -628,7 +631,6 @@ class TestBoutons(BaseDocuments):
             self.assertIn("Documents pour le client", page)
             for document in ("soumission", "facture"):
                 self.assertIn(f'href="/{document}/{i}/pdf" target="_blank"', page)
-                self.assertIn(f'href="/{document}/{i}/pdf?telecharger=1" download', page)
         accepte = self.soumission_complete()
         self.post(f"/soumission/{accepte}/accepter", {"retour": "/soumissions"})
         self.post(f"/chantier/{accepte}/attente", {"retour": "/chantiers", "choix": "indefini"})
@@ -690,7 +692,8 @@ class TestDroits(BaseComptes, BaseDocuments):
         i = self.complete(cookie=self.alice)
         ligne = TestBoutons.ligne_de(self.get("/soumissions", cookie=self.alice), i)
         self.assertIn(f'href="/soumission/{i}/pdf"', ligne)
-        self.assertIn(">Télécharger PDF<", ligne)
+        self.assertIn(">Soumission<", ligne)
+        self.assertNotIn("Télécharger", ligne)
 
 
 if __name__ == "__main__":
