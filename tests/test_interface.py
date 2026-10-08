@@ -239,7 +239,7 @@ class TestAucunEmoji(BaseInterface):
         jour = self.sql("SELECT date_prevue FROM chantiers WHERE id = 3")[0][0]
         self.post("/nouveau", {})                                                        # une soumission entièrement vide (#4)
         pages = [("/", {}), ("/", {"date": jour, "terminer": "3"}), ("/journee", {"date": jour}), ("/journee", {"date": jour, "terminer": "3"}),
-                 ("/chantiers", {}), ("/soumissions", {}), ("/clients", {}), ("/nouveau", {}), ("/secteurs", {}), ("/client/1", {}), ("/client/4", {}),
+                 ("/chantiers", {}), ("/soumissions", {}), ("/clients", {}), ("/nouveau", {}), ("/client/1", {}), ("/client/4", {}),
                  ("/client/1/modifier", {}), ("/client/1/soumission/nouveau", {}), ("/soumission/4", {}), ("/soumission/4/completer", {}),
                  ("/raccourcis", {"page": "chantiers"}), ("/raccourcis", {"page": "soumissions"}),
                  ("/chantier/1", {}), ("/chantier/2", {}), ("/chantier/3", {}), ("/chantier/3/dupliquer", {}), ("/utilisateurs", {})]

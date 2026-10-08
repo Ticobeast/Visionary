@@ -297,12 +297,9 @@ def controler(conn, requete, methode, chemin, query=None):
         if not permis(utilisateur["role"], methode, chemin):
             return _page_refus("Accès réservé", "Cette page est réservée à l'administrateur. <a href=\"/chantiers\">Retour aux chantiers</a>")
         suite = utilisateur
-    # page d'accueil : le compte « soumission » arrive sur les soumissions, le téléphone sur la liste des chantiers
-    if methode == "GET" and chemin == "/":
-        if suite and suite["role"] != "admin":
-            return "303 See Other", [("Location", "/soumissions")], b""
-        if MOBILE.search(requete.get("agent") or ""):
-            return "303 See Other", [("Location", "/chantiers")], b""
+    # page d'accueil : le compte « soumission » arrive sur les soumissions (le tableau de bord est aussi sur téléphone, pour l'administrateur)
+    if methode == "GET" and chemin == "/" and suite and suite["role"] != "admin":
+        return "303 See Other", [("Location", "/soumissions")], b""
     return None
 
 

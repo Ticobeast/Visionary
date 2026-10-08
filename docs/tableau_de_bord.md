@@ -5,11 +5,11 @@ avancés » (repliés). Chaque chose a **un seul endroit** :
 
 | Section | Rôle |
 |---|---|
-| **Tableau de bord** | voir le calendrier et le déroulement de la journée choisie ; terminer un chantier |
+| **Tableau de bord** | (aussi sur téléphone, façon calendrier Apple : un point sous les jours chargés, la journée en dessous) voir le calendrier et le déroulement de la journée choisie ; terminer un chantier |
 | **Journée** | créer et gérer une journée complète : placer des chantiers, ordre, terminer, retirer, annuler |
 | **Chantiers** | les jobs **acceptés** : liste des chantiers actifs (dont ceux **en attente**) ; plus bas, les archives récentes |
 | **Soumissions** | les demandes de soumission, du premier appel à la réponse du client : boutons **Accepter** / **En attente** / **Refuser**, et le **PDF** à envoyer au client |
-| **Clients** | les fiches clients (seul endroit où l'on modifie un client) et la liste des secteurs desservis |
+| **Clients** | les fiches clients (seul endroit où l'on modifie un client) |
 | **Archives** | *(administrateur)* tout l'historique (terminés, annulés, soumissions refusées) : recherche, **statistiques**, relance des clients, export Excel |
 
 L'interface ne contient **aucun emoji**.
@@ -376,9 +376,7 @@ l'adresse** (pour Google Maps) **vient du secteur** choisi : plus de « Trois Ri
 qui permet de **classer et filtrer** par secteur (clients, soumissions, chantiers, Journée).
 
 La liste de départ est celle de la région de Trois-Rivières (Centre-ville, Trois-Rivières-Ouest, Cap-de-la-Madeleine, Sainte-Marthe-du-Cap,
-Pointe-du-Lac, Saint-Louis-de-France, Bécancour, Champlain, Yamachiche, Saint-Étienne-des-Grès, Shawinigan, Louiseville, Nicolet) : **à adapter
-aux secteurs réellement desservis** dans la page **Secteurs** (lien au bas de la liste des clients) : ajouter, renommer, supprimer un secteur
-inutilisé. Un nom déjà présent (à l'accent, au tiret ou à la casse près) est refusé : pas de doublons.
+Pointe-du-Lac, Saint-Louis-de-France, Bécancour, Champlain, Yamachiche, Saint-Étienne-des-Grès, Shawinigan, Louiseville, Nicolet) : la liste est fixe dans l'interface (plus de page de gestion des secteurs).
 
 ## 9. Règles d'une fiche
 

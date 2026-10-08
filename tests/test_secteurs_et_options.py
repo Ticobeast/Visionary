@@ -90,38 +90,11 @@ class TestListeDeSecteurs(Base):
         self.assertTrue(noyau.renommer_secteur(conn, "inconnu", "X"))
 
 
-class TestPageSecteurs(Base):
-    def test_page_et_actions(self):
-        page = self.get("/secteurs")[1]
-        self.assertIn("Cap-de-la-Madeleine", page)
-        self.assertIn('action="/secteurs/ajouter"', page)
-        _, en_tetes, _ = self.post("/secteurs/ajouter", {"libelle": "Saint-Maurice", "ville": ""})
-        self.assertEqual(en_tetes["Location"], "/secteurs?ok=secteur_ajoute")
-        self.assertIn("Saint-Maurice", self.get("/secteurs")[1])
-        statut, _, page = self.post("/secteurs/ajouter", {"libelle": "saint maurice"})            # doublon
-        self.assertTrue(statut.startswith("200"))
-        self.assertIn("existe déjà", page)
-        self.post("/secteurs/saint_maurice/renommer", {"libelle": "Saint-Maurice (village)"})
-        self.assertEqual(self.sql("SELECT libelle FROM secteurs WHERE code = 'saint_maurice'"), [("Saint-Maurice (village)",)])
-        self.post("/secteurs/saint_maurice/supprimer", {})
-        self.assertEqual(self.sql("SELECT count(*) FROM secteurs WHERE code = 'saint_maurice'"), [(0,)])
-
-    def test_secteur_utilise_non_supprimable(self):
-        self.post("/client/1/modifier", {"client_nom": "Gagnon", "client_prenom": "Marie", "client_telephone": "+14505550142", "adresse": "1 Rue A",
-                                         "client_secteur": "nicolet"})
-        _, _, page = self.post("/secteurs/nicolet/supprimer", {})
-        self.assertIn("utilise ce secteur", page)
-        self.assertEqual(self.sql("SELECT count(*) FROM secteurs WHERE code = 'nicolet'"), [(1,)])
-
-    def test_route_protegee_contre_les_codes_etranges(self):
-        self.assertTrue(self.post("/secteurs/../supprimer", {})[0].startswith("404"))
-        self.assertTrue(self.post("/secteurs/A'; DROP TABLE clients;--/supprimer", {})[0].startswith("404"))
-        self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
-
-    def test_html_echappe(self):
-        self.post("/secteurs/ajouter", {"libelle": "<script>alert(1)</script>"})
-        self.assertNotIn("<script>alert", self.get("/secteurs")[1])
-        self.assertNotIn("<script>alert", self.get("/nouveau")[1])
+class TestPasDeGestionDesSecteurs(Base):
+    def test_plus_de_page_de_gestion(self):
+        self.assertIn("404", self.get("/secteurs")[0])
+        self.assertNotIn("/secteurs", self.get("/clients")[1])
+        self.assertTrue(self.post("/secteurs/ajouter", {"libelle": "X"})[0].startswith("404"))
 
 
 class TestFiltrerParSecteur(Base):

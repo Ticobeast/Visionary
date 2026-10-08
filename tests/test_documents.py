@@ -604,7 +604,7 @@ class TestBoutons(BaseDocuments):
         page = self.get("/soumissions")
         for i in (a, b):
             ligne = self.ligne_de(page, i)
-            self.assertIn(f'<a class="bouton secondaire" href="/soumission/{i}/pdf" target="_blank" rel="noopener"', ligne)
+            self.assertIn(f'<a class="bouton secondaire lien-pdf" href="/soumission/{i}/pdf" target="_blank" rel="noopener"', ligne)
             self.assertNotIn("telecharger", ligne)                                    # un seul bouton, pas de « Télécharger »
             ordre = [ligne.index(x) for x in (">Accepter<", ">En attente<", ">Refuser<", ">Soumission<")]
             self.assertEqual(ordre, sorted(ordre))                                    # dans cet ordre, sur la même ligne de boutons
@@ -613,11 +613,10 @@ class TestBoutons(BaseDocuments):
     def test_fiche_d_une_soumission_carte_documents_sans_encombrer_les_boutons_du_haut(self):
         i = self.soumission_complete()
         page = self.get(f"/soumission/{i}")
-        haut = page[:page.index("Documents pour le client")]
-        self.assertNotIn("/pdf", haut)                                                # rien dans la rangée Accepter / En attente / Refuser
-        carte = page[page.index("Documents pour le client"):]
-        self.assertIn(f'href="/soumission/{i}/pdf" target="_blank"', carte)
-        self.assertIn(">Soumission<", carte)
+        rangee = re.search(r'<div class="actions-bloc">.*?</div></div>', page, re.S).group(0)
+        self.assertNotIn("/pdf", rangee)                                              # rien dans la rangée Accepter / En attente / Refuser
+        self.assertIn(f'class="lien-pdf-coin" href="/soumission/{i}/pdf"', page)       # téléphone : lien discret en haut à droite de la fiche
+        self.assertIn('class="carte documents documents-pc"', page)                   # ordinateur : la carte Documents
         self.assertNotIn("/facture/", page)                                           # pas de facture avant l'acceptation
         self.assertNotIn("telecharger", page)
         self.post(f"/soumission/{i}/refuser", {"retour": "/soumissions"})

@@ -185,7 +185,7 @@ td a{color:var(--vert-fonce)}
 .actions-page .bouton,.actions-page button{padding:11px 20px;font-size:.95rem;white-space:nowrap}.actions-bloc .manque{margin:8px 0 0;font-size:.9rem}
 .actions-soumission .bouton,.actions-soumission button{padding:7px 14px;font-size:14px;line-height:1.3;white-space:nowrap}
 .actions-ligne.actions-soumission{flex-wrap:wrap}.groupe-actions{display:inline-flex;gap:8px;align-items:center}
-.carte.documents h2{margin:0 0 8px}.ligne-document{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0}.ligne-document b{min-width:112px}.ligne-document .actions-page .bouton{padding:8px 16px;font-size:.9rem}
+.lien-pdf-coin{display:none;position:absolute;top:10px;right:14px;font-size:.78rem;font-weight:600;color:var(--doux)!important;text-decoration:underline}.carte.documents h2{margin:0 0 8px}.ligne-document{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0}.ligne-document b{min-width:112px}.ligne-document .actions-page .bouton{padding:8px 16px;font-size:.9rem}
 .tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}
 .tuile{background:#fff;border:1px solid var(--trait-leger);border-radius:14px;box-shadow:var(--ombre-sm);padding:12px 16px}
 .tuile b{display:block;font-size:1.35rem;font-weight:800;color:var(--vert-fonce);line-height:1.2}.tuile span{color:var(--doux);font-size:.78rem;font-weight:700}
@@ -245,6 +245,33 @@ table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne,.grou
 .liste-defile{overflow-x:visible}.carte{padding:12px}
 dl.lecture{grid-template-columns:1fr}.type{grid-template-columns:1fr}
 .modale-carte{padding:18px}
+/* Téléphone : calendrier à la façon d'Apple (un point sous le jour s'il y a des chantiers), recherche sur une ligne, fiches compactes */
+.cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:0;align-items:center;gap:3px;padding:4px 0}
+.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:600;background:none;color:var(--texte);align-self:center}
+.cal-jour.aujourdhui .cal-n{color:var(--alerte)}
+.cal-jour.occupe::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--vert);display:block}.cal-jour.chargee::after{background:var(--alerte)}
+.cal-jour.selection{outline:0}.cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}.cal-jour.aujourdhui.selection .cal-n{background:var(--alerte);color:#fff}
+.cal-jour.autre-mois{opacity:.35}.cal-info,.cal-alerte{display:none}.cal-grille{gap:0}.cal-nav{flex-wrap:nowrap;gap:6px}.cal-nav h2{min-width:0;font-size:1.05rem}.cal-nav .bouton{flex:0 0 auto;min-height:40px;padding:6px 12px;font-size:13px}
+.cal-nav a[aria-label]{font-size:0;padding:0;width:40px;position:relative}.cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:10px;height:10px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
+.cal-nav a[aria-label="Mois suivant"]::before{transform:translate(-70%,-50%) rotate(-135deg)}
+.cal-nav a[href="/"]{order:3}
+.recherche{flex-wrap:nowrap}.recherche input{flex:1 1 0;min-width:0}.recherche button{flex:0 0 auto}
+.resume-chantier{position:relative;gap:6px}.resume-chantier>div:first-child{padding-right:84px}
+.lien-pdf-coin{display:block}.documents-pc{display:none}
+.lecture-seule{padding:10px 12px}.lecture-seule .barre{gap:6px}.lecture-seule .bouton{min-height:36px;padding:5px 10px;font-size:13px}.lecture-seule h2{font-size:1rem}.lecture-seule p{margin-top:4px!important}
+.actions-page{gap:6px}.actions-page .bouton,.actions-page button{padding:8px 10px;font-size:14px;min-height:40px}
+table.soumissions tr{position:relative;display:grid;grid-template-columns:1fr auto;gap:3px 10px;padding:10px 12px}
+table.soumissions td{padding:0!important}
+table.soumissions td:nth-child(1),table.soumissions td:nth-child(2),table.soumissions td:nth-child(3),table.soumissions td:nth-child(6){grid-column:1/-1}
+table.soumissions td:nth-child(1),table.soumissions td:nth-child(2),table.soumissions td:nth-child(3),table.soumissions td:nth-child(4){display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+table.soumissions td:nth-child(1){padding-right:90px!important;align-items:center}table.soumissions td:nth-child(1) div{margin:0}
+table.soumissions td:nth-child(2) .manque{flex-basis:100%;margin:0}
+table.soumissions td:nth-child(5){display:block;text-align:right!important;align-self:end}
+table.soumissions td.col-actions{margin-top:4px;min-width:0!important}
+table.soumissions .actions-ligne{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+table.soumissions .actions-ligne .mini{display:block;margin:0}
+table.soumissions .actions-ligne .bouton,table.soumissions .actions-ligne button{width:100%;min-height:40px;padding:6px 4px;font-size:14px}
+table.soumissions .lien-pdf{position:absolute;top:10px;right:12px;width:auto!important;min-height:0!important;padding:2px 4px!important;border:0;background:none;box-shadow:none;color:var(--doux);font-size:12.5px!important;text-decoration:underline}
 }
 """
 
@@ -329,9 +356,10 @@ def _navigation(section):
 def _barre_mobile(section):
     def lien(href, texte, classe=""):
         return f'<a href="{href}" class="{classe}">{texte}</a>'
-    return ('<nav class="barre-mobile">' + lien("/chantiers", "Chantiers", "actif" if section == "chantiers" else "")
+    return ('<nav class="barre-mobile">' + (lien("/", "Tableau de bord", "actif" if section == "tableau" else "") if est_admin() else "")
+            + lien("/chantiers", "Chantiers", "actif" if section == "chantiers" else "")
             + lien("/soumissions", "Soumissions", "actif" if section == "soumissions" else "")
-            + lien("/clients", "Clients", "actif" if section == "clients" else "") + lien("/nouveau", "+ Soumission", "principal") + "</nav>")
+            + lien("/clients", "Clients", "actif" if section == "clients" else "") + "</nav>")
 
 
 def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False, section=None):

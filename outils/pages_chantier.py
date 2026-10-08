@@ -260,13 +260,13 @@ def boutons_soumission(chantier_id, retour, retour_accepter=None, pdf=True):
             + (liens_pdf(chantier_id, "soumission") if pdf else ""))
 
 
-def _bloc_documents(chantier_id, statut, genre):
+def _bloc_documents(chantier_id, statut, genre, soumission=False):
     """Carte « Documents pour le client » d'un chantier accepté : sa soumission, et sa facture (administrateur : elle montre les paiements)."""
     lignes = [("Soumission", liens_pdf(chantier_id, "soumission"))]
     if est_admin() and facture_possible(statut, genre):
         lignes.append(("Facture", liens_pdf(chantier_id, "facture")))
     corps = "".join(f'<div class="ligne-document"><b>{nom}</b><div class="actions-page">{liens}</div></div>' for nom, liens in lignes)
-    return f'<div class="carte documents"><h2>Documents pour le client</h2>{corps}</div>'
+    return f'<div class="carte documents{" documents-pc" if soumission else ""}"><h2>Documents pour le client</h2>{corps}</div>'
 
 
 def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_paiement=(), erreur_globale=None):
@@ -294,7 +294,9 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     montants = (f'<div class="montant">{argent(total) if total is not None and total else "prix à saisir"}'
                 + (f'<small>{argent(prix)} + TPS {argent(tps)} + TVQ {argent(tvq)}</small>' if total else "")
                 + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and est_admin() and not soumission else "") + "</div>")
-    resume = (f'<div class="carte resume-chantier"><div><div class="barre"><h2 style="margin:0">{esc(nom)}</h2>{badges}</div>'
+    coin = (f'<a class="lien-pdf-coin" href="/soumission/{chantier_id}/pdf" target="_blank" rel="noopener" '
+            'title="Ouvrir la soumission en PDF (nouvel onglet)">Soumission</a>') if soumission else ""      # téléphone : discret, en haut à droite
+    resume = (f'<div class="carte resume-chantier">{coin}<div><div class="barre"><h2 style="margin:0">{esc(nom)}</h2>{badges}</div>'
               f'<p style="margin:10px 0 0"><b>Travaux :</b> {esc(detail) if detail else "à préciser"}</p>'
               f'{f"<p class=doux style=margin-bottom:0>{esc(infos)}</p>" if infos else ""}</div>{montants}</div>')
 
@@ -328,7 +330,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         if statut == "annule" and est_admin():
             boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="actions-bloc"><div class="actions-page">{boutons}</div>{manque}</div>'
-    documents_client = _bloc_documents(chantier_id, statut, genre)
+    documents_client = _bloc_documents(chantier_id, statut, genre, soumission)
     bandeau = ""
     if refusee:
         bandeau = ('<div class="verrou-termine">Soumission <b>refusée</b> : elle est dans la section « Refusées » de l\'onglet Soumissions. '

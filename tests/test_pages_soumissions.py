@@ -1003,9 +1003,15 @@ class TestComptesEtSoumissions(BaseComptes):
         telephone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari/604.1"
         page = self.get("/soumissions", cookie=self.alice, agent=telephone)
         barre = page[page.index('class="barre-mobile"'):]
-        for lien in ('href="/chantiers"', 'href="/soumissions"', 'href="/clients"', 'href="/nouveau"'):
+        for lien in ('href="/chantiers"', 'href="/soumissions"', 'href="/clients"'):
             self.assertIn(lien, barre)
-        self.assertIn("+ Soumission", barre)
+        self.assertNotIn("+ Soumission", barre)                                       # plus de « + Soumission » en bas
+        self.assertNotIn('href="/"', barre)                                           # le tableau de bord est réservé à l'administrateur
+        admin = self.get("/soumissions", cookie=self.admin, agent=telephone)
+        barre = admin[admin.index('class="barre-mobile"'):]
+        self.assertIn('<a href="/" class="">Tableau de bord</a>', barre)
+        self.assertLess(barre.index("Tableau de bord"), barre.index('href="/chantiers"'))
+        self.assertIn('class="actif">Tableau de bord', self.get("/", cookie=self.admin, agent=telephone)[self.get("/", cookie=self.admin, agent=telephone).index('class="barre-mobile"'):])
         self.assertLess(barre.index('href="/chantiers"'), barre.index('href="/soumissions"'))
 
 

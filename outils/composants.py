@@ -105,7 +105,7 @@ def lien_facture(chantier_id, texte="Facture"):
 def liens_pdf(chantier_id, document="soumission"):
     """Un seul bouton, au nom du document (« Soumission » ou « Facture ») : ouvre le PDF dans un nouvel onglet (on l'y imprime ou l'enregistre)."""
     nom, titre = ("Facture", "la facture") if document == "facture" else ("Soumission", "la soumission")
-    return (f'<a class="bouton secondaire" href="/{document}/{chantier_id}/pdf" target="_blank" rel="noopener" '
+    return (f'<a class="bouton secondaire lien-pdf" href="/{document}/{chantier_id}/pdf" target="_blank" rel="noopener" '
             f'title="Ouvrir {titre} en PDF (nouvel onglet)">{nom}</a>')
 
 

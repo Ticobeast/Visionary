@@ -184,7 +184,7 @@ class TestPorte(BaseAuth):
     def test_avec_comptes_tout_exige_la_connexion_meme_depuis_cet_ordinateur(self):
         self.comptes()
         for ip in ("127.0.0.1", "100.64.1.2"):
-            for chemin in ("/", "/chantiers", "/clients", "/client/1", "/chantier/3", "/journee", "/journee.pdf", "/nouveau", "/utilisateurs", "/secteurs"):
+            for chemin in ("/", "/chantiers", "/clients", "/client/1", "/chantier/3", "/journee", "/journee.pdf", "/nouveau", "/utilisateurs"):
                 statut, en_tetes, corps = self.req("GET", chemin, ip=ip)
                 self.assertTrue(statut.startswith("303"), (chemin, statut))
                 self.assertTrue(en_tetes["Location"].startswith("/connexion"), chemin)
@@ -261,7 +261,7 @@ class TestDroits(BaseAuth):
         self.soum = self.ouvrir("Soumission", "motdepasse-soum")
 
     def test_administrateur_voit_tout(self):
-        for chemin in ("/", "/journee", "/chantiers", "/clients", "/client/1", "/chantier/3", "/nouveau", "/utilisateurs", "/secteurs"):
+        for chemin in ("/", "/journee", "/chantiers", "/clients", "/client/1", "/chantier/3", "/nouveau", "/utilisateurs"):
             self.assertTrue(self.req("GET", chemin, cookie=self.admin)[0].startswith("200"), chemin)
         self.assertTrue(self.req("GET", "/journee.pdf", cookie=self.admin, query={"date": "2026-10-14"})[0].startswith("200"))
         page = self.req("GET", "/chantiers", cookie=self.admin)[2]
@@ -282,7 +282,7 @@ class TestDroits(BaseAuth):
         self.assertIn("Soumission", entete)
 
     def test_soumission_pages_refusees(self):
-        for chemin in ("/journee", "/journee.pdf", "/utilisateurs", "/secteurs", "/tournee", "/suivi"):
+        for chemin in ("/journee", "/journee.pdf", "/utilisateurs", "/tournee", "/suivi"):
             statut, _, corps = self.req("GET", chemin, cookie=self.soum)
             self.assertTrue(statut.startswith("403"), chemin)
             self.assertNotIn("Boucher", corps)
@@ -292,7 +292,7 @@ class TestDroits(BaseAuth):
                              ("/chantier/3/paiement", {"paiement_date": "2026-10-10", "paiement_montant": "10", "paiement_mode": "interac"}),
                              ("/paiement/1/supprimer", {}), ("/chantier/3/supprimer", {}), ("/client/3/supprimer", {}),
                              ("/utilisateurs/ajouter", {"nom": "Pirate", "mot_de_passe": "pirate", "role": "admin"}),
-                             ("/utilisateurs/1/actif", {"actif": "0"}), ("/secteurs/ajouter", {"libelle": "X"})):
+                             ("/utilisateurs/1/actif", {"actif": "0"})):
             self.assertTrue(self.req("POST", chemin, form, cookie=self.soum)[0].startswith("403"), chemin)
         self.assertEqual(self.sql("SELECT statut FROM chantiers ORDER BY id"), avant)
         self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 3"), [(1,)])
@@ -329,8 +329,7 @@ class TestDroits(BaseAuth):
     def test_accueil_redirige_le_telephone_et_le_compte_soumission(self):
         statut, en_tetes, _ = self.req("GET", "/", cookie=self.soum)
         self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/soumissions"))               # le soumissionneur arrive sur ses soumissions
-        statut, en_tetes, _ = self.req("GET", "/", cookie=self.admin, agent=TELEPHONE)
-        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/chantiers"))
+        self.assertTrue(self.req("GET", "/", cookie=self.admin, agent=TELEPHONE)[0].startswith("200"))     # l'administrateur a le tableau de bord sur téléphone
         self.assertTrue(self.req("GET", "/", cookie=self.admin, agent=BUREAU)[0].startswith("200"))
 
     def test_connecte_va_directement_a_l_accueil(self):

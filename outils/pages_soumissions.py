@@ -57,7 +57,7 @@ def _table(conn, lignes, retour, refusees=False):
             action = f'<div class="actions-ligne actions-soumission">{boutons_soumission(i, retour)}</div>'
         corps += (f'<tr><td>{demande}</td><td><a href="{url_fiche(i, "soumission")}">{esc(nom)}</a>{tel}{manque}</td><td>{adresse}</td>'
                   f'<td>{travaux}{duree}</td>{montant}<td class="col-actions">{action}</td></tr>')
-    return ('<div class="liste-defile"><table class="tableau"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th>'
+    return ('<div class="liste-defile"><table class="tableau soumissions"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th>'
             f'<th class="droite">Montant</th><th></th></tr></thead><tbody>{corps}</tbody></table></div>')
 
 

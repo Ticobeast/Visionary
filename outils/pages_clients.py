@@ -82,7 +82,7 @@ def page_clients(conn, query):
     recherche = (f'<form class="recherche" method="get" action="/clients"><input type="search" name="q" value="{esc(q)}" '
                  f'placeholder="Chercher : nom, téléphone, adresse…">{select_sect}<button type="submit">Chercher</button></form>')
     nouveau = '<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/nouveau">+ Nouveau client</a></div>'
-    return gabarit("Clients", f'<h1>Clients</h1>{nouveau}{recherche}{tableau}<p class="doux"><a href="/secteurs">Gérer les secteurs desservis</a></p>', query.get("ok"))
+    return gabarit("Clients", f'<h1>Clients</h1>{nouveau}{recherche}{tableau}', query.get("ok"))
 
 
 def page_client(conn, client_id, query):
@@ -240,42 +240,6 @@ def soumission_creer(conn, client_id, form):
     return gabarit("Nouvelle soumission", f'<h1>Nouvelle soumission</h1>{_form_simplifie(conn, client_id, saisie, erreurs)}', section="soumissions")
 
 
-# ---------------------------------------------------------------------------
-# Secteurs desservis (la liste déroulante des clients)
-# ---------------------------------------------------------------------------
-def page_secteurs(conn, query, erreurs=(), saisie=None):
-    saisie = saisie or {}
-    nombres = dict(conn.execute("SELECT secteur, count(*) FROM clients WHERE secteur IS NOT NULL GROUP BY secteur"))
-    lignes = ""
-    for code, libelle, ville in lister_secteurs(conn):
-        n = nombres.get(code, 0)
-        supprimer = (f'<form class="mini" method="post" action="/secteurs/{esc(code)}/supprimer" onsubmit="return confirm(\'Supprimer ce secteur ?\')">'
-                     '<button class="danger" type="submit">Supprimer</button></form>') if not n else '<span class="doux">utilisé</span>'
-        lignes += (f'<tr><td><form class="mini" method="post" action="/secteurs/{esc(code)}/renommer"><input name="libelle" value="{esc(libelle)}" '
-                   f'aria-label="Nom du secteur"><button type="submit" class="secondaire">Renommer</button></form></td>'
-                   f'<td>{esc(ville)}</td><td class="droite">{n}</td><td>{supprimer}</td></tr>')
-    err = ('<div class="erreurs"><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>") if erreurs else ""
-    ajout = (f'<div class="carte"><h2>Ajouter un secteur</h2><form method="post" action="/secteurs/ajouter"><div class="grille">'
-             f'{champ("libelle", "Nom du secteur", saisie, required=True, placeholder="Ex. Cap-de-la-Madeleine")}'
-             f'{champ("ville", "Ville inscrite sur l’adresse (si différente du nom)", saisie, placeholder="Ex. Trois-Rivières")}'
-             '<div><label>&nbsp;</label><button type="submit">Ajouter</button></div></div></form>'
-             '<p class="doux">Un secteur existant (même nom à l’accent, au tiret ou à la casse près) est refusé : pas de doublons.</p></div>')
-    contenu = ('<h1>Secteurs desservis</h1><p class="doux">La liste déroulante « Ville / secteur » des clients. La ville inscrite sur l\'adresse '
-               '(pour Google Maps) vient du secteur choisi : plus de « Trois Rivieres » ni de « Trois-Riviere ».</p>'
-               f'{err}<div class="liste-defile"><table><thead><tr><th>Secteur</th><th>Ville sur l’adresse</th><th class="droite">Clients</th><th></th></tr></thead>'
-               f'<tbody>{lignes}</tbody></table></div>{ajout}<p><a href="/clients">Retour aux clients</a></p>')
-    return gabarit("Secteurs", contenu, query.get("ok"))
-
-
-def _secteur_action(conn, travail, ok):
-    try:
-        with transaction(conn):
-            erreurs = travail()
-    except sqlite3.IntegrityError as e:
-        erreurs = [f"Refusé par la base : {e}"]
-    return redirection(f"/secteurs?ok={ok}") if not erreurs else page_secteurs(conn, {}, erreurs)
-
-
 def client_supprimer(conn, client_id):
     if _client(conn, client_id) is None:
         return _introuvable()
@@ -290,10 +254,6 @@ def client_supprimer(conn, client_id):
 
 
 ROUTES_CLIENTS = [
-    ("GET", r"^/secteurs$", lambda c, q, f, *g: page_secteurs(c, q)),
-    ("POST", r"^/secteurs/ajouter$", lambda c, q, f, *g: _secteur_action(c, lambda: ajouter_secteur(c, f.get("libelle"), f.get("ville"))[1], "secteur_ajoute")),
-    ("POST", r"^/secteurs/([a-z0-9_]+)/renommer$", lambda c, q, f, code: _secteur_action(c, lambda: renommer_secteur(c, code, f.get("libelle")), "secteur_maj")),
-    ("POST", r"^/secteurs/([a-z0-9_]+)/supprimer$", lambda c, q, f, code: _secteur_action(c, lambda: supprimer_secteur(c, code), "secteur_supprime")),
     ("GET", r"^/clients$", lambda c, q, f, *g: page_clients(c, q)),
     ("GET", r"^/client/(\d+)$", lambda c, q, f, i: page_client(c, int(i), q)),
     ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: page_client_modifier(c, int(i), q)),
