@@ -353,7 +353,18 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
             '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
-            f'{_barre_mobile(section)}</body></html>')
+            f'{_barre_mobile(section)}{SCRIPT_POSITION}</body></html>')
+
+
+# Changer de jour, de mois ou de filtre sur la même page : on reste à la même hauteur au lieu de remonter en haut.
+SCRIPT_POSITION = (
+    '<script>(function(){var k="pos:"+location.pathname;try{var v=sessionStorage.getItem(k);'
+    'if(v!==null){sessionStorage.removeItem(k);window.scrollTo(0,parseInt(v,10)||0);}}catch(e){}'
+    'function g(){try{sessionStorage.setItem(k,String(window.pageYOffset));}catch(e){}}'
+    'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");'
+    'if(a&&!a.target&&a.pathname===location.pathname&&a.origin===location.origin&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey)g();});'
+    'document.addEventListener("submit",function(e){var f=e.target;if(f.method&&f.method.toLowerCase()==="get"&&'
+    'new URL(f.action||location.href,location.href).pathname===location.pathname)g();});})();</script>')
 
 
 def heures(h):
