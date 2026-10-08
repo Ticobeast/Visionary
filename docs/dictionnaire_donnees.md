@@ -119,7 +119,7 @@ Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depui
 | `en_attente` | **chantier accepté mis de côté** (saison, client pas prêt...) : pas dans la Journée ; revient à `a_planifier` à la date `reprise_le`, ou quand on l'en sort | date effacée ; `accepte_le` rempli |
 | `a_planifier` | **soumission acceptée** (renseignements complets), pas encore de date (file d'attente classée par délai) | date effacée ; `accepte_le` rempli |
 | `planifie` | date fixée, rang dans la journée | `date_prevue` obligatoire |
-| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait) ; garde son rang dans la journée |
+| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait : **fin des travaux**, point de départ de la pastille « depuis la fin des travaux » de Chantiers et date de la **facture** PDF) ; garde son rang dans la journée |
 | `annule` | **soumission refusée** (`accepte_le` vide) ou **chantier annulé** (`accepte_le` rempli) | |
 
 **Genre** (colonne `genre` de la vue `v_chantiers`, calculée) : `soumission` pour `soumission` et pour `annule` quand `accepte_le` est vide ;

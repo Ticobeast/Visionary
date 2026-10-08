@@ -16,6 +16,8 @@ import sqlite3
 
 from urllib.parse import quote, urlencode
 
+from composants import liens_pdf
+from documents import facture_possible
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
                    dupliquer_chantier, empreinte, encaisser, libelles_manques, lire_ligne, lister_secteurs, manques_pour_accepter,
                    mettre_a_jour_fiche, remettre_en_soumission, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
@@ -254,7 +256,17 @@ def boutons_soumission(chantier_id, retour, retour_accepter=None):
             f'<input type="hidden" name="retour" value="{esc(retour_accepter or retour)}"><button type="submit">Accepter</button></form>'
             f'<a class="bouton secondaire" href="/soumission/{chantier_id}/attente?retour={quote(retour_accepter or retour, safe="")}">En attente</a>'
             f'<form class="mini" method="post" action="/soumission/{chantier_id}/refuser" onsubmit="return confirm({esc(repr(CONFIRMATION_REFUS))})">'
-            f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire">Refuser</button></form>')
+            f'<input type="hidden" name="retour" value="{esc(retour)}"><button type="submit" class="secondaire">Refuser</button></form>'
+            + liens_pdf(chantier_id, "soumission"))
+
+
+def _bloc_documents(chantier_id, statut, genre):
+    """Carte « Documents pour le client » d'un chantier accepté : sa soumission, et sa facture (administrateur : elle montre les paiements)."""
+    lignes = [("Soumission", liens_pdf(chantier_id, "soumission"))]
+    if est_admin() and facture_possible(statut, genre):
+        lignes.append(("Facture", liens_pdf(chantier_id, "facture")))
+    corps = "".join(f'<div class="ligne-document"><b>{nom}</b><div class="actions-page">{liens}</div></div>' for nom, liens in lignes)
+    return f'<div class="carte documents"><h2>Documents pour le client</h2>{corps}</div>'
 
 
 def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_paiement=(), erreur_globale=None):
@@ -300,7 +312,8 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         if manques:
             manque = f'<p class="manque">Pour accepter, il manque encore : {esc(", ".join(libelles_manques(manques)))}.</p>'
     elif refusee:
-        boutons = _formulaire_action(f"{base}/{chantier_id}", f"/soumission/{chantier_id}/rouvrir", chantier_id, "Rouvrir la soumission") + dupliquer
+        boutons = (_formulaire_action(f"{base}/{chantier_id}", f"/soumission/{chantier_id}/rouvrir", chantier_id, "Rouvrir la soumission")
+                   + liens_pdf(chantier_id, "soumission") + dupliquer)
     else:
         boutons = dupliquer
         if statut == "planifie" and est_admin():
@@ -316,6 +329,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         if statut == "annule" and est_admin():
             boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="actions-bloc"><div class="actions-page">{boutons}</div>{manque}</div>'
+    documents_client = "" if soumission else _bloc_documents(chantier_id, statut, genre)
     bandeau = ""
     if refusee:
         bandeau = ('<div class="verrou-termine">Soumission <b>refusée</b> : elle est dans la section « Refusées » de l\'onglet Soumissions. '
@@ -337,7 +351,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         verrou = ('<div class="verrou-termine"><b>Chantier terminé : verrouillé en lecture seule.</b> Le client est considéré comme facturé. Il ne peut plus être modifié, '
                   'rouvert ni supprimé. Restent possibles : les paiements et la duplication (pour un travail récurrent).'
                   + (' Il est <b>archivé</b> (terminé et payé).' if archive else '') + '</div>')
-        contenu = (f'<h1>Chantier #{chantier_id}</h1>{resume}{verrou}{actions}{corps}{paiements}'
+        contenu = (f'<h1>Chantier #{chantier_id}</h1>{resume}{verrou}{actions}{documents_client}{corps}{paiements}'
                    f'{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres)}')
     elif refusee:
         suppression = (f'<div class="carte"><h2>Supprimer</h2><form method="post" action="/soumission/{chantier_id}/supprimer" '
@@ -360,7 +374,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                       f'<form id="supprimer-chantier" method="post" action="{base}/{chantier_id}/supprimer"></form>'
                       f'<form id="annuler-chantier" method="post" action="/action/annuler"><input type="hidden" name="chantier_id" value="{chantier_id}">'
                       f'<input type="hidden" name="retour" value="{base}/{chantier_id}"></form>')
-        contenu = f'<h1>{mot} #{chantier_id}</h1>{resume}{bandeau}{actions}{corps}{paiements}{formulaire}'
+        contenu = f'<h1>{mot} #{chantier_id}</h1>{resume}{bandeau}{actions}{documents_client}{corps}{paiements}{formulaire}'
     return gabarit(f"{mot} {chantier_id}", contenu, query.get("ok") if query else None, erreur_globale or (query.get("err") if query else None))
 
 

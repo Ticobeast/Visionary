@@ -96,12 +96,29 @@ def cellule_montant(l):
     return f'<div class="montant">{argent(l["total_ttc"])}{avant}</div>'
 
 
+def lien_facture(chantier_id, texte="Facture"):
+    """Raccourci vers la facture en PDF (nouvel onglet) : la soumission acceptée devient une facture."""
+    return (f'<a class="bouton secondaire" href="/facture/{chantier_id}/pdf" target="_blank" rel="noopener" '
+            f'title="Ouvrir la facture en PDF (nouvel onglet)">{esc(texte)}</a>')
+
+
+def liens_pdf(chantier_id, document="soumission"):
+    """« Voir PDF » (nouvel onglet) et « Télécharger PDF » (enregistre le fichier) d'un document du client : soumission ou facture."""
+    nom = "la facture" if document == "facture" else "la soumission"
+    return (f'<span class="groupe-actions"><a class="bouton secondaire" href="/{document}/{chantier_id}/pdf" target="_blank" rel="noopener" '
+            f'title="Ouvrir {nom} en PDF (nouvel onglet)">Voir PDF</a>'
+            f'<a class="bouton secondaire" href="/{document}/{chantier_id}/pdf?telecharger=1" download '
+            f'title="Enregistrer {nom} en PDF sur cet appareil">Télécharger PDF</a></span>')
+
+
 def bouton_terminer(l, retour):
-    """« Terminer » sur un chantier planifié : ouvre une fenêtre de confirmation (avec « payé ou pas »)."""
+    """« Terminer » sur un chantier planifié : ouvre une fenêtre de confirmation (avec « payé ou pas »).
+    À côté, le raccourci « Facture » (PDF) : sur place, on remet la facture avant ou après avoir confirmé."""
     if l["statut"] == "planifie":
-        return f'<a class="bouton" href="{esc(avec_params(retour, terminer=l["chantier_id"], ok=None, err=None))}">Terminer</a>'
+        return (f'<span class="groupe-actions"><a class="bouton" href="{esc(avec_params(retour, terminer=l["chantier_id"], ok=None, err=None))}">Terminer</a>'
+                + lien_facture(l["chantier_id"]) + "</span>")
     if l["statut"] == "termine":
-        return '<span class="doux">Terminé</span>'
+        return '<span class="groupe-actions"><span class="doux">Terminé</span>' + lien_facture(l["chantier_id"]) + "</span>"
     return ""
 
 
@@ -139,4 +156,5 @@ def fenetre_terminer(conn, chantier_id, chemin, query):
             f'<input id="duree_reelle_h" name="duree_reelle_h" value="{duree and format(duree, "g") or ""}" inputmode="decimal"></div>'
             f'<p class="doux">Une fois terminé, le chantier est verrouillé en lecture seule et le client est considéré comme facturé.</p>'
             f'<div class="barre"><button type="submit">Oui, il est terminé</button>'
+            f'{lien_facture(chantier_id, "Facture (PDF)")}'
             f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form></div></div>')

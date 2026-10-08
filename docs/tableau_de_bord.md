@@ -8,7 +8,7 @@ avancés » (repliés). Chaque chose a **un seul endroit** :
 | **Tableau de bord** | voir le calendrier et le déroulement de la journée choisie ; terminer un chantier |
 | **Journée** | créer et gérer une journée complète : placer des chantiers, ordre, terminer, retirer, annuler |
 | **Chantiers** | les jobs **acceptés** : liste des chantiers actifs (dont ceux **en attente**) ; plus bas, les archives récentes |
-| **Soumissions** | les demandes de soumission, du premier appel à la réponse du client : boutons **Accepter** / **En attente** / **Refuser** |
+| **Soumissions** | les demandes de soumission, du premier appel à la réponse du client : boutons **Accepter** / **En attente** / **Refuser**, et le **PDF** à envoyer au client |
 | **Clients** | les fiches clients (seul endroit où l'on modifie un client) et la liste des secteurs desservis |
 | **Archives** | *(administrateur)* tout l'historique (terminés, annulés, soumissions refusées) : recherche, **statistiques**, relance des clients, export Excel |
 
@@ -52,10 +52,11 @@ Chantiers, jusqu'à leur acceptation.
 
 L'annulation d'un chantier se fait sur sa page (« Paramètres avancés », « Annuler le chantier »).
 
-## Pas de système de facture
+## Facture : un document PDF, pas un système de facturation
 
-Dès qu'un chantier est **Terminé**, le client est considéré comme **facturé** : il n'y a ni numéro de facture, ni date de facture, ni bouton
-« Facturer ». Un chantier terminé qui n'est pas payé est simplement « **À recevoir** ».
+Dès qu'un chantier est **Terminé**, le client est considéré comme **facturé** : il n'y a pas de bouton « Facturer », ni de registre de factures. Un chantier
+terminé qui n'est pas payé est simplement « **À recevoir** ». La **facture en PDF** (voir « La soumission et la facture en PDF » plus bas) est un document
+qu'on **imprime ou envoie** : elle est refaite à chaque ouverture d'après la fiche, sans rien enregistrer. Son numéro est celui de la fiche.
 
 ## 1. Tableau de bord
 
@@ -106,6 +107,9 @@ Un clic sur **Terminer** ouvre une fenêtre :
 Le même bouton existe dans la page *Journée* et sur la page du chantier. Les acomptes et les montants partiels se saisissent sur la page du
 chantier (« + Ajouter un paiement »).
 
+**Facture à côté de Terminer** : le bouton **Facture** (tableau de bord et Journée, sur chaque chantier planifié ou terminé) ouvre la **facture en PDF** dans un
+nouvel onglet, pour la remettre au client sur place. La fenêtre « Terminer » a aussi son bouton **Facture (PDF)**, à côté de « Oui, il est terminé ».
+
 ### Heures calculées
 
 - la première intervention commence à **7 h 30** ;
@@ -142,8 +146,17 @@ Menu **Chantiers** : une seule page, qui ne contient **que des chantiers accept�
 - **En haut : les raccourcis** (pastilles que tu choisis : voir plus bas), puis la recherche (nom sans accent, téléphone, adresse, secteur) et les
   filtres statut / paiement / **secteur**.
 - **Les chantiers actifs**, classés du plus récent au plus ancien d'après leur **date d'attente** (pour un chantier : depuis son **acceptation**), avec le
-  **délai d'attente** des chantiers « À planifier » (pastille verte moins de 7 jours, jaune 7 à 30, rouge plus de 30), le temps, le statut, le paiement
-  et le **montant à droite** (écran minimal : ni nacelle ni bois affichés ici).
+  **délai d'attente**, le temps, le statut, le paiement et le **montant à droite** (écran minimal : ni nacelle ni bois affichés ici).
+- **Deux pastilles de délai, toujours accompagnées de ce qu'elles comptent** (le nombre seul ne dit pas de quelle date on part) :
+
+  | Chantier | Date affichée | Pastille |
+  |---|---|---|
+  | **À planifier** | le jour de l'**acceptation** de la soumission (ou de son **retour** d'attente ou de sa réouverture) | `41 j` **depuis l'acceptation** (ou **depuis la reprise**) |
+  | **Terminé**, **À recevoir** ou **Partiel** *(administrateur)* | le jour de la **fin des travaux** (jamais la date de la soumission ni de l'acceptation) | `144 j` **depuis la fin des travaux** |
+
+  La couleur suit les mêmes seuils : **verte** moins de 7 jours, **jaune** 7 à 30, **rouge** plus de 30. Survole la pastille pour la phrase complète
+  (« Paiement attendu depuis 144 jours : travaux terminés le 2026-05-17, solde à recevoir 1 270,47 $ »). Dès que le chantier est payé en totalité, la
+  pastille disparaît (il part aux archives). Le compte « Soumission » ne voit pas la pastille de paiement (finances).
 - **Les chantiers en attente** (voir plus bas) sont dans cette liste, avec « reprise le … » ou « jusqu'à nouvel ordre » sous leur statut. Un lien « En attente (N) »
   en haut de page les isole ; le filtre « Statut » et un raccourci « En attente » (à ajouter, voir Raccourcis) aussi.
 - **Plus bas : « Archives »** : les chantiers **annulés** et les chantiers **terminés et payés**. Ils y vont **automatiquement**, sans rien cliquer.
@@ -173,8 +186,8 @@ main, mode de règlement. **Après la création, on revient à la fiche du clien
 
 Les soumissions en cours, **la plus récente en haut** ; chaque ligne montre la date de la demande avec la **pastille d'attente** (verte moins de
 7 jours, jaune 7 à 30, rouge plus de 30) et « par » le compte qui l'a ouverte, le client, l'adresse, les travaux, le montant, et **ce qui manque encore
-pour l'accepter** (en rouge). À droite : les trois **boutons rapides Accepter, En attente et Refuser**. Un lien « En attente (N) » à côté du titre mène aux chantiers
-qui ont été mis en attente.
+pour l'accepter** (en rouge). À droite : les trois **boutons rapides Accepter, En attente et Refuser**, suivis de **Voir PDF** et **Télécharger PDF** (la soumission pour le client :
+voir plus bas). Un lien « En attente (N) » à côté du titre mène aux chantiers qui ont été mis en attente.
 
 Au-dessus : les **raccourcis** (par défaut « Mes soumissions » et « À relancer (7 jours et plus) »), une recherche (nom, téléphone, adresse,
 travaux), un filtre par **délai** et un filtre « **ouvertes par** ». En bas : la section **Refusées**.
@@ -228,6 +241,39 @@ laisser le dossier dans « À planifier » (où il reviendrait chaque jour dans 
 - Un chantier **en attente** n'est **pas proposé dans la Journée**, ne compte pas dans le délai d'attente des « À planifier », mais reste dans Chantiers (lien
   « En attente (N) » en haut, filtre « Statut »). Un chantier déjà **placé dans une journée** doit d'abord en être retiré avant d'être mis en attente.
 - Le compte « Soumission » peut mettre en attente et sortir de l'attente, comme accepter et refuser.
+
+### La soumission et la facture en PDF
+
+Deux documents à l'allure professionnelle (logo, numéro d'entreprise, coordonnées, montants, conditions), au format **Lettre (8,5 × 11 po)**, prêts à envoyer ou
+à imprimer. Le programme ne demande **rien d'installer**.
+
+| Document | Où le trouver | Qui |
+|---|---|---|
+| **Soumission** | sur chaque ligne de la liste Soumissions, à côté d'Accepter / En attente / Refuser ; sur la fiche d'une soumission (même rangée de boutons) ; sur la fiche d'un chantier, carte « **Documents pour le client** » | tous les comptes |
+| **Facture** | carte « **Documents pour le client** » de la fiche d'un chantier accepté ; bouton **Facture** à côté de **Terminer** (tableau de bord et Journée) ; bouton **Facture (PDF)** dans la fenêtre « Terminer » | administrateur seulement (elle montre les paiements et le solde) |
+
+Chaque document a deux boutons : **Voir PDF** (s'ouvre dans un nouvel onglet : on regarde, on imprime) et **Télécharger PDF** (enregistre le fichier, nommé par
+exemple `Soumission-0042-Jean-Tremblay.pdf`). Rien n'est enregistré dans la base : le PDF est refait avec les données du moment.
+
+**La soumission** : numéro (celui de la fiche), date (**le jour où on la produit**), « valide jusqu'au » (30 jours après cette date), **client** (nom, téléphone, courriel), **lieu des travaux**, **description des
+travaux** (chaque type avec sa précision, nacelle, sort du bois, durée estimée, date prévue), **montant avant taxes, TPS (5 %), TVQ (9,975 %) et total**,
+conditions (mode de règlement prévu, paiement à la fin des travaux), puis une **case d'acceptation à signer** (nom, signature, date). Une soumission déjà
+acceptée n'a ni validité ni case à signer : elle indique « Acceptée le … ». Sans prix, le total affiche « à confirmer ».
+
+**La facture** : « **Une fois la soumission acceptée, c'est une facture** » : même fiche, même numéro, titre FACTURE. Elle existe pour tout chantier **accepté** (À
+planifier, En attente, Planifié, Terminé), pas pour une soumission ni un chantier annulé. Elle ajoute les **paiements reçus** (date et mode), le **solde à payer**
+(ou « Facture acquittée » quand tout est payé) et l'échéance « à la réception ». **Date de la facture** : la date des travaux une fois le chantier **terminé** (elle
+ne bouge plus), sinon la date du jour. Pas de durée ni de case à signer.
+
+**Jamais de notes internes** : les notes d'accès, les notes sur le client, la durée réelle et la « Description » de la fiche (c'est la feuille de route : « appeler
+avant de venir », « grimpeur requis ») ne sont **pas** imprimées. Les types de travaux et leurs **précisions** le sont toujours : c'est là qu'on écrit ce que le client doit lire.
+
+**Changer ce qui s'imprime** : tout est dans le fichier `outils/entreprise.py` (nom, NEQ, téléphone, courriel, site web, **numéros de TPS et de TVQ**, durée de validité,
+lignes de conditions, remerciement, impression de la description) ; le logo est le fichier `outils/ressources/logo-entreprise.svg` (un SVG fait de tracés, comme
+un logo exporté d'Illustrator, Inkscape, Figma ou Canva ; sinon le nom de l'entreprise est écrit à la place). Enregistre, puis relance le programme.
+
+> **Important : numéros de taxes.** La loi exige les numéros d'inscription à la TPS et à la TVQ sur une facture qui perçoit ces taxes. Ils ne sont pas encore dans
+> `entreprise.py` (`NUMERO_TPS`, `NUMERO_TVQ`) : tant qu'ils sont vides, rien n'est imprimé. À remplir avec ceux de Revenu Québec.
 
 ## 5. Raccourcis : les pastilles du haut
 

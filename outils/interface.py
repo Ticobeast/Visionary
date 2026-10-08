@@ -30,8 +30,8 @@ from noyau import (DB_DEFAUT, Index, Resultat, cle, creer_chantier, jours_attent
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
 from reseau import adresses_tailscale, client_autorise, hote_autorise  # noqa: E402
-from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, badge_statut, esc, gabarit,  # noqa: E402,F401
-                 heures, redirection, select_secteur, texte_attente)
+from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, badge_depuis, badge_statut, esc,  # noqa: E402,F401
+                 gabarit, heures, redirection, select_secteur, texte_attente, texte_jours)
 
 # ---------------------------------------------------------------------------
 # Pages
@@ -50,7 +50,17 @@ def _table_chantiers(lignes, finances=True):
         date_ = esc(l["attente_depuis"] or "")                          # chantier : depuis l'acceptation de la soumission
         if st == "a_planifier" and l["attente_depuis"]:
             jours = jours_attente(l["attente_depuis"], aujourdhui)
-            date_ += f'<div>{badge_attente(jours, priorite(jours))}</div>'
+            retour = bool(l["reprise_le"])                              # sorti de l'attente (ou rouvert) : on compte depuis ce retour
+            date_ += badge_depuis(jours, priorite(jours), "depuis la reprise" if retour else "depuis l'acceptation",
+                                  f"À planifier depuis {texte_jours(jours)} (" + ("de retour à planifier" if retour else "soumission acceptée")
+                                  + f" le {l['attente_depuis']})")
+        elif finances and st == "termine" and stp in ("a_payer", "partiel") and l["date_prevue"]:
+            # on attend l'argent : on compte depuis la FIN DES TRAVAUX (pas depuis la soumission ni l'acceptation)
+            jours = jours_attente(l["date_prevue"], aujourdhui)
+            date_ = esc(l["date_prevue"]) + badge_depuis(
+                jours, priorite(jours), "depuis la fin des travaux",
+                f"Paiement attendu depuis {texte_jours(jours)} : travaux terminés le {l['date_prevue']}, "
+                + (f"solde à recevoir {argent(solde)}" if solde else "paiement à recevoir"))
         prevu = f'<div class="doux">prévu le {esc(l["date_prevue"])}</div>' if l["date_prevue"] and st == "planifie" else ""
         if st == "en_attente":
             prevu = f'<div class="doux">{esc(texte_attente(l["reprise_le"]))}</div>'
@@ -119,7 +129,7 @@ def page_chantiers(conn, query):
                         'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent. '
                         + ('Pour chercher dans tout l\'historique, comparer et voir les statistiques : <a href="/archives">onglet Archives</a>.</p>' if admin else "</p>")
                         + archives_html)
-    return gabarit("Chantiers", f'<h1>Chantiers{lien_attente}{lien_archives}</h1>{raccourcis.barre(conn, "chantiers", query)}{recherche}{tableau}{section_archives}', query.get("ok"))
+    return gabarit("Chantiers", f'<h1>Chantiers{lien_attente}{lien_archives}</h1>{raccourcis.barre(conn, "chantiers", query)}{recherche}{tableau}{section_archives}', query.get("ok"), large=True)
 
 
 def page_nouveau(conn, query):
@@ -172,18 +182,20 @@ import raccourcis  # noqa: E402
 from pages_clients import ROUTES_CLIENTS  # noqa: E402
 from archives import ROUTES_ARCHIVES  # noqa: E402
 from pages_attente import ROUTES_ATTENTE  # noqa: E402
+from pages_documents import ROUTES_DOCUMENTS  # noqa: E402
 from pages_soumissions import ROUTES_SOUMISSIONS  # noqa: E402
 from raccourcis import ROUTES_RACCOURCIS  # noqa: E402
 from tableau import ROUTES_TABLEAU  # noqa: E402
 from calendrier import page_calendrier  # noqa: E402
 from composants import fenetre_terminer  # noqa: E402
 
-ROUTES = ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_SOUMISSIONS + ROUTES_ATTENTE + ROUTES_ARCHIVES + ROUTES_RACCOURCIS + ROUTES_CHANTIER + [
+ROUTES = (ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_DOCUMENTS + ROUTES_SOUMISSIONS + ROUTES_ATTENTE + ROUTES_ARCHIVES
+          + ROUTES_RACCOURCIS + ROUTES_CHANTIER + [
     ("GET", r"^/$", lambda c, q, f, *g: page_calendrier(c, q)),
     ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
     ("POST", r"^/nouveau$", lambda c, q, f, *g: creer(c, f)),
-]
+])
 
 
 def repondre(db_path, methode, chemin, query=None, form=None, requete=None):

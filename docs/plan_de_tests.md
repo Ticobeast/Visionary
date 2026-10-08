@@ -63,7 +63,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 19 | **Clients** : la liste | seulement Nom, Téléphone, Adresse (le secteur sous l'adresse) ; filtre par secteur ; la fiche d'un client n'affiche aucun montant |
 | 20 | **Clients**, « Gérer les secteurs desservis » : ajouter « Cap de la Madeleine » ; ajouter un vrai nouveau secteur ; renommer ; supprimer un secteur utilisé | le doublon (accent, tiret ou casse près) est refusé ; un secteur utilisé ne se supprime pas ; la liste déroulante suit |
 | 21 | Ajouter un **acompte** (page d'un chantier, « + Ajouter un paiement »), puis un paiement plus grand que le solde | acompte accepté (« Partiel ») ; le dépassement est **refusé** (jamais de solde négatif) |
-| 22 | Ouvrir un chantier **terminé** | page en **lecture seule** ; ni formulaire, ni « Supprimer » ; ni facture ni bouton « Facturer » (terminé = client facturé) ; il reste « + Ajouter un paiement » et « Dupliquer » |
+| 22 | Ouvrir un chantier **terminé** | page en **lecture seule** ; ni formulaire, ni « Supprimer » ; pas de bouton « Facturer » (terminé = client facturé : la facture est un PDF, carte « Documents pour le client ») ; il reste « + Ajouter un paiement » et « Dupliquer » |
 | 23 | **Dupliquer le chantier** sur un chantier terminé : changer le prix, valider | nouvelle **soumission** du même client : mêmes travaux et options, date de demande = aujourd'hui, aucun paiement ; l'original est intact |
 | 24 | Se tromper exprès : téléphone `123`, prix `12,345` | chaque erreur est expliquée, **rien n'est perdu** dans le formulaire |
 | 25 | Cliquer une **adresse** | Google Maps s'ouvre sur cette adresse dans un nouvel onglet |
@@ -97,6 +97,13 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 53 | Archives : regarder les chiffres clés et les statistiques (par type de travaux, par secteur, par année, selon le mois de l'année, que deviennent les soumissions) | des nombres cohérents avec les chantiers terminés ; les barres suivent le chiffre d'affaires ; le taux d'acceptation compte les soumissions acceptées et refusées |
 | 54 | Archives : « Exporter (Excel) », ouvrir le fichier dans Excel | un fichier `archives-AAAA-MM-JJ.csv` : accents corrects, montants avec la virgule, mêmes résultats que la page (et tous, pas seulement les 200 premiers) |
 | 55 | Compte « Soumission » : chercher « Archives » dans le menu, ouvrir `/archives` à la main | pas d'entrée Archives, et la page est refusée (réservée à l'administrateur) |
+| 56 | Chantiers : regarder un chantier « À planifier » et un chantier **terminé non payé** | sous la date, une pastille suivie de ce qu'elle compte : « **41 j depuis l'acceptation** » (À planifier) et « **144 j depuis la fin des travaux** » (terminé, À recevoir ou Partiel : la date affichée est celle de la **fin des travaux**, pas celle de la soumission) ; verte moins de 7 jours, jaune 7 à 30, rouge plus de 30 ; le survol donne la phrase complète ; sur téléphone, la pastille est en haut de la carte |
+| 57 | Chantier terminé non payé : ajouter un paiement partiel, puis le solde | la pastille reste tant qu'il y a un solde (« Partiel ») avec le même nombre de jours ; elle disparaît dès que tout est payé (le chantier part aux archives) ; le compte « Soumission » ne la voit pas |
+| 58 | Soumissions : sur une soumission **complète**, cliquer **Voir PDF**, puis **Télécharger PDF** | le PDF s'ouvre dans un nouvel onglet : logo, SOUMISSION, numéro, date, « valide jusqu'au », client, lieu, travaux avec précisions, montant avant taxes / TPS / TVQ / total, conditions, **case d'acceptation à signer**, **NEQ, téléphone et courriel au bas** ; le second bouton enregistre `Soumission-00NN-Prénom-Nom.pdf` ; la fiche n'a pas changé |
+| 59 | Imprimer ce PDF sur du papier Lettre | tout tient sur la page, rien n'est coupé, le bas de page (NEQ, téléphone, courriel) est bien imprimé |
+| 60 | Soumission **sans prix**, **sans nom**, puis une avec un texte de précision **très long** (plus d'une page) | « à confirmer » à la place du total ; « (client à identifier) » ; le long texte continue sur la page suivante, avec le rappel du document en haut et les coordonnées au bas de **chaque** page ; **aucune note interne** (accès, notes sur le client, description de la feuille de route) n'est imprimée |
+| 61 | Tableau de bord, un jour avec un chantier planifié : bouton **Facture** à côté de **Terminer** ; ouvrir la fenêtre « Terminer » | la facture s'ouvre en PDF (FACTURE, même numéro que la fiche, date du jour, solde à payer) ; la fenêtre offre « Facture (PDF) » à côté de « Oui, il est terminé » ; après avoir terminé, la facture porte la **date des travaux** ; si le client a payé : « Facture acquittée » et solde 0,00 $ |
+| 62 | Page d'un chantier accepté (carte « Documents pour le client »), page d'une soumission non acceptée, puis le compte « Soumission » | la soumission : Voir / Télécharger ; la **facture** seulement pour un chantier accepté et seulement pour l'administrateur (aucun lien pour le compte « Soumission », et `/facture/N/pdf` lui est refusé) ; sur une soumission non acceptée, ouvrir `/facture/N/pdf` à la main ramène à la fiche avec un message |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -111,7 +118,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 55 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 62 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

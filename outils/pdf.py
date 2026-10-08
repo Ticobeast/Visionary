@@ -63,15 +63,22 @@ def _nettoyer(texte):
     return texte.encode("cp1252", "replace").decode("cp1252")
 
 
+# Signes hors ASCII de Windows-1252 : largeurs Helvetica (normal, gras), en milliemes d'em. Les lettres accentuées prennent celle de leur lettre de base.
+_SIGNES = {"•": (350, 350), "·": (278, 278), "–": (556, 556), "—": (1000, 1000), "…": (1000, 1000), "«": (556, 556), "»": (556, 556),
+           "’": (222, 278), "‘": (222, 278), "“": (333, 500), "”": (333, 500), "°": (400, 400), "×": (584, 584), "€": (556, 556), "™": (1000, 1000)}
+
+
 def largeur(texte, taille, gras=False):
     table = _TABLES[gras]
     total = 0
     for c in texte:
         if c in table:
             total += table[c]
+        elif c in _SIGNES:
+            total += _SIGNES[c][1 if gras else 0]
         else:
             base = unicodedata.normalize("NFD", c)[0]
-            total += table.get(base, 1000 if c in "—…" else 556)
+            total += table.get(base, 556)
     return total * taille / 1000.0
 
 
@@ -106,6 +113,11 @@ def _litteral(texte):
 
 def _nombre(x):
     return ("%.2f" % x).rstrip("0").rstrip(".") or "0"
+
+
+def _chaine_unicode(texte):
+    """Chaîne PDF en UTF-16 (accents garantis dans les propriétés du document)."""
+    return b"<FEFF" + _nettoyer(texte).encode("utf-16-be").hex().upper().encode("ascii") + b">"
 
 
 # ---------------------------------------------------------------------------
@@ -237,38 +249,80 @@ def _matrice(orientation, x, y, dw, dh):
 class Document:
     """Mise en page au fil de l'eau : on écrit de haut en bas, une nouvelle page s'ouvre quand il n'y a plus de place."""
 
-    def __init__(self, titre_courant):
+    def __init__(self, titre_courant, haut=None, bas=None, meta=None, format=None):
+        """`haut` / `bas` : ordonnées entre lesquelles on écrit (par défaut : sous l'en-tête et au-dessus du pied de page courants).
+        `meta` : {"titre", "auteur", "sujet"} écrits dans les propriétés du PDF (le titre s'affiche dans la fenêtre du lecteur).
+        `format` : (largeur, hauteur) de la page en points ; A4 par défaut."""
         self.titre_courant = titre_courant
+        self.largeur_page, self.hauteur_page = format or (LARGEUR, HAUTEUR)
+        self.haut = self.hauteur_page - MARGE - HAUT_ENTETE if haut is None else haut
+        self.bas = MARGE + BAS_PIED if bas is None else bas
+        self.meta = meta or {}
         self.pages = []                 # chaque page : {"ops": [bytes], "images": [indices]}
         self.images = []
         self.y = 0.0
+        self._cible = -1                # page où écrivent les primitives : la dernière (_decorer en vise une autre)
         self._ouvrir_page()
 
     # --- pages ----------------------------------------------------------
     def _ouvrir_page(self):
         self.pages.append({"ops": [], "images": [], "liens": []})
-        self.y = HAUTEUR - MARGE - HAUT_ENTETE
+        self.y = self.haut
 
     def _op(self, texte):
-        self.pages[-1]["ops"].append(texte.encode("latin-1"))
+        self.pages[self._cible]["ops"].append(texte.encode("latin-1"))
 
     def besoin(self, hauteur):
-        if self.y - hauteur < MARGE + BAS_PIED:
+        if self.y - hauteur < self.bas:
             self._ouvrir_page()
 
     # --- primitives -------------------------------------------------------
-    def _texte(self, x, y, texte, taille, gras=False, couleur=_NOIR):
+    def _texte(self, x, y, texte, taille, gras=False, couleur=_NOIR, espacement=0.0):
+        """`espacement` : points ajoutés entre les lettres (titres en petites capitales espacées)."""
         rvb = couleur if isinstance(couleur, tuple) else (couleur,) * 3
-        self.pages[-1]["ops"].append(
-            ("%s %s %s rg BT /F%d %s Tf %s %s Td " % (_nombre(rvb[0]), _nombre(rvb[1]), _nombre(rvb[2]), 2 if gras else 1,
-                                                    _nombre(taille), _nombre(x), _nombre(y))).encode("latin-1")
-            + _litteral(texte) + b" Tj ET")
+        tc = ("%s Tc " % _nombre(espacement)) if espacement else ""
+        self.pages[self._cible]["ops"].append(
+            ("%s %s %s rg BT /F%d %s Tf %s%s %s Td " % (_nombre(rvb[0]), _nombre(rvb[1]), _nombre(rvb[2]), 2 if gras else 1,
+                                                      _nombre(taille), tc, _nombre(x), _nombre(y))).encode("latin-1")
+            + _litteral(texte) + (b" Tj 0 Tc ET" if espacement else b" Tj ET"))        # l'espacement dure jusqu'au prochain réglage : on le remet à 0
 
     def _trait(self, x1, y1, x2, y2, epaisseur=0.6, gris=0.75):
-        self._op("%s G %s w %s %s m %s %s l S" % (_nombre(gris), _nombre(epaisseur), _nombre(x1), _nombre(y1), _nombre(x2), _nombre(y2)))
+        """Trait ; `gris` : un niveau de gris (0 à 1) ou une couleur (r, g, b)."""
+        couleur = "%s %s %s RG" % tuple(_nombre(c) for c in gris) if isinstance(gris, tuple) else "%s G" % _nombre(gris)
+        self._op("%s %s w %s %s m %s %s l S" % (couleur, _nombre(epaisseur), _nombre(x1), _nombre(y1), _nombre(x2), _nombre(y2)))
 
     def _rect(self, x, y, w, h, gris):
-        self._op("%s g %s %s %s %s re f" % (_nombre(gris), _nombre(x), _nombre(y), _nombre(w), _nombre(h)))
+        """Rectangle plein ; `gris` : un niveau de gris (0 à 1) ou une couleur (r, g, b)."""
+        couleur = "%s %s %s rg" % tuple(_nombre(c) for c in gris) if isinstance(gris, tuple) else "%s g" % _nombre(gris)
+        self._op("%s %s %s %s %s re f" % (couleur, _nombre(x), _nombre(y), _nombre(w), _nombre(h)))
+
+    def _cadre(self, x, y, w, h, couleur, epaisseur=0.6):
+        """Contour d'un rectangle (sans remplissage)."""
+        self._op("%s %s %s RG %s w %s %s %s %s re S" % (_nombre(couleur[0]), _nombre(couleur[1]), _nombre(couleur[2]), _nombre(epaisseur),
+                                                        _nombre(x), _nombre(y), _nombre(w), _nombre(h)))
+
+    def _texte_droite(self, x_droite, y, texte, taille, gras=False, couleur=_NOIR, espacement=0.0):
+        """Texte dont la FIN est en x_droite (montants alignés à droite)."""
+        propre = _nettoyer(texte)
+        self._texte(x_droite - largeur(propre, taille, gras) - espacement * len(propre), y, propre, taille, gras, couleur, espacement)
+
+    def _texte_centre(self, x_centre, y, texte, taille, gras=False, couleur=_NOIR):
+        propre = _nettoyer(texte)
+        self._texte(x_centre - largeur(propre, taille, gras) / 2, y, propre, taille, gras, couleur)
+
+    def _lien(self, x1, y1, x2, y2, url):
+        """Zone cliquable de la page courante (adresse web, mailto:, tel:)."""
+        self.pages[self._cible]["liens"].append((x1, y1, x2, y2, url))
+
+    def logo(self, logo, x, y_haut, largeur_cible):
+        """Dessine un logo vectoriel (voir logo.py) : coin supérieur gauche en (x, y_haut), `largeur_cible` points de large.
+        Retourne sa hauteur sur la page."""
+        e = largeur_cible / logo.largeur
+        m = [("%.6f" % v).rstrip("0").rstrip(".") or "0" for v in (e, -e, x - e * logo.x0, y_haut + e * logo.y0)]
+        self._op("q %s 0 0 %s %s %s cm" % (m[0], m[1], m[2], m[3]))
+        self._op(logo.operateurs)
+        self._op("Q")
+        return logo.hauteur * e
 
     # --- éléments de mise en page -------------------------------------------
     def espace(self, h=6.0):
@@ -360,16 +414,21 @@ class Document:
         return i
 
     # --- fabrication du fichier -------------------------------------------------
+    def _decorer(self, numero, total):
+        """En-tête et pied de page de la feuille `numero` sur `total` (à surcharger pour une autre mise en page)."""
+        ops = self.pages[numero - 1]["ops"]
+        en_tete = _litteral(self.titre_courant)
+        ops.append(b"0.4 0.4 0.4 rg BT /F1 8.5 Tf %s %s Td " % (_nombre(MARGE).encode(), _nombre(self.hauteur_page - MARGE + 6).encode()) + en_tete + b" Tj ET")
+        ops.append(("0.75 G 0.6 w %s %s m %s %s l S" % (_nombre(MARGE), _nombre(self.hauteur_page - MARGE), _nombre(self.largeur_page - MARGE),
+                                                       _nombre(self.hauteur_page - MARGE))).encode())
+        pied = "Page %d / %d" % (numero, total)
+        ops.append(b"0.4 0.4 0.4 rg BT /F1 8.5 Tf %s %s Td " % (_nombre(self.largeur_page - MARGE - largeur(pied, 8.5)).encode(), _nombre(MARGE - 6).encode())
+                   + _litteral(pied) + b" Tj ET")
+
     def octets(self):
         n = len(self.pages)
-        for numero, page in enumerate(self.pages, 1):                       # en-tête et pied de page de chaque feuille
-            ops = page["ops"]
-            en_tete = _litteral(self.titre_courant)
-            ops.append(b"0.4 0.4 0.4 rg BT /F1 8.5 Tf %s %s Td " % (_nombre(MARGE).encode(), _nombre(HAUTEUR - MARGE + 6).encode()) + en_tete + b" Tj ET")
-            ops.append(("0.75 G 0.6 w %s %s m %s %s l S" % (_nombre(MARGE), _nombre(HAUTEUR - MARGE), _nombre(LARGEUR - MARGE), _nombre(HAUTEUR - MARGE))).encode())
-            pied = "Page %d / %d" % (numero, n)
-            ops.append(b"0.4 0.4 0.4 rg BT /F1 8.5 Tf %s %s Td " % (_nombre(LARGEUR - MARGE - largeur(pied, 8.5)).encode(), _nombre(MARGE - 6).encode())
-                       + _litteral(pied) + b" Tj ET")
+        for numero in range(1, n + 1):
+            self._decorer(numero, n)
         objets = [None] * 4                                                  # 1 catalogue, 2 pages, 3 et 4 polices
         objets[2] = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
         objets[3] = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
@@ -392,9 +451,16 @@ class Document:
             xobjets = " ".join("/Im%d %d 0 R" % (i, numeros_images[i]) for i in page["images"])
             objets.append(("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %s %s] /Contents %d 0 R "
                            "/Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << %s >> >> /Annots [%s] >>"
-                           % (_nombre(LARGEUR), _nombre(HAUTEUR), numero_contenu, xobjets, " ".join(annots))).encode("latin-1"))
+                           % (_nombre(self.largeur_page), _nombre(self.hauteur_page), numero_contenu, xobjets, " ".join(annots))).encode("latin-1"))
             numeros_pages.append(len(objets))
         objets[0] = b"<< /Type /Catalog /Pages 2 0 R >>"
+        info = ""
+        if self.meta:       # propriétés du document : le titre s'affiche dans la fenêtre du lecteur, le nom de l'entreprise comme auteur
+            objets[0] = b"<< /Type /Catalog /Pages 2 0 R /Lang (fr-CA) /ViewerPreferences << /DisplayDocTitle true >> >>"
+            champs = "".join("/%s %s " % (cle, _chaine_unicode(self.meta[k]).decode("ascii"))
+                             for k, cle in (("titre", "Title"), ("auteur", "Author"), ("sujet", "Subject")) if self.meta.get(k))
+            objets.append(("<< %s/Creator (Sylvainculteur) >>" % champs).encode("ascii"))
+            info = " /Info %d 0 R" % len(objets)
         objets[1] = ("<< /Type /Pages /Count %d /Kids [%s] >>" % (len(numeros_pages), " ".join("%d 0 R" % p for p in numeros_pages))).encode("latin-1")
         sortie = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
         positions = []
@@ -405,7 +471,7 @@ class Document:
         sortie += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objets) + 1)
         for p in positions:
             sortie += b"%010d 00000 n \n" % p
-        sortie += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objets) + 1, debut_xref)
+        sortie += b"trailer\n<< /Size %d /Root 1 0 R%s >>\nstartxref\n%d\n%%%%EOF\n" % (len(objets) + 1, info.encode(), debut_xref)
         return bytes(sortie)
 
 

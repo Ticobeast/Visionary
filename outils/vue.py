@@ -184,6 +184,8 @@ td a{color:var(--vert-fonce)}
 .actions-bloc{margin-bottom:16px}.actions-page{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.actions-page form{margin:0}
 .actions-page .bouton,.actions-page button{padding:11px 20px;font-size:.95rem;white-space:nowrap}.actions-bloc .manque{margin:8px 0 0;font-size:.9rem}
 .actions-soumission .bouton,.actions-soumission button{padding:7px 14px;font-size:14px;line-height:1.3;white-space:nowrap}
+.actions-ligne.actions-soumission{flex-wrap:wrap}.groupe-actions{display:inline-flex;gap:8px;align-items:center}
+.carte.documents h2{margin:0 0 8px}.ligne-document{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0}.ligne-document b{min-width:112px}.ligne-document .actions-page .bouton{padding:8px 16px;font-size:.9rem}
 .tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}
 .tuile{background:#fff;border:1px solid var(--trait-leger);border-radius:14px;box-shadow:var(--ombre-sm);padding:12px 16px}
 .tuile b{display:block;font-size:1.35rem;font-weight:800;color:var(--vert-fonce);line-height:1.2}.tuile span{color:var(--doux);font-size:.78rem;font-weight:700}
@@ -191,6 +193,7 @@ td a{color:var(--vert-fonce)}
 table.stat{box-shadow:none;border:0}table.stat th,table.stat td{padding:7px 8px;font-size:14px;white-space:normal}table.stat td:first-child{white-space:normal}
 .cellule-barre{width:24%}.stat-barre{display:block;height:8px;border-radius:4px;background:var(--vert)}.stat-defile{overflow-x:auto}
 table.tableau.archive td:first-child{white-space:nowrap}
+table.liste td .depuis{margin-top:3px;white-space:nowrap}table.liste td .depuis .doux{font-size:12px;margin-left:2px}
 form.filtres{margin-bottom:12px}form.filtres .recherche{margin-bottom:12px}
 .manque{font-size:.82rem;color:var(--alerte);margin-top:4px}.attente{border-radius:8px}.a-normale{background:var(--vert-doux);color:var(--vert);border-color:var(--vert-bord)}
 .a-surveiller{background:#fff7e6;color:#92400e;border-color:#fcd9a0}.a-urgente{background:var(--alerte-fond);color:var(--alerte);border-color:var(--alerte-bord)}
@@ -238,7 +241,7 @@ table.tableau tr.ligne-actions{border-top:0;border-radius:0 0 10px 10px;padding-
 table.tableau tr.diner{border:0;background:none;padding:0;text-align:center}table.tableau tr.diner td{padding:2px}
 table.tableau td{display:block;border:0;padding:4px 8px;min-width:0!important;text-align:left!important}
 table.tableau td.col-ordre{display:flex;align-items:center;gap:10px}table.tableau .col-ordre .fleches{margin:0}
-table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne{flex-wrap:wrap}
+table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne,.groupe-actions{flex-wrap:wrap}
 .liste-defile{overflow-x:visible}.carte{padding:12px}
 dl.lecture{grid-template-columns:1fr}.type{grid-template-columns:1fr}
 .modale-carte{padding:18px}
@@ -378,6 +381,17 @@ def lien_maps(adresse_maps, texte):
 def badge_attente(jours, priorite):
     libelle = {"normale": "normal", "surveiller": "à surveiller", "urgente": "URGENT"}[priorite]
     return f'<span class="attente a-{priorite}" title="{libelle}">{jours} j</span>'
+
+
+def texte_jours(jours):
+    return "1 jour" if jours == 1 else f"{jours} jours"
+
+
+def badge_depuis(jours, priorite, depuis, titre):
+    """Pastille « N j » suivie, en toutes lettres, de ce qu'elle compte (« depuis l'acceptation », « depuis la fin des travaux ») :
+    un nombre seul ne dit pas de quelle date on part. `titre` : l'explication complète, au survol."""
+    return (f'<div class="depuis"><span class="attente a-{priorite}" title="{esc(titre)}">{jours} j</span> '
+            f'<span class="doux">{esc(depuis)}</span></div>')
 
 
 def champ_modalite(valeurs):

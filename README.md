@@ -8,12 +8,12 @@ sans retranscription.
 ## Le choix : SQLite + une interface de saisie locale
 
 - **SQLite = la source de vérité.** Un seul fichier (`data/sylvainculteur.db`), aucun serveur, aucun abonnement.
-  Python le lit sans rien installer (`import sqlite3`). Le PDF de la journée est lui aussi fabriqué sans rien installer ;
-  Pillow (`pip install pillow`) est **facultatif** : il sert seulement à réduire les grosses photos dans ce PDF.
+  Python le lit sans rien installer (`import sqlite3`). Les PDF (journée, **soumission** et **facture** pour le client) sont eux aussi fabriqués sans rien installer ;
+  Pillow (`pip install pillow`) est **facultatif** : il sert seulement à réduire les grosses photos dans le PDF de la journée.
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
 - **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**
-  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / En attente / Refuser), des **raccourcis** à ton goût en haut des listes, les fiches clients, l'onglet **Archives** (tout l'historique, recherches, statistiques, export Excel), la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
+  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / En attente / Refuser, et le **PDF de la soumission** à envoyer au client), des **raccourcis** à ton goût en haut des listes, les fiches clients, l'onglet **Archives** (tout l'historique, recherches, statistiques, export Excel), la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
 **Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
@@ -34,7 +34,7 @@ chantier dure en moyenne 2 h : plusieurs par journée ; il peut combiner plusieu
 qu'**une seule date** de travaux (prévue, puis réalisée ; elle se change dans la page Journée). Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
 
 Règles appliquées par l'application **et** par la base : le client ne se modifie que depuis sa fiche ; un chantier **Terminé** est
-verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : il n'y a pas de système de facture) ; **jamais de solde négatif** ; un seul mode
+verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : pas de registre de factures, mais une **facture en PDF** refaite à la demande) ; **jamais de solde négatif** ; un seul mode
 de règlement parmi cinq ; durée estimée obligatoire pour accepter une soumission ; le statut est **automatique** (Accepter = À planifier, Refuser = Refusée, Journée = Planifié, Retirer = À planifier, Annuler = archivé, Terminer = Terminé avec « payé ou pas ») ; un
 chantier annulé, ou terminé **et payé**, passe seul dans les *Archives* ; la ville d'un client se choisit dans une **liste de secteurs** (pas de doublons
 d'écriture) ; nacelle et sort du bois sont des options du travail.
@@ -54,7 +54,11 @@ outils/tableau.py                       page Journée (créer / gérer une journ
 outils/composants.py                    cellules (client, adresse, travaux, montant) partagées, bouton Terminer et sa fenêtre de confirmation
 outils/pages_clients.py                 liste des clients, fiche client, secteurs desservis, nouvelle soumission pour un client
 outils/pages_chantier.py                page d'une soumission ou d'un chantier (client en lecture seule, verrou « Terminé », paiements, duplication)
-outils/pdf.py                           PDF de la journée (feuilles de route, sans rien installer)
+outils/pdf.py                           moteur PDF maison (sans rien installer) + PDF de la journée (feuilles de route)
+outils/documents.py                     soumission et facture en PDF pour le client (logo, NEQ, coordonnées, montants, conditions)
+outils/pages_documents.py               adresses /soumission/N/pdf et /facture/N/pdf (voir, télécharger ; facture : administrateur)
+outils/entreprise.py                    nom, NEQ, téléphone, courriel, numéros de TPS / TVQ, conditions : ce qui s'imprime sur les documents du client
+outils/logo.py, outils/ressources/      logo de l'entreprise (SVG converti en dessin vectoriel dans les PDF)
 outils/auth.py, outils/reseau.py        comptes et connexion ; accès par téléphone / iPad (Tailscale)
 outils/vue.py                           composants d'affichage partagés
 outils/noyau.py                         règles de validation et d'écriture partagées, migrations

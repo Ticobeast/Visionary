@@ -1,5 +1,6 @@
 """Tests du tableau de bord, des actions rapides et des tournées (outils/tableau.py)."""
 import datetime
+import html
 import re
 import sqlite3
 import sys
@@ -133,6 +134,77 @@ class TestChantiersListe(BaseTableau):
         self.assertIn('class="montant"', page)
         self.assertIn("400,00 $", page)                                    # Urgent : 400 $, pas de taxes saisies
         self.assertIn("919,80 $", page)                                    # Fait : 800 + TPS + TVQ
+
+    def ecrire(self, requete, args=()):
+        conn, _ = noyau.ouvrir_base(self.db)              # connexion en validation automatique (self.sql ne valide rien)
+        try:
+            conn.execute(requete, args)
+        finally:
+            conn.close()
+
+    @staticmethod
+    def ligne(page, nom):
+        """Le texte (sans balises ni entités HTML) de la ligne du tableau qui contient ce client."""
+        for tr in re.findall(r"<tr>.*?</tr>", page, re.S):
+            if f">{nom}</a>" in tr:
+                return html.unescape(re.sub(r"<[^>]+>", " ", tr)), html.unescape(tr)
+        raise AssertionError(f"{nom} n'est pas dans la liste")
+
+    def test_badge_a_planifier_dit_depuis_quand(self):
+        texte, brut = self.ligne(self.get("/chantiers")[1], "Urgent")
+        self.assertIn("45 j", texte)
+        self.assertIn("depuis l'acceptation", texte)                       # le nombre seul ne dit pas de quelle date on part
+        self.assertIn(il_y_a(45), texte)                                   # et la date de départ est juste au-dessus
+        self.assertIn("À planifier depuis 45 jours (soumission acceptée le " + il_y_a(45) + ")", brut)
+        self.ecrire("UPDATE chantiers SET reprise_le = ? WHERE id = ?", (il_y_a(9), self.ids["Urgent"]))     # sorti de l'attente il y a 9 jours
+        texte, brut = self.ligne(self.get("/chantiers")[1], "Urgent")
+        self.assertIn("9 j", texte)
+        self.assertIn("depuis la reprise", texte)
+        self.assertNotIn("depuis l'acceptation", texte)
+        self.assertIn("a-surveiller", brut)
+
+    def test_badge_de_paiement_compte_depuis_la_fin_des_travaux(self):
+        """Terminé et pas (tout à fait) payé : le délai se compte depuis la date de terminaison, pas depuis la soumission."""
+        self.ecrire("DROP TRIGGER trg_chantiers_termine_verrouille")
+        self.ecrire("UPDATE chantiers SET date_soumission = ?, accepte_le = ? WHERE id = ?", (il_y_a(200), il_y_a(190), self.ids["Fait"]))
+        texte, brut = self.ligne(self.get("/chantiers")[1], "Fait")
+        self.assertIn("40 j", texte)                                       # 40 jours depuis la fin (il_y_a(40)), pas 190 ni 200
+        self.assertIn("depuis la fin des travaux", texte)
+        self.assertIn(il_y_a(40), texte)
+        self.assertNotIn(il_y_a(190), texte)
+        self.assertIn("a-urgente", brut)                                   # plus de 30 jours : rouge
+        self.assertIn("Paiement attendu depuis 40 jours : travaux terminés le " + il_y_a(40) + ", solde à recevoir 919,80 $", brut)
+        # un acompte (paiement partiel) ne change rien : on attend toujours le reste
+        self.post(f"/chantier/{self.ids['Fait']}/paiement", {"paiement_date": il_y_a(1), "paiement_montant": "100", "paiement_mode": "cheque"})
+        self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Fait"],)), [("partiel",)])
+        texte, brut = self.ligne(self.get("/chantiers")[1], "Fait")
+        self.assertIn("40 j", texte)
+        self.assertIn("depuis la fin des travaux", texte)
+        self.assertIn("solde à recevoir 819,80 $", brut)
+        # payé en totalité : archivé, plus de badge
+        self.post(f"/chantier/{self.ids['Fait']}/paiement", {"paiement_date": il_y_a(0), "paiement_montant": "819,80", "paiement_mode": "cheque"})
+        page = self.get("/chantiers")[1]
+        self.assertNotIn("depuis la fin des travaux", page)
+
+    def test_les_couleurs_du_badge_de_paiement_suivent_les_memes_seuils(self):
+        self.ecrire("DROP TRIGGER trg_chantiers_termine_verrouille")
+        for jours, classe in ((3, "a-normale"), (7, "a-surveiller"), (30, "a-surveiller"), (31, "a-urgente")):
+            self.ecrire("UPDATE chantiers SET date_prevue = ? WHERE id = ?", (il_y_a(jours), self.ids["Fait"]))
+            texte, brut = self.ligne(self.get("/chantiers")[1], "Fait")
+            self.assertIn(f"{jours} j", texte)
+            self.assertIn(classe, brut, jours)
+
+    def test_pas_de_badge_de_paiement_hors_termine_ni_sans_finances(self):
+        page = self.get("/chantiers")[1]
+        for nom in ("Demain", "Urgent", "Surveiller"):                     # planifié ou à planifier : jamais « depuis la fin des travaux »
+            self.assertNotIn("depuis la fin des travaux", self.ligne(page, nom)[0])
+        conn, _ = noyau.ouvrir_base(self.db)
+        lignes = interface.selection_chantiers(conn, {}, False)
+        conn.close()
+        self.assertIn("depuis la fin des travaux", interface._table_chantiers(lignes, True))
+        sans_finances = interface._table_chantiers(lignes, False)         # compte « soumission » : aucune information de paiement
+        self.assertNotIn("depuis la fin des travaux", sans_finances)
+        self.assertNotIn("Paiement attendu", sans_finances)
 
     def test_a_recevoir(self):
         page = self.get("/chantiers", {"paiement": "a_recevoir"})[1]

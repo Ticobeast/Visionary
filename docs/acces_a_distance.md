@@ -25,7 +25,8 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
    répondre `o` pour un administrateur (ou `n`), puis le mot de passe (invisible pendant la saisie, à taper deux fois).
    - **Administrateur** : tout (tableau de bord, journée, PDF, finances, suppressions, comptes, **archives et statistiques**).
    - **Soumission** : soumissions, chantiers et clients : ouvrir, remplir, **accepter**, **mettre en attente** et **refuser** des soumissions, consulter les chantiers
-     et les clients. Ni finances, ni Terminer, ni suppression, ni journée, ni archives.
+     et les clients, **voir et télécharger le PDF d'une soumission** pour l'envoyer au client. Ni finances (donc **pas la facture** en PDF, qui montre les paiements),
+     ni Terminer, ni suppression, ni journée, ni archives.
 3. Double-cliquer **`lancer_reseau.bat`** (au lieu de `lancer_interface.bat`) et laisser la fenêtre ouverte.
 4. Si Windows demande d'autoriser le pare-feu : accepter. Si les téléphones n'arrivent pas à se connecter, ouvrir l'**Invite de commandes en
    administrateur** et taper (une ligne ; elle n'autorise que le réseau Tailscale) :
@@ -47,7 +48,8 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 ## Version téléphone : volontairement simple
 Sur un téléphone, il n'y a que ce qu'il faut pour une soumission, avec une barre en bas : **Chantiers**, **Soumissions**, **Clients** et **+ Soumission**.
 - **Chantiers** : la liste (une carte par chantier accepté), avec les pastilles de raccourcis et la recherche.
-- **Soumissions** : la liste des soumissions en cours (une carte chacune) avec, sur chaque carte, les boutons **Accepter**, **En attente** et **Refuser** ; en bas, les refusées.
+- **Soumissions** : la liste des soumissions en cours (une carte chacune) avec, sur chaque carte, les boutons **Accepter**, **En attente** et **Refuser**, puis
+  **Voir PDF** et **Télécharger PDF** (la soumission à envoyer au client : sur téléphone, le PDF s'ouvre et se partage avec les boutons de l'appareil) ; en bas, les refusées.
   Si on appuie sur Accepter (ou En attente) alors qu'il manque des renseignements, le programme demande seulement ceux qui manquent.
 - **Clients** : la liste, avec recherche ; la fiche d'un client permet d'ouvrir une nouvelle soumission.
 - **+ Soumission** : on ouvre une soumission dès que le client appelle (rien n'est obligatoire : on remplit ce qu'on sait ; le formulaire propose d'abord de
