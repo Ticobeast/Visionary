@@ -213,7 +213,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
-.barre-mobile,.menu-tel{display:none}
+.barre-mobile,.menu-tel,.tel-seul{display:none}
 /* Téléphone : cibles tactiles de 44 px, champs à 16 px (sinon l'iPhone zoome), tableaux de la journée en cartes */
 @media (max-width:700px){
 main,main.large,main.conteneur{padding:16px 12px 24px}.navbar{position:static}.nav-contenu{padding:10px 14px;gap:10px}.nav-bureau{display:none}.nav-droite .admin-seul{display:none}.nav-droite{gap:8px}
@@ -246,8 +246,9 @@ table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne,.grou
 dl.lecture{grid-template-columns:1fr}.type{grid-template-columns:1fr}
 .modale-carte{padding:18px}
 /* barre du bas + feuille « Menu » */
-.barre-mobile button.menu-bouton{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.76rem;padding:0 2px;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
-.barre-mobile button.menu-bouton.actif,body.menu-ouvert .barre-mobile button.menu-bouton{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
+.barre-mobile button.menu-bouton{flex:0 0 64px;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;padding:0;background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
+.barre-mobile button.menu-bouton::before{content:"";width:22px;height:2.5px;border-radius:2px;background:var(--vert-fonce);box-shadow:0 -7px 0 var(--vert-fonce),0 7px 0 var(--vert-fonce)}
+.barre-mobile button.menu-bouton.actif,body.menu-ouvert .barre-mobile button.menu-bouton{background-color:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
 body.menu-ouvert .menu-tel{display:block}
 .menu-fond{position:fixed;left:0;right:0;top:0;bottom:80px;background:rgba(14,52,29,.45);z-index:1001}
 .menu-feuille{position:fixed;left:10px;right:10px;bottom:84px;z-index:1002;background:#fff;border-radius:18px;padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
@@ -294,22 +295,25 @@ table.candidats td.c-montant{grid-column:3;grid-row:1;text-align:right!important
 table.candidats td.c-client,table.candidats td.c-adresse,table.candidats td.c-travaux{grid-column:1/-1;display:flex!important;flex-wrap:wrap;gap:0 10px;align-items:baseline}
 table.candidats td.c-travaux{display:block!important}
 table.tableau.jour td.c-heures{color:var(--texte)!important;font-size:1rem!important}table.tableau.jour td.c-montant small{display:none}
-.note-heures{display:none}.pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;min-height:42px;text-align:center}
+.note-heures{display:none}.resume-jour,.total-jour{display:inline;margin:0;font-size:14px}.resume-jour::after{content:" · "}.total-jour .total{white-space:nowrap}.total-jour .doux{display:none}.carte>h2{margin-bottom:6px}.resume-jour+.total-jour+.liste-defile{margin-top:8px}
+table.tableau.jour td{font-size:14px}table.tableau.jour td.c-heures{font-size:15px!important}
+table.tableau.jour td.c-client a{font-size:16px;font-weight:700}table.tableau.jour td.c-adresse a,table.tableau.jour td.c-travaux a{font-weight:400;color:var(--texte)}.pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;min-height:42px;text-align:center}
 table.tableau.jour.gestion td.col-ordre{display:flex!important;align-items:center;gap:6px;white-space:nowrap}table.tableau.jour.gestion .col-ordre .fleches{display:flex;gap:4px;margin:0}
 table.tableau.jour.gestion .col-ordre button.fleche{min-height:34px;width:34px;padding:0}table.tableau.jour.gestion .col-ordre .doux{display:none}
 table.candidats tr.ligne-urgente{border-left:4px solid var(--alerte)}table.candidats tr.ligne-surveiller{border-left:4px solid #e8c675}table.candidats td:first-child{box-shadow:none!important}
 table.candidats td.c-montant small{display:none}.sel-total{bottom:76px;padding:8px 12px;font-size:13px;gap:8px}.sel-total button{width:100%;min-height:40px;padding:6px 10px;font-size:14px}
-table.chantiers td.c-depuis:not(:has(.depuis))::before{content:"Accepté le ";color:var(--doux)}
+table.chantiers td.c-statut .doux{display:none}.tel-seul{display:inline!important}table.chantiers td.c-depuis:has(.tel-seul) .date-depuis{display:none}
+table.chantiers td.c-depuis:not(:has(.depuis)):not(:has(.tel-seul))::before{content:"Accepté le ";color:var(--doux)}
 
 /* Téléphone : calendrier léger (un point sous les jours chargés), recherche sur une ligne, fiches compactes */
 .pc-seul,.nav-droite .base{display:none}
 .cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:10px;align-items:center;gap:3px;padding:4px 0}
-.cal-jour.weekend{background:var(--vert-doux)!important}
+.cal-jour.weekend{background:var(--vert-doux)!important;border-radius:0}
 .cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:700;background:none;color:var(--texte);align-self:center}
-.cal-jour.aujourdhui .cal-n{background:var(--vert);color:#fff}
+.cal-jour.aujourdhui .cal-n{background:var(--vert)!important;color:#fff!important}
 .cal-jour.selection{outline:0}.cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}.cal-jour.aujourdhui.selection .cal-n{background:var(--vert)}
 .cal-jour.occupe::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--vert);display:block}.cal-jour.chargee::after{background:var(--alerte)}
-.cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte{display:none}.cal-grille{gap:2px}
+.cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte{display:none}.cal-grille{gap:0}
 table.tableau.jour:not(.gestion) .c-adresse .doux,table.tableau.jour:not(.gestion) .ligne-duree,table.tableau.jour:not(.gestion) .ligne-options,table.tableau.jour:not(.gestion) .ligne-desc{display:none}
 .cal-nav{flex-wrap:nowrap;gap:6px}.cal-nav h2{min-width:0;font-size:1.05rem}.cal-nav .bouton{flex:0 0 auto;min-height:40px;padding:6px 12px;font-size:13px}
 .cal-nav a[aria-label]{font-size:0;padding:0;width:40px;position:relative}.cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:10px;height:10px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
@@ -426,7 +430,6 @@ def _barre_mobile(section):
     else:
         principaux = [("/soumissions", "Soumissions", "soumissions"), ("/clients", "Clients", "clients")]
         reste = [("/chantiers", "Chantiers", "chantiers")]
-    reste.append(("/nouveau", "Nouvelle soumission", "nouveau"))
     u = utilisateur_courant()
     if u and u["role"] == "admin":
         reste.append(("/utilisateurs", "Utilisateurs", "utilisateurs"))
@@ -434,7 +437,7 @@ def _barre_mobile(section):
     qui = f'<div class="menu-qui">{esc(u["nom"])}</div>' if u else ""
     menu_actif = any(section == code for _, _, code in reste)
     bas = "".join(lien(h, t, section == c) for h, t, c in principaux)
-    bas += f'<button type="button" class="menu-bouton{" actif" if menu_actif else ""}" onclick="document.body.classList.toggle(\'menu-ouvert\')" aria-label="Ouvrir le menu">Menu</button>'
+    bas += f'<button type="button" class="menu-bouton{" actif" if menu_actif else ""}" onclick="document.body.classList.toggle(\'menu-ouvert\')" aria-label="Menu" title="Menu"></button>'
     feuille = "".join(lien(h, t, section == c) for h, t, c in reste)
     return (f'<nav class="barre-mobile">{bas}</nav><div class="menu-tel"><div class="menu-fond" onclick="document.body.classList.remove(\'menu-ouvert\')"></div>'
             f'<div class="menu-feuille">{qui}{feuille}{sortie}</div></div>')

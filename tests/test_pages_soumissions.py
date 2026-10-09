@@ -1019,19 +1019,19 @@ class TestMenuTelephone(BaseComptes):
     def test_le_menu_garde_le_reste_et_la_barre_le_plus_important(self):
         page = self.get("/chantiers", cookie=self.admin)
         bas = page[page.index('<nav class="barre-mobile">'):page.index("</nav>", page.index('<nav class="barre-mobile">'))]
-        for texte in ("Tableau de bord", "Clients", ">Menu<"):
+        for texte in ("Tableau de bord", "Clients", 'aria-label="Menu"'):
             self.assertIn(texte, bas)
-        for texte in ("Chantiers", "Soumissions", "Journée", "Archives", "Nouvelle soumission"):
+        for texte in ("Chantiers", "Soumissions", "Journée", "Archives"):
             self.assertNotIn(texte, bas)                                              # pas tout en bas : le reste est dans le menu
         feuille = page[page.index('class="menu-feuille"'):]
-        for texte in ("Chantiers", "Soumissions", "Journée", "Archives", "Nouvelle soumission", "Utilisateurs", "Se déconnecter"):
+        for texte in ("Chantiers", "Soumissions", "Journée", "Archives", "Utilisateurs", "Se déconnecter"):
             self.assertIn(texte, feuille)
         self.assertIn("menu-ouvert", page)
         # compte « soumission » : ses trois onglets en bas, un menu réduit (pas de journée ni d'archives)
         page = self.get("/soumissions", cookie=self.alice)
         feuille = page[page.index('class="menu-feuille"'):]
         self.assertIn("Chantiers", feuille)
-        self.assertIn("Nouvelle soumission", feuille)
+        self.assertNotIn("Nouvelle soumission", feuille)
         self.assertIn("Se déconnecter", feuille)
         for interdit in ("Journée", "Archives", "Utilisateurs"):
             self.assertNotIn(interdit, feuille)

@@ -64,6 +64,8 @@ def _table_chantiers(lignes, finances=True):
         prevu = f'<div class="doux">prévu le {esc(l["date_prevue"])}</div>' if l["date_prevue"] and st == "planifie" else ""
         if st == "en_attente":
             prevu = f'<div class="doux">{esc(texte_attente(l["reprise_le"]))}</div>'
+        if prevu:                                # téléphone : la date prévue remplace la date d'acceptation, sur la ligne du bas
+            date_ = f'<span class="date-depuis">{date_}</span><span class="tel-seul">{re.sub("<[^>]+>", "", prevu)}</span>'
         paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""
         if stp in ("a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
