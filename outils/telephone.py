@@ -109,6 +109,7 @@ table.soumissions td:nth-child(1),table.soumissions td:nth-child(2),table.soumis
 table.soumissions td:nth-child(1),table.soumissions td:nth-child(2),table.soumissions td:nth-child(3),table.soumissions td:nth-child(4){display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
 table.soumissions td:nth-child(1){padding-right:96px;align-items:center;font-size:13px;color:var(--doux)}table.soumissions td:nth-child(1) div{margin:0}
 table.soumissions td:nth-child(2) a{font-size:1.06rem;font-weight:700;color:var(--vert-fonce)}table.soumissions td:nth-child(2) .manque{flex-basis:100%;margin:0}
+table.soumissions td:nth-child(2) .doux{margin:0}table.soumissions td:nth-child(2) a.tel{font-size:.9rem;font-weight:400;color:var(--vert)}
 table.soumissions td:nth-child(5){text-align:right!important;align-self:end;font-size:1.06rem;font-weight:800}
 table.soumissions td.col-actions{margin-top:6px}
 table.soumissions .actions-ligne{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
