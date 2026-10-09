@@ -142,7 +142,14 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 .cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte,.cal-ligne{display:none}
 
 /* jour du tableau de bord et page de gestion du jour */
-.note-heures{display:none}.resume-jour,.total-jour{display:inline;margin:0;font-size:14px}.resume-jour::after{content:" · "}.total-jour .total{white-space:nowrap}.total-jour .doux{display:none}
+.note-heures,.resume-jour,.total-jour{display:none}
+.carte-jour{position:relative}.carte-jour h2{padding-right:44px}
+.resume-min{display:block;margin:0 0 10px;font-size:14px;color:var(--doux)}.resume-min b{color:var(--texte)}
+.info-btn{display:block;position:absolute;top:10px;right:10px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E") center/18px no-repeat;box-shadow:none}
+.carte-jour.info-ouverte .info-pop{display:block}
+.info-pop{position:absolute;z-index:20;top:52px;right:10px;left:10px;padding:14px 16px;border:1px solid var(--trait-leger);border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(15,23,42,.18);font-size:14px;line-height:1.7}
+.bouton.lien-dl{width:44px;padding:0;font-size:0;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 11l5 5 5-5M5 20h14'/%3E%3C/svg%3E") center/20px no-repeat}
+.ligne-document .actions-page{display:grid;grid-template-columns:1fr 44px;gap:6px}.ligne-document .actions-page .lien-dl{display:flex;width:44px}
 .pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;text-align:center}
 .lien-pdf-coin{top:12px;right:14px}
 table.tableau.jour tr.sans-bas,table.tableau.jour.gestion tr:not(.diner):not(.ligne-actions){position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;background:var(--fond);border:1px solid var(--trait-leger);border-bottom:0;box-shadow:none}
@@ -221,6 +228,11 @@ form>.barre>button[type=submit]:first-child:not(.secondaire):not(.danger){flex:1
 .types .type label.coche:has(input:checked),.options-travaux label.coche:has(input:checked){background:#fff;border-color:var(--vert);box-shadow:var(--ombre-carte);color:var(--vert-fonce);font-weight:700}
 }
 
+table.paiements tr{display:grid;grid-template-columns:1fr auto;gap:3px 10px}table.paiements td{padding:0}
+table.paiements td.c-date{grid-column:1;grid-row:1;font-weight:700}table.paiements td.c-mode{grid-column:1;grid-row:2}table.paiements td.c-ref{grid-column:1;grid-row:3}
+table.paiements td.c-montant{grid-column:2;grid-row:1;font-weight:800}
+table.paiements td.col-actions{grid-column:2;grid-row:2/4;align-self:end;justify-self:end}table.paiements td.col-actions button{min-height:36px;padding:4px 14px;font-size:13px}
+
 /* fiches : étiquettes discrètes, boutons côte à côte */
 .carte p>b:first-child,.lecture-seule p>b:first-child,.lecture-seule p b{color:var(--doux);font-weight:600;font-size:.8rem}
 .carte p{margin-bottom:0}.carte p+form{margin-top:12px}.carte p a{font-weight:500}
@@ -233,7 +245,7 @@ form>.barre>button[type=submit]:first-child:not(.secondaire):not(.danger){flex:1
 .actions-page.actions-sou{grid-template-columns:repeat(3,1fr)}.actions-page.actions-sou>:first-child{grid-column:1/-1}.actions-page.actions-sou>:last-child:nth-child(odd){grid-column:auto}
 .carte.documents{display:grid;grid-template-columns:1fr 1fr;gap:10px}.carte.documents h2{grid-column:1/-1;margin:0}
 .ligne-document{display:block;padding:0;margin:0}.ligne-document b{display:none}.ligne-document:only-of-type{grid-column:1/-1}
-.ligne-document .actions-page{display:block}.ligne-document .bouton{width:100%}
+.ligne-document .bouton{width:100%}.ligne-document .bouton.lien-dl{width:44px}
 .barre-ajout{position:absolute;top:-54px;right:16px;margin:0!important}
 .barre-ajout .bouton{width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;font-size:0;position:relative}
 .barre-ajout .bouton::before,.barre-ajout .bouton::after{content:"";position:absolute;top:50%;left:50%;width:18px;height:2.6px;border-radius:2px;background:#fff;transform:translate(-50%,-50%)}

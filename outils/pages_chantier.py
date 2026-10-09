@@ -16,7 +16,7 @@ import sqlite3
 
 from urllib.parse import quote, urlencode
 
-from composants import liens_pdf
+from composants import liens_pdf, lien_telecharger
 from documents import facture_possible
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
                    dupliquer_chantier, empreinte, encaisser, libelles_manques, lire_ligne, lister_secteurs, manques_pour_accepter,
@@ -204,10 +204,10 @@ def _bloc_lecture(conn, chantier_id, v):
 def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
     pmts = conn.execute("SELECT id, date_paiement, mode, montant, reference FROM paiements WHERE chantier_id = ? ORDER BY date_paiement, id", (chantier_id,)).fetchall()
     lignes = "".join(
-        f'<tr><td>{esc(d)}</td><td>{esc(LIBELLES_MODE[m])}</td><td>{esc(ref)}</td><td class="droite">{argent(mt)}</td>'
-        f'<td class="droite"><form method="post" action="/paiement/{pid}/supprimer" onsubmit="return confirm(\'Supprimer ce paiement ?\')">'
+        f'<tr><td class="c-date">{esc(d)}</td><td class="c-mode">{esc(LIBELLES_MODE[m])}</td><td class="c-ref">{esc(ref)}</td><td class="droite c-montant">{argent(mt)}</td>'
+        f'<td class="droite col-actions"><form method="post" action="/paiement/{pid}/supprimer" onsubmit="return confirm(\'Supprimer ce paiement ?\')">'
         f'<button class="danger" type="submit">Supprimer</button></form></td></tr>' for pid, d, m, mt, ref in pmts)
-    table = (f'<div class="liste-defile"><table><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="droite">Montant</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
+    table = (f'<div class="liste-defile"><table class="paiements"><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="droite">Montant</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
              if pmts else '<p class="doux">Aucun paiement enregistré.</p>')
     ev = {"paiement_date": datetime.date.today().isoformat(), "paiement_montant": f"{solde:.2f}" if solde and solde > 0 else "",
           **(erreur_paiement[1] if erreur_paiement else {})}
@@ -262,9 +262,9 @@ def boutons_soumission(chantier_id, retour, retour_accepter=None, pdf=True):
 
 def _bloc_documents(chantier_id, statut, genre, soumission=False):
     """Carte « Documents pour le client » d'un chantier accepté : sa soumission, et sa facture (administrateur : elle montre les paiements)."""
-    lignes = [("Soumission", liens_pdf(chantier_id, "soumission"))]
+    lignes = [("Soumission", liens_pdf(chantier_id, "soumission") + lien_telecharger(chantier_id, "soumission"))]
     if est_admin() and facture_possible(statut, genre):
-        lignes.append(("Facture", liens_pdf(chantier_id, "facture")))
+        lignes.append(("Facture", liens_pdf(chantier_id, "facture") + lien_telecharger(chantier_id, "facture")))
     corps = "".join(f'<div class="ligne-document"><b>{nom}</b><div class="actions-page">{liens}</div></div>' for nom, liens in lignes)
     return f'<div class="carte documents{" documents-pc" if soumission else ""}"><h2>Documents pour le client</h2>{corps}</div>'
 

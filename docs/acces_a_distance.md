@@ -61,6 +61,8 @@ Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes 
   Si on appuie sur Accepter (ou En attente) alors qu'il manque des renseignements, le programme demande seulement ceux qui manquent.
 - **Clients** : une liste « contacts » (nom, numéro, adresse) ; **toucher un numéro lance l'appel** ; le bouton rond **+** ouvre un nouveau client.
 - **Archives** : la recherche, un bouton **Filtres** qui déplie les critères, les idées de recherche et les chiffres en pastilles qu'on fait défiler, puis une carte par résultat.
+- **Tableau de bord, la journée** : une ligne minimale (nombre de chantiers · durée · total) et une loupe en haut à droite qui ouvre le détail (début, fin prévue, total avec taxes, dîner).
+- **Documents** : à côté de **Soumission** et **Facture**, une petite flèche enregistre le PDF (dans l'application ajoutée à l'écran d'accueil, le PDF ne fait que s'afficher ; si l'enregistrement n'y marche pas, ouvre l'adresse directement dans Safari). L'export Excel et le lien « En attente » de Chantiers (à ajouter en raccourci) ne sont pas affichés sur téléphone.
 - **Annuler / Fermer** : ramènent toujours à la page d'où tu viens (la liste filtrée, la fiche), même après une erreur de saisie.
 - **Fiche client** : l'historique avec le statut à droite de chaque ligne, et un petit bouton **Supprimer le client** (la mise en garde s'affiche dans la fenêtre de confirmation).
 - **Fiches et formulaires** : les types de travaux et les options sont des **tuiles** à cocher ; le bouton principal prend toute la largeur ; « Terminer » monte

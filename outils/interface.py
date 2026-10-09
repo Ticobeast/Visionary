@@ -125,7 +125,7 @@ def page_chantiers(conn, query):
         archives_html = '<div class="carte doux">Aucune archive' + (" ne correspond à cette recherche." if total_archives else " pour l'instant.") + "</div>"
     lien_archives = f' <a class="doux" href="#archives">Archives ({total_archives})</a>' if total_archives else ""
     en_attente = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'en_attente'").fetchone()[0]
-    lien_attente = f' <a class="doux" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
+    lien_attente = f' <a class="doux pc-seul" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
     section_archives = (f'<h2 id="archives" style="margin-top:32px">Archives <small class="doux">({total_archives})</small></h2>'
                         '<p class="doux">Chantiers <b>annulés</b>, et chantiers <b>terminés et payés</b> : ils sont déplacés ici automatiquement. '
                         'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent. '

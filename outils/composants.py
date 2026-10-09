@@ -109,6 +109,12 @@ def liens_pdf(chantier_id, document="soumission"):
             f'title="Ouvrir {titre} en PDF (nouvel onglet)">{nom}</a>')
 
 
+def lien_telecharger(chantier_id, document="soumission"):
+    """Téléphone seulement : petite icône qui enregistre le PDF (utile dans l'application ajoutée à l'écran d'accueil, où le PDF ne s'ouvre que pour être vu)."""
+    return (f'<a class="bouton secondaire lien-dl" href="/{document}/{chantier_id}/pdf?telecharger=1" download '
+            f'aria-label="Télécharger {"la facture" if document == "facture" else "la soumission"}" title="Télécharger le PDF"></a>')
+
+
 def bouton_terminer(l, retour):
     """« Terminer » sur un chantier planifié : ouvre une fenêtre de confirmation (avec « payé ou pas »).
     À côté, le raccourci « Facture » (PDF) : sur place, on remet la facture avant ou après avoir confirmé."""

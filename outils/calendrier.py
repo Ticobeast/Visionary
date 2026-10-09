@@ -70,6 +70,17 @@ def panneau_jour(conn, jour, retour, gestion=False):
               + (f' <b>Attention : {sans_duree} chantier{"s" if sans_duree > 1 else ""} sans durée estimée : les heures sont approximatives.</b>' if sans_duree else "")
               + "</p>")
 
+    # téléphone : une ligne minimale (nombre, durée, total) et une loupe qui ouvre une petite fenêtre avec tout le détail
+    minimal = (f'<p class="resume-min">{len(chantiers)} chantier{"s" if len(chantiers) > 1 else ""} · {heures(total_h) if total_h else "durée ?"} · '
+               f'<b>{esc(argent(total_jour))}</b>' + (' · <span class="attente a-urgente">chargée</span>' if chargee else "") + "</p>"
+               '<button type="button" class="info-btn" aria-label="Détail de la journée" onclick="this.closest(\'.carte\').classList.toggle(\'info-ouverte\')"></button>'
+               f'<div class="info-pop"><b>{len(chantiers)} chantier{"s" if len(chantiers) > 1 else ""}</b><br>Durée totale : {heures(total_h) if total_h else "inconnue"}<br>'
+               f'Début {heure_texte(DEBUT_JOURNEE)} · fin prévue {heure_texte(fin)}<br>Total de la journée : <b>{esc(argent(total_jour))}</b> <span class="doux">(taxes incluses)</span>'
+               + (f'<br><span class="attente a-urgente">journée chargée (plus de {heures(JOURNEE_H)})</span>' if chargee else "")
+               + (f'<br><b>{sans_duree} chantier{"s" if sans_duree > 1 else ""} sans durée estimée : heures approximatives.</b>' if sans_duree else "")
+               + f'<br><span class="doux">Dîner {heure_texte(DINER_DEBUT)} - {heure_texte(DINER_FIN)} ; trajets non comptés.</span></div>')
+    resume += minimal
+
     colonnes = 7 if gestion else 5
     corps = ""
     for rang, (l, h) in enumerate(zip(chantiers, horaire)):
@@ -109,7 +120,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
     lien_pdf = (f'<a class="bouton" href="/journee.pdf?date={jour}" download title="Toute la journée, avec les détails de chaque chantier">'
                 f'Télécharger la journée<span class="pc-seul"> (PDF)</span></a>')
     pied = "" if gestion else f'<div class="barre pied-jour" style="margin-top:12px">{lien_gerer}{lien_pdf}</div>'
-    return f'<div class="carte"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
+    return f'<div class="carte carte-jour"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 
 
 # ---------------------------------------------------------------------------

@@ -618,7 +618,8 @@ class TestBoutons(BaseDocuments):
         self.assertIn(f'class="lien-pdf-coin" href="/soumission/{i}/pdf"', page)       # téléphone : lien discret en haut à droite de la fiche
         self.assertIn('class="carte documents documents-pc"', page)                   # ordinateur : la carte Documents
         self.assertNotIn("/facture/", page)                                           # pas de facture avant l'acceptation
-        self.assertNotIn("telecharger", page)
+        self.assertEqual(page.count('class="bouton secondaire lien-dl"'), 1)           # téléphone (application ajoutée à l'écran d'accueil) : une icône qui enregistre le PDF
+        self.assertNotIn("Télécharger PDF", page)
         self.post(f"/soumission/{i}/refuser", {"retour": "/soumissions"})
         page = self.get(f"/soumission/{i}")
         self.assertIn(f'href="/soumission/{i}/pdf"', page)
