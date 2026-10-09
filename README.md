@@ -61,6 +61,7 @@ outils/entreprise.py                    nom, NEQ, téléphone, courriel, numéro
 outils/logo.py, outils/ressources/      logo de l'entreprise (SVG converti en dessin vectoriel dans les PDF)
 outils/auth.py, outils/reseau.py        comptes et connexion ; accès par téléphone / iPad (Tailscale)
 outils/vue.py                           composants d'affichage partagés
+outils/photos.py                        photos d'une fiche : prendre une photo, galerie, ordinateur ; vignettes ; suppression
 outils/telephone.py                     la mise en forme du téléphone (écrans de 700 px et moins) ; l'ordinateur n'est pas touché
 outils/noyau.py                         règles de validation et d'écriture partagées, migrations
 outils/donnees_test.py                  crée une base d'ESSAI avec de fausses données

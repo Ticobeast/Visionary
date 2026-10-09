@@ -15,6 +15,7 @@ MESSAGES = {
     "cree_reutilise": "Chantier créé pour un client déjà dans la base (même adresse) : sa fiche a été réutilisée.",
     "maj": "Modifications enregistrées.",
     "paiement": "Paiement ajouté.",
+    "photo_supprimee": "Photo supprimée.",
     "paiement_supprime": "Paiement supprimé.",
     "supprime": "Chantier supprimé.",
     "statut_change": "Statut mis à jour.",
@@ -215,6 +216,12 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
 .barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-btn,.info-pop,.lien-dl{display:none}
 main a.tel{color:inherit;font-weight:inherit;text-decoration:none}
+.photos-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+.photos .photo{display:block;padding:0;font-weight:400}.photos .photo img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--trait-leger);border-radius:10px;background:var(--puce)}
+.photos label.bouton{cursor:pointer}.photo-prendre{display:none!important}.photo-etat{margin:8px 0 0}.photo-etat:empty{display:none}
+.visionneuse{position:fixed;inset:0;z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;background:rgba(14,52,29,.94)}
+.visionneuse[hidden]{display:none}.visionneuse img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:8px}
+.visionneuse .barre{margin:0;justify-content:center}.visionneuse form{margin:0}
 """
 
 

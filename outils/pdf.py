@@ -497,8 +497,11 @@ def _dict(cur):
     return [dict(zip(noms, r)) for r in cur.fetchall()]
 
 
-def photos_du_chantier(dossier_base, dossier_photos):
-    """Fichiers photo (JPEG/PNG) du dossier de photos du chantier, triés par nom. Jamais en dehors du dossier de la base."""
+def photos_du_chantier(dossier_base, dossier_photos, chantier_id=None):
+    """Fichiers photo (JPEG/PNG) du dossier de photos du chantier, triés par nom. Jamais en dehors du dossier de la base.
+    Sans dossier de photos inscrit dans la fiche : photos/chantier-N, où l'interface range les photos prises avec le téléphone."""
+    if not dossier_photos and chantier_id is not None:
+        dossier_photos = f"photos/chantier-{chantier_id}"
     if not dossier_photos or dossier_base is None:
         return []
     base = Path(dossier_base).resolve()
@@ -569,12 +572,12 @@ def _chantier(doc, rang, chantier, heure, travaux, paiements, client, dossier_ba
         doc.champ("Reste à encaisser", argent(max(c["solde"], 0)) if c["solde"] > 0 else "Rien (payé)")
     doc.espace(3)
     doc.champ("Dossier de photos", c["dossier_photos"])
-    _photos(doc, dossier_base, c["dossier_photos"])
+    _photos(doc, dossier_base, c["dossier_photos"], c["chantier_id"])
     doc.espace(8)
 
 
-def _photos(doc, dossier_base, dossier_photos):
-    fichiers = photos_du_chantier(dossier_base, dossier_photos)
+def _photos(doc, dossier_base, dossier_photos, chantier_id=None):
+    fichiers = photos_du_chantier(dossier_base, dossier_photos, chantier_id)
     if not fichiers:
         return
     prises, omises = [], []

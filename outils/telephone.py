@@ -37,6 +37,8 @@ select{-webkit-appearance:none;appearance:none;padding-right:34px;background-ima
 textarea{min-height:90px}
 label{font-size:.8rem;font-weight:600;color:var(--doux);margin-bottom:5px}
 label.coche,span.coche{font-size:1rem;color:var(--texte);font-weight:500}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;width:100%;max-width:100%;text-align:left}
+.grille>div{min-width:0}
 input[type=radio]{min-height:0;width:24px;height:24px;padding:0;accent-color:var(--vert)}
 input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:0 0 auto;min-height:0;width:22px;height:22px;padding:0;border:2px solid var(--trait);border-radius:6px;background:#fff center/14px no-repeat}
 input[type=checkbox]:checked{background-color:var(--vert);border-color:var(--vert);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")}
@@ -144,7 +146,7 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 /* jour du tableau de bord et page de gestion du jour */
 .note-heures,.resume-jour,.total-jour{display:none}
 .carte-jour{position:relative}.carte-jour h2{padding-right:44px}
-.resume-min{display:block;margin:0 0 10px;font-size:14px;color:var(--doux)}.resume-min b{color:var(--texte)}
+.carte-jour .info-pop+*{margin-top:4px}
 .info-btn{display:block;position:absolute;top:10px;right:10px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E") center/18px no-repeat;box-shadow:none}
 .carte-jour.info-ouverte .info-pop{display:block}
 .info-pop{position:absolute;z-index:20;top:52px;right:10px;left:10px;padding:14px 16px;border:1px solid var(--trait-leger);border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(15,23,42,.18);font-size:14px;line-height:1.7}
@@ -223,15 +225,22 @@ form>.barre>button[type=submit]:first-child:not(.secondaire):not(.danger){flex:1
 .options-travaux #bois-format{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:2px 2px 0;font-size:.95rem;color:var(--doux)}
 .options-travaux #bois-format select{flex:1 1 140px;width:auto}
 @supports selector(:has(a)){
+.grille>div:has(>button[type=submit]){grid-column:1/-1}.grille>div>button[type=submit]{width:100%}
 .grille>div:has(>input[type=tel]),.grille>div:has(>#client_secteur){grid-column:1/-1}
 .types .type:has(input[type=checkbox]:checked){grid-column:1/-1}
 .types .type label.coche:has(input:checked),.options-travaux label.coche:has(input:checked){background:#fff;border-color:var(--vert);box-shadow:var(--ombre-carte);color:var(--vert-fonce);font-weight:700}
 }
 
-table.paiements tr{display:grid;grid-template-columns:1fr auto;gap:3px 10px}table.paiements td{padding:0}
+table.paiements tr{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:2px 12px}table.paiements td{padding:0}table.paiements td:empty{display:none}
 table.paiements td.c-date{grid-column:1;grid-row:1;font-weight:700}table.paiements td.c-mode{grid-column:1;grid-row:2}table.paiements td.c-ref{grid-column:1;grid-row:3}
-table.paiements td.c-montant{grid-column:2;grid-row:1;font-weight:800}
-table.paiements td.col-actions{grid-column:2;grid-row:2/4;align-self:end;justify-self:end}table.paiements td.col-actions button{min-height:36px;padding:4px 14px;font-size:13px}
+table.paiements td.c-montant{grid-column:2;grid-row:1/4;font-weight:800;white-space:nowrap}
+table.paiements td.col-actions{grid-column:3;grid-row:1/4}table.paiements td.col-actions form{margin:0}
+table.paiements td.col-actions button{font-size:0;width:38px;height:38px;min-height:0;padding:0;border-radius:50%;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b42318' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3'/%3E%3C/svg%3E") center/18px no-repeat}
+
+/* photos : on prend la photo directement, les vignettes sont en grille de trois */
+.photos-vide{margin:0 0 12px}.photos-grille{grid-template-columns:repeat(3,1fr);gap:6px}.photo-prendre{display:inline-flex!important}
+.photos-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.photos-actions .bouton{width:100%;padding:8px 4px;font-size:14px;text-align:center}
+.visionneuse .barre{display:flex}
 
 /* fiches : étiquettes discrètes, boutons côte à côte */
 .carte p>b:first-child,.lecture-seule p>b:first-child,.lecture-seule p b{color:var(--doux);font-weight:600;font-size:.8rem}
@@ -239,8 +248,8 @@ table.paiements td.col-actions{grid-column:2;grid-row:2/4;align-self:end;justify
 .lecture-seule .barre{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lecture-seule .barre h2{grid-column:1/-1}
 .lecture-seule .barre .bouton{width:100%;min-height:40px;font-size:13px}.lecture-seule p a{font-weight:500}
 .actions-client{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions-client .bouton{width:100%;padding:8px 6px;font-size:14px}
-.actions-page{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.actions-page>*{min-width:0}.actions-page form{display:block;width:100%}.actions-page .bouton,.actions-page button{width:100%;flex:none;white-space:normal;text-align:center;line-height:1.15}
+.actions-page{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:8px}
+.actions-page>*{min-width:0}.actions-page form{display:flex;width:100%;margin:0}.actions-page .bouton,.actions-page button{width:100%;flex:none;height:100%;min-height:44px;padding:8px 4px;font-size:13.5px;white-space:normal;text-align:center;line-height:1.15}
 .actions-page>:last-child:nth-child(odd){grid-column:1/-1}
 .actions-page.actions-sou{grid-template-columns:repeat(3,1fr)}.actions-page.actions-sou>:first-child{grid-column:1/-1}.actions-page.actions-sou>:last-child:nth-child(odd){grid-column:auto}
 .carte.documents{display:grid;grid-template-columns:1fr 1fr;gap:10px}.carte.documents h2{grid-column:1/-1;margin:0}

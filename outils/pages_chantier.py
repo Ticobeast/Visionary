@@ -17,6 +17,7 @@ import sqlite3
 from urllib.parse import quote, urlencode
 
 from composants import liens_pdf, lien_telecharger
+from photos import bloc as bloc_photos
 from documents import facture_possible
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
                    dupliquer_chantier, empreinte, encaisser, libelles_manques, lire_ligne, lister_secteurs, manques_pour_accepter,
@@ -206,7 +207,7 @@ def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
     lignes = "".join(
         f'<tr><td class="c-date">{esc(d)}</td><td class="c-mode">{esc(LIBELLES_MODE[m])}</td><td class="c-ref">{esc(ref)}</td><td class="droite c-montant">{argent(mt)}</td>'
         f'<td class="droite col-actions"><form method="post" action="/paiement/{pid}/supprimer" onsubmit="return confirm(\'Supprimer ce paiement ?\')">'
-        f'<button class="danger" type="submit">Supprimer</button></form></td></tr>' for pid, d, m, mt, ref in pmts)
+        f'<button class="danger" type="submit" aria-label="Supprimer ce paiement" title="Supprimer ce paiement">Supprimer</button></form></td></tr>' for pid, d, m, mt, ref in pmts)
     table = (f'<div class="liste-defile"><table class="paiements"><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="droite">Montant</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
              if pmts else '<p class="doux">Aucun paiement enregistré.</p>')
     ev = {"paiement_date": datetime.date.today().isoformat(), "paiement_montant": f"{solde:.2f}" if solde and solde > 0 else "",
@@ -330,7 +331,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         if statut == "annule" and est_admin():
             boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
     actions = f'<div class="actions-bloc"><div class="actions-page{" actions-sou" if soumission and not refusee else ""}">{boutons}</div>{manque}</div>'
-    documents_client = _bloc_documents(chantier_id, statut, genre, soumission)
+    documents_client = _bloc_documents(chantier_id, statut, genre, soumission) + bloc_photos(conn, chantier_id)
     bandeau = ""
     if refusee:
         bandeau = ('<div class="verrou-termine">Soumission <b>refusée</b> : elle est dans la section « Refusées » de l\'onglet Soumissions. '

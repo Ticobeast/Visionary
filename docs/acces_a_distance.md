@@ -63,6 +63,7 @@ Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes 
 - **Archives** : la recherche, un bouton **Filtres** qui déplie les critères, les idées de recherche et les chiffres en pastilles qu'on fait défiler, puis une carte par résultat.
 - **Tableau de bord, la journée** : une ligne minimale (nombre de chantiers · durée · total) et une loupe en haut à droite qui ouvre le détail (début, fin prévue, total avec taxes, dîner).
 - **Documents** : à côté de **Soumission** et **Facture**, une petite flèche enregistre le PDF (dans l'application ajoutée à l'écran d'accueil, le PDF ne fait que s'afficher ; si l'enregistrement n'y marche pas, ouvre l'adresse directement dans Safari). L'export Excel et le lien « En attente » de Chantiers (à ajouter en raccourci) ne sont pas affichés sur téléphone.
+- **Photos** : sur la fiche d'une soumission ou d'un chantier, la carte **Photos** a deux boutons : **Prendre une photo** (ouvre l'appareil photo) et **Ajouter des photos** (la galerie, plusieurs à la fois). Le téléphone réduit chaque photo avant de l'envoyer (quelques centaines de Ko). Toucher une vignette l'agrandit, avec **Fermer** et **Supprimer**.
 - **Annuler / Fermer** : ramènent toujours à la page d'où tu viens (la liste filtrée, la fiche), même après une erreur de saisie.
 - **Fiche client** : l'historique avec le statut à droite de chaque ligne, et un petit bouton **Supprimer le client** (la mise en garde s'affiche dans la fenêtre de confirmation).
 - **Fiches et formulaires** : les types de travaux et les options sont des **tuiles** à cocher ; le bouton principal prend toute la largeur ; « Terminer » monte
@@ -108,7 +109,6 @@ Pour afficher le logo du site dans l'application, copier `logo.svg` (ou `logo.pn
 | « Tailscale n'a pas été trouvé » dans la fenêtre | Tailscale pas installé / pas ouvert sur l'ordinateur | l'installer, ouvrir une session, relancer |
 
 ## Pas encore là
-- Prise de **photos avec l'appareil** directement dans la soumission.
 - Rôle **chef d'équipe** (Journée et Terminer sur téléphone) et **équipes** séparées.
 - Mode **hors-ligne** (non prévu : l'enregistrement exige du réseau).
 - Accès par un simple URL public (sans Tailscale sur les téléphones) : demande des mots de passe longs et un tunnel sécurisé.

@@ -185,6 +185,7 @@ from pages_clients import ROUTES_CLIENTS  # noqa: E402
 from archives import ROUTES_ARCHIVES  # noqa: E402
 from pages_attente import ROUTES_ATTENTE  # noqa: E402
 from pages_documents import ROUTES_DOCUMENTS  # noqa: E402
+from photos import ROUTES_PHOTOS, LIMITE_OCTETS as LIMITE_PHOTO  # noqa: E402
 from pages_soumissions import ROUTES_SOUMISSIONS  # noqa: E402
 from raccourcis import ROUTES_RACCOURCIS  # noqa: E402
 from tableau import ROUTES_TABLEAU  # noqa: E402
@@ -192,7 +193,7 @@ from calendrier import page_calendrier  # noqa: E402
 from composants import fenetre_terminer  # noqa: E402
 
 ROUTES = (ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_DOCUMENTS + ROUTES_SOUMISSIONS + ROUTES_ATTENTE + ROUTES_ARCHIVES
-          + ROUTES_RACCOURCIS + ROUTES_CHANTIER + [
+          + ROUTES_RACCOURCIS + ROUTES_PHOTOS + ROUTES_CHANTIER + [
     ("GET", r"^/$", lambda c, q, f, *g: page_calendrier(c, q)),
     ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
@@ -275,7 +276,14 @@ class Gestionnaire(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         query = {k: v[0] for k, v in parse_qs(url.query, keep_blank_values=True).items()}
         form = {}
-        if methode == "POST":
+        if methode == "POST" and (self.headers.get("Content-Type") or "").startswith("image/"):
+            # une photo : le corps de la requête EST l'image (voir photos.py) ; trop lourde -> refusée sans être lue
+            taille = int(self.headers.get("Content-Length") or 0)
+            if taille > LIMITE_PHOTO:
+                return self._envoyer("413 Payload Too Large", [("Content-Type", "application/json; charset=utf-8")],
+                                     '{"erreur": "photo trop lourde"}'.encode())
+            form = {"_octets": self.rfile.read(taille)}
+        elif methode == "POST":
             taille = min(int(self.headers.get("Content-Length") or 0), 1_000_000)
             form = {k: v[0] for k, v in parse_qs(self.rfile.read(taille).decode("utf-8", "replace"), keep_blank_values=True).items()}
         requete = {"cookie": self.headers.get("Cookie", ""), "ip": self.client_address[0], "agent": self.headers.get("User-Agent", ""),
@@ -288,7 +296,8 @@ class Gestionnaire(BaseHTTPRequestHandler):
         for k, v in en_tetes:
             self.send_header(k, v)
         self.send_header("Content-Length", str(len(corps)))
-        self.send_header("Cache-Control", "no-store")
+        if not any(k.lower() == "cache-control" for k, _ in en_tetes):
+            self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(corps)
 

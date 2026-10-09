@@ -116,6 +116,11 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 72 | Téléphone, **fiche client** | l'historique montre le statut à droite ; en bas, un petit bouton « Supprimer le client » sans texte ; le texte d'avertissement apparaît dans la fenêtre de confirmation |
 | 73 | Téléphone : comparer avec le site de l'entreprise | boutons secondaires blancs à bordure grise, champs blancs, cases à cocher vertes, bouton principal vert : même style que le site |
 | 74 | **Essai sur téléphone** : double-clic sur `lancer_essai_reseau.bat`, puis ouvrir l'adresse sur le téléphone et se connecter avec `essai` / `essai1234` | la fenêtre annonce « BASE D'ESSAI » et le compte d'essai ; la connexion fonctionne ; les fausses données s'affichent ; aucune donnée de la vraie base n'apparaît |
+| 75 | **Téléphone** : fiche d'une soumission > carte Photos > **Prendre une photo**, puis **Ajouter des photos** (deux photos de la galerie) | l'appareil photo s'ouvre ; la page se recharge et les vignettes apparaissent (3 par rangée) ; chaque photo pèse quelques centaines de Ko ; toucher une vignette l'agrandit |
+| 76 | Photo agrandie > **Supprimer** | confirmation, puis la photo disparaît de la fiche ; le message « Photo supprimée. » s'affiche |
+| 77 | **Ordinateur** : la même fiche > **Ajouter des photos** (un ou plusieurs JPEG / PNG) | les vignettes apparaissent ; un fichier qui n'est pas une image (ex. un PDF renommé en .jpg) est refusé avec un message |
+| 78 | Planifier le chantier à une date, puis **Télécharger la journée (PDF)** | les photos de la fiche sont dans le PDF, en vignettes |
+| 79 | **Compte Soumission** sur un téléphone : ajouter une photo à une soumission | permis |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -130,7 +135,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 74 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 79 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

@@ -275,6 +275,14 @@ un logo exporté d'Illustrator, Inkscape, Figma ou Canva ; sinon le nom de l'ent
 > **Important : numéros de taxes.** La loi exige les numéros d'inscription à la TPS et à la TVQ sur une facture qui perçoit ces taxes. Ils ne sont pas encore dans
 > `entreprise.py` (`NUMERO_TPS`, `NUMERO_TVQ`) : tant qu'ils sont vides, rien n'est imprimé. À remplir avec ceux de Revenu Québec.
 
+### Photos d'une soumission ou d'un chantier
+
+Sur la fiche (soumission ou chantier, même terminé), la carte **Photos** sert à joindre des photos : **Prendre une photo** (sur téléphone : ouvre l'appareil photo), **Ajouter des photos** (la galerie du téléphone, ou n'importe quel dossier de l'ordinateur ; plusieurs à la fois). Toucher ou cliquer une vignette l'agrandit ; **Supprimer** l'efface (avec confirmation). Le compte « Soumission » peut en ajouter aussi.
+
+Où elles vont : dans le **dossier de photos** de la fiche (« Paramètres avancés ») ; s'il est vide, dans `data/photos/chantier-N` (N = numéro de la fiche). Ce sont de simples fichiers JPEG ou PNG : tu peux aussi les glisser toi-même dans ce dossier, et elles apparaissent dans la fiche. Rien n'est écrit dans la base. Elles sont reprises dans le **PDF de la journée** (voir plus haut).
+
+Détails : le navigateur réduit chaque photo (1 600 px de large au plus, JPEG) avant l'envoi ; le serveur ne garde que de vrais JPEG ou PNG (20 Mo au plus par photo, 80 par fiche) et choisit lui-même le nom du fichier (date et heure). Les photos de `data/` ne sont jamais envoyées sur GitHub.
+
 ## 5. Raccourcis : les pastilles du haut
 
 En haut des pages **Chantiers** et **Soumissions**, des **pastilles** : un nombre et un nom (par exemple « 2 · À recevoir · 3 466,64 $ », « 1 · Planifiés »).

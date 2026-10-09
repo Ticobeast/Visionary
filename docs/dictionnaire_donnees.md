@@ -90,7 +90,7 @@ secteur **au moment d'accepter** la soumission, et pour modifier un client qui a
 | `tps` | réel | oui, défaut `0` | montant de TPS (laisser `0` si non inscrit aux taxes) | `24.00` |
 | `tvq` | réel | oui, défaut `0` | montant de TVQ (idem) | `47.88` |
 | `modalite_paiement` | texte | non | **un seul choix** : `comptant`, `cheque`, `interac`, `carte`, `autre` (CHECK) ; imprimée sur la feuille de route pour savoir quoi encaisser sur place. Pas de paiement en plusieurs versements : les acomptes se saisissent comme paiements | `interac` |
-| `dossier_photos` | chemin | non | **un dossier par chantier** ; les photos qu'il contient seront lues par le script (miniatures) | `photos/2026/2026-06-14_gagnon` |
+| `dossier_photos` | chemin | non | **un dossier par chantier** ; les photos qu'il contient sont affichées dans la fiche et reprises dans le PDF de la journée (vide : `photos/chantier-N`, où l'interface range les photos prises avec le téléphone) | `photos/2026/2026-06-14_gagnon` |
 | `cree_le` | texte | auto | | |
 | `accepte_le` | date | non | `AAAA-MM-JJ` : **jour où la soumission a été acceptée** (posé par le bouton Accepter). Vide : soumission en cours ou refusée. Rempli : c'est un chantier (même annulé plus tard). C'est ce qui distingue une soumission refusée d'un chantier annulé | `2026-10-07` |
 | `cree_par` | texte | non | **nom du compte** qui a ouvert la soumission (pour « Mes soumissions »). Vide : interface ouverte sans comptes, ou fiche d'avant les comptes | `Marc` |
