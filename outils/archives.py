@@ -12,7 +12,7 @@ import io
 from urllib.parse import urlencode
 
 from noyau import cle, decaler_mois, lister_secteurs
-from vue import argent, badge_statut, esc, gabarit, heures, url_fiche
+from vue import argent, badge_statut, esc, gabarit, heures, lien_tel, url_fiche
 
 LIMITE_RESULTATS = 200
 RESULTATS = (("termine", "Chantiers terminés"), ("annule", "Chantiers annulés"), ("refusee", "Soumissions refusées"), ("tout", "Tout l'historique"))
@@ -260,6 +260,12 @@ def _mois_selection(nom, options, choisi):
         f'<option value="{m}"{" selected" if choisi == str(m) else ""}>{esc(t)}</option>' for m, t in options) + extra)
 
 
+def _filtres_actifs(f):
+    """True si au moins un filtre (autre que le texte et le tri) est utilisé : le panneau « Filtres » s'ouvre alors tout seul."""
+    return bool(f.get("par_client") or any(f.get(k) for k in ("type", "secteur", "plus_de", "moins_de", "du", "au", "montant_min"))
+                or f.get("resultat") != RESULTATS[0][0])
+
+
 def _formulaire(conn, f):
     types = conn.execute("SELECT code, libelle FROM types_travaux ORDER BY libelle COLLATE NOCASE").fetchall()
     secteurs = lister_secteurs(conn)
@@ -273,6 +279,7 @@ def _formulaire(conn, f):
         '<form class="filtres" method="get" action="/archives">'
         f'<div class="recherche"><input type="search" name="q" value="{esc(f.get("q", ""))}" aria-label="Texte cherché" '
         'placeholder="Chercher : nom, adresse, travaux, précision (ex. cèdre)…"><button type="submit">Chercher</button></div>'
+        f'<details class="filtres-det" id="filtres-det"{" open" if _filtres_actifs(f) else ""}><summary>Filtres</summary>'
         '<div class="grille">'
         f'<div><label for="resultat">Quoi</label><select id="resultat" name="resultat">{opt_resultat}</select></div>'
         f'<div><label for="type">Type de travaux</label><select id="type" name="type">{opt_types}</select></div>'
@@ -286,9 +293,11 @@ def _formulaire(conn, f):
         f'<div><label for="tri">Trier par</label><select id="tri" name="tri">{opt_tri}</select></div>'
         '</div>'
         f'<p><label class="coche"><input type="checkbox" name="par_client" value="1"{" checked" if f.get("par_client") else ""}> '
-        'Un seul résultat par client (son dernier chantier) : pour savoir qui relancer</label></p>'
-        '<div class="barre"><button type="submit">Chercher</button><a class="bouton secondaire" href="/archives">Tout effacer</a>'
-        f'<a class="bouton secondaire" href="/archives.csv?{esc(urlencode(f))}" title="Un fichier qui s\'ouvre dans Excel">Exporter (Excel)</a></div></form>')
+        'Un seul résultat par client (son dernier chantier) : pour savoir qui relancer</label></p></details>'
+        '<div class="barre barre-filtres"><button type="submit">Chercher</button><a class="bouton secondaire" href="/archives">Tout effacer</a>'
+        f'<a class="bouton secondaire" href="/archives.csv?{esc(urlencode(f))}" title="Un fichier qui s\'ouvre dans Excel">Exporter (Excel)</a></div></form>'
+        # ordinateur : les filtres restent toujours affichés ; téléphone : repliés sous « Filtres » (sauf s'il y en a d'actifs)
+        '<script>if(window.innerWidth>700){var d=document.getElementById("filtres-det");if(d)d.open=true;}</script>')
 
 
 def _idees(aujourdhui):
@@ -300,8 +309,8 @@ def _idees(aujourdhui):
              (f"Tout ce qui a été terminé en {annee}", {"du": f"{annee}-01-01", "au": f"{annee}-12-31"}),
              ("Plus gros chantiers (1 000 $ et plus)", {"montant_min": "1000", "tri": "montant"}),
              ("Soumissions refusées", {"resultat": "refusee"}))
-    liens = " · ".join(f'<a href="/archives?{esc(urlencode(q))}">{esc(t)}</a>' for t, q in idees)
-    return f'<p class="doux">Idées de recherche : {liens}</p>'
+    liens = '<span class="sep"> · </span>'.join(f'<a href="/archives?{esc(urlencode(q))}">{esc(t)}</a>' for t, q in idees)
+    return f'<p class="doux idees">Idées de recherche : <span class="idees-liens">{liens}</span></p>'
 
 
 def _tuile(valeur, libelle, aide=""):
@@ -373,7 +382,7 @@ def _bloc_soumissions(ss):
 
 def _identite(nom, tel, lien):
     """Le nom du client (lien) et, dessous, son téléphone."""
-    return f'<a href="{lien}">{esc(nom)}</a>' + (f'<div class="doux">{esc(_tel(tel))}</div>' if tel else "")
+    return f'<a href="{lien}">{esc(nom)}</a>' + (f'<div class="doux">{lien_tel(tel)}</div>' if tel else "")
 
 
 def _lieu(adresse, secteur, ville):
@@ -392,10 +401,11 @@ def _resultats(lignes, groupes, f, historique_vide=False):
         corps = ""
         for g in groupes[:LIMITE_RESULTATS]:
             lien_client = f"/client/{g['client_id']}"
-            corps += (f'<tr><td>{esc(g["date_ref"])}</td><td>{_identite(g["client_nom_complet"], g["telephone"], lien_client)}</td>'
-                      f'<td>{_lieu(g["adresse"], g["secteur"], g["ville"])}</td>'
-                      f'<td><a href="{url_fiche(g["chantier_id"], g["genre"])}">{esc(g["type_libelle"] or "à préciser")}</a></td>'
-                      f'<td class="droite">{g["nb"]}</td><td class="montant">{_montant_ou_tiret(g["total"])}</td>{_relancer(g["client_id"])}</tr>')
+            corps += (f'<tr><td class="c-date">{esc(g["date_ref"])}</td><td class="c-client">{_identite(g["client_nom_complet"], g["telephone"], lien_client)}</td>'
+                      f'<td class="c-adresse">{_lieu(g["adresse"], g["secteur"], g["ville"])}</td>'
+                      f'<td class="c-travaux"><a href="{url_fiche(g["chantier_id"], g["genre"])}">{esc(g["type_libelle"] or "à préciser")}</a></td>'
+                      f'<td class="droite c-statut">{g["nb"]}<span class="tel-seul"> chantier{"s" if g["nb"] > 1 else ""}</span></td>'
+                      f'<td class="montant c-montant">{_montant_ou_tiret(g["total"])}</td>{_relancer(g["client_id"])}</tr>')
         tete = ('<th>Dernier chantier</th><th>Client</th><th>Adresse</th><th>Travaux</th><th class="droite">Nb</th>'
                 '<th class="droite">Total avant taxes</th><th></th>')
         unite = "client" + ("s" if total > 1 else "")
@@ -403,9 +413,9 @@ def _resultats(lignes, groupes, f, historique_vide=False):
         total = len(lignes)
         corps = ""
         for l in lignes[:LIMITE_RESULTATS]:
-            corps += (f'<tr><td>{esc(l["date_ref"])}</td><td>{_identite(l["client_nom_complet"], l["telephone"], url_fiche(l["chantier_id"], l["genre"]))}</td>'
-                      f'<td>{_lieu(l["adresse"], l["secteur"], l["ville"])}</td><td>{esc(l["travaux_detail"] or "à préciser")}</td>'
-                      f'<td>{badge_statut(l["statut"], l["genre"])}</td><td class="montant">{_montant_ou_tiret(l["prix_ht"])}</td>{_relancer(l["client_id"])}</tr>')
+            corps += (f'<tr><td class="c-date">{esc(l["date_ref"])}</td><td class="c-client">{_identite(l["client_nom_complet"], l["telephone"], url_fiche(l["chantier_id"], l["genre"]))}</td>'
+                      f'<td class="c-adresse">{_lieu(l["adresse"], l["secteur"], l["ville"])}</td><td class="c-travaux">{esc(l["travaux_detail"] or "à préciser")}</td>'
+                      f'<td class="c-statut">{badge_statut(l["statut"], l["genre"])}</td><td class="montant c-montant">{_montant_ou_tiret(l["prix_ht"])}</td>{_relancer(l["client_id"])}</tr>')
         tete = ('<th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Résultat</th><th class="droite">Prix avant taxes</th><th></th>')
         unite = "fiche" + ("s" if total > 1 else "")
     if not total and historique_vide:
@@ -435,7 +445,7 @@ def page_archives(conn, query):
         _bloc_soumissions(statistiques_soumissions(conn, f))))
     stats = (f'<h2 class="groupe" id="statistiques">Statistiques <small>sur les chantiers terminés qui correspondent</small></h2>'
              f'<div class="grille-stats">{sections}</div>') if sections else ""
-    contenu = (f'<h1>Archives</h1><p class="doux">Tout l\'historique : chantiers terminés, annulés et soumissions refusées. Cherche, compare, '
+    contenu = (f'<h1>Archives</h1><p class="doux intro-page">Tout l\'historique : chantiers terminés, annulés et soumissions refusées. Cherche, compare, '
                'exporte. (Les chantiers en cours restent dans Chantiers.)</p>'
                f'{_formulaire(conn, f)}{_idees(datetime.date.today())}{_tuiles(st)}{_resultats(lignes, groupes, f, historique_vide)}{stats}')
     return gabarit("Archives", contenu, section="archives", large=True)

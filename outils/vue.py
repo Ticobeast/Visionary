@@ -5,6 +5,7 @@ import threading
 from pathlib import Path
 from urllib.parse import quote
 
+from telephone import CSS_TELEPHONE  # noqa: F401  (feuille de style du téléphone)
 from noyau import DB_DEFAUT, LIBELLES_MODE, LIBELLES_STATUT, MODES, adresses, libelle_statut  # noqa: F401  (réexportés pour les pages)
 
 LIBELLES_PAIEMENT = {"a_payer": "À recevoir", "partiel": "Partiel",
@@ -131,7 +132,6 @@ label.coche,span.coche{display:inline-flex;align-items:center;gap:6px;color:var(
 .resume-chantier{display:flex;gap:20px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start}.resume-chantier>div:first-child{flex:1 1 320px}.resume-chantier .montant{margin-left:auto}
 .montant{font-size:18px;font-weight:700;text-align:right;white-space:nowrap}.montant small{display:block;font-size:12px;font-weight:400;color:var(--doux)}
 .total-jour .total,.resume-jour .total{font-weight:700}
-@media (max-width:700px){table.liste th:nth-child(n+5),table.liste td:nth-child(n+5){display:none}}
 
 /* Style de sylvainculteur.ca : vert forêt et vert signature, cartes blanches arrondies, titres lourds, étiquettes en capitales */
 *{-webkit-font-smoothing:antialiased}
@@ -213,130 +213,8 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
-.barre-mobile,.menu-tel,.tel-seul{display:none}
-/* Téléphone : cibles tactiles de 44 px, champs à 16 px (sinon l'iPhone zoome), tableaux de la journée en cartes */
-@media (max-width:700px){
-main,main.large,main.conteneur{padding:16px 12px 24px}.navbar{position:static}.nav-contenu{padding:10px 14px;gap:10px}.nav-bureau{display:none}.nav-droite .admin-seul{display:none}.nav-droite{gap:8px}
-.bandeau-page{padding:18px 0 14px}.conteneur{padding:0 14px}.bandeau-page h1{font-size:1.5rem}
-body{padding-bottom:84px}.pied{display:none}.puces{display:none}.recherche select{display:none}
-.raccourcis-bloc{display:block}.tuiles{grid-template-columns:repeat(2,minmax(0,1fr))}.cellule-barre{display:none}.raccourcis{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.raccourcis .puce{flex:0 0 auto;min-width:110px}.raccourcis-bloc .modifier{display:inline-block;margin-top:8px}
-.barre-mobile{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:1000;gap:6px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--trait-leger)}
-.barre-mobile a{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.76rem;padding:0 2px;text-align:center;text-decoration:none;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
-.barre-mobile a.actif{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
-.barre-mobile a.principal{flex:1.35 1 0;background:var(--vert);border-color:transparent;color:#fff;box-shadow:var(--ombre-btn)}
-.connexion{margin:20px auto}table.liste,.liste-defile table{border:0;box-shadow:none;background:none;border-radius:0}
-
-button,.bouton{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
-input,select,textarea,.mini input,.mini select{font-size:16px;min-height:44px}.mini button,.actions-ligne .bouton,.actions-ligne button,.actions-page .bouton,.actions-page button{font-size:15px;min-height:44px;padding:8px 16px}
-input[type=checkbox],input[type=radio]{min-height:0;width:22px;height:22px}
-.recherche select,.recherche input,.cal-nav .bouton,.onglets{flex:1 1 auto}.recherche select{width:100%}
-.cal-jour{min-height:58px;padding:4px 3px}.cal-ligne{display:none}.cal-info{font-size:11px}.cal-info b{display:block;font-size:0}.cal-info b::first-letter{font-size:13px}.cal-tete{font-size:11px}
-td,th{white-space:normal!important}
-table.tableau,table.tableau tbody,.liste-defile table,.liste-defile table tbody,table.liste,table.liste tbody{display:block}table.tableau thead,.liste-defile table thead,table.liste thead{display:none}
-.liste-defile table tr,table.liste tr{display:block;border:1px solid var(--trait);border-radius:10px;margin:0 0 10px;padding:6px 4px}.liste-defile table td,table.liste td{display:block;border:0;padding:3px 8px;text-align:left!important}
-.liste-defile table td:first-child,table.liste td:first-child{color:var(--doux);font-size:13px}.liste-defile table td.droite form{margin-top:4px}
-table.liste td:nth-child(n+5){display:none}table.tableau tr{display:block;border:1px solid var(--trait);border-radius:10px;margin:0 0 10px;padding:6px 4px;background:var(--carte)}
-table.tableau tr.sans-bas{margin-bottom:0;border-bottom:0;border-radius:10px 10px 0 0;padding-bottom:0}
-table.tableau tr.ligne-actions{border-top:0;border-radius:0 0 10px 10px;padding-top:0}
-table.tableau tr.diner{border:0;background:none;padding:0;text-align:center}table.tableau tr.diner td{padding:2px}
-table.tableau td{display:block;border:0;padding:4px 8px;min-width:0!important;text-align:left!important}
-table.tableau td.col-ordre{display:flex;align-items:center;gap:10px}table.tableau .col-ordre .fleches{margin:0}
-table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne,.groupe-actions{flex-wrap:wrap}
-.liste-defile{overflow-x:visible}.carte{padding:12px}
-dl.lecture{grid-template-columns:1fr}.type{grid-template-columns:1fr}
-.modale-carte{padding:18px}
-/* barre du bas + feuille « Menu » */
-.barre-mobile button.menu-bouton{flex:0 0 64px;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;padding:0;background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
-.barre-mobile button.menu-bouton::before{content:"";width:22px;height:2.5px;border-radius:2px;background:var(--vert-fonce);box-shadow:0 -7px 0 var(--vert-fonce),0 7px 0 var(--vert-fonce)}
-.barre-mobile button.menu-bouton.actif,body.menu-ouvert .barre-mobile button.menu-bouton{background-color:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
-body.menu-ouvert .menu-tel{display:block}
-.menu-fond{position:fixed;left:0;right:0;top:0;bottom:80px;background:rgba(14,52,29,.45);z-index:1001}
-.menu-feuille{position:fixed;left:10px;right:10px;bottom:84px;z-index:1002;background:#fff;border-radius:18px;padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
-.menu-feuille a,.menu-feuille button{display:flex;align-items:center;justify-content:flex-start;width:100%;min-height:48px;padding:0 14px;border-radius:10px;border:0;background:none;box-shadow:none;font-weight:700;font-size:1rem;color:var(--vert-fonce);text-decoration:none}
-.menu-feuille a.actif{background:var(--vert-doux);color:var(--vert)}.menu-feuille form{margin:0;border-top:1px solid var(--trait-leger);margin-top:4px;padding-top:4px}.menu-feuille form button{color:var(--doux);font-weight:600}
-.menu-qui{padding:6px 14px;color:var(--doux);font-size:.85rem;font-weight:600}
-/* chantiers : carte compacte */
-table.chantiers tr{display:grid;grid-template-columns:1fr auto;gap:3px 10px;padding:10px 12px}
-table.chantiers td{display:block!important;padding:0!important;font-size:14px}
-table.chantiers td.c-client{grid-column:1;grid-row:1;font-size:16px;font-weight:700}
-table.chantiers td.c-statut{grid-column:2;grid-row:1;text-align:right!important}table.chantiers td.c-statut .doux{font-size:12px}
-table.chantiers td.c-adresse{grid-column:1/-1;grid-row:2;display:flex!important;flex-wrap:wrap;gap:0 8px}
-table.chantiers td.c-travaux{grid-column:1;grid-row:3;display:flex!important;flex-wrap:wrap;gap:0 8px;align-items:baseline}
-table.chantiers td.c-montant{grid-column:2;grid-row:3;text-align:right!important;font-size:16px;align-self:end}
-table.chantiers td.c-depuis{grid-column:1;grid-row:4;color:var(--texte)!important;font-size:13px!important}
-table.chantiers td.c-paiement{grid-column:2;grid-row:4;text-align:right!important}table.chantiers td.c-paiement .doux{font-size:12px}
-table.chantiers td.c-depuis .depuis{margin:2px 0 0}
-/* tableau de bord et journée : carte compacte, « Facture » en haut à droite */
-.lien-pdf-coin{position:absolute;top:10px;right:12px}
-table.tableau.jour tr.sans-bas,table.tableau.jour.gestion tr:not(.diner):not(.ligne-actions){position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:10px 12px}
-table.tableau.jour td{padding:0!important}
-table.tableau.jour td.c-heures{grid-column:1/-1;font-size:1rem;padding-right:70px!important}
-table.tableau.jour td.c-client,table.tableau.jour td.c-adresse{grid-column:1/-1;display:flex!important;flex-wrap:wrap;align-items:baseline;gap:0 10px}
-table.tableau.jour td.c-travaux{grid-column:1/3;display:block}
-table.tableau.jour td.c-montant{grid-column:3;text-align:right!important;align-self:end}
-table.tableau.jour .col-travaux{min-width:0!important}
-table.tableau.jour tr.ligne-actions{padding:0 12px 10px}
-table.tableau.jour tr.ligne-actions .groupe-actions{display:flex;width:100%}
-table.tableau.jour tr.ligne-actions .bouton{flex:1}
-table.tableau.jour .facture-pc{display:none}
-table.tableau.jour.gestion td.col-ordre{grid-column:1;grid-row:1}table.tableau.jour.gestion td.c-heures{grid-column:2/-1;grid-row:1;align-self:center}
-table.tableau.jour.gestion td.col-actions{grid-column:1/-1;margin-top:4px;min-width:0!important}
-table.tableau.jour.gestion .actions-ligne{display:flex;gap:8px}table.tableau.jour.gestion .actions-ligne>*{flex:1}table.tableau.jour.gestion .actions-ligne .bouton,table.tableau.jour.gestion .actions-ligne button{width:100%}
-table.tableau.jour.gestion .actions-ligne .groupe-actions{display:flex;flex:2;gap:8px}table.tableau.jour.gestion .actions-ligne .mini{display:block;flex:1}
-/* journée : navigation et filtres sur téléphone */
-form.nav-jour{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}form.nav-jour>*{width:100%!important;max-width:none!important;min-width:0}
-form.nav-jour a:nth-child(1){order:1}form.nav-jour input{order:2}form.nav-jour a:nth-child(4){order:3}form.nav-jour button{order:4}form.nav-jour a:nth-child(5){order:5}form.nav-jour a:nth-child(6){order:6}
-form.nav-jour .bouton,form.nav-jour button{padding:6px 4px;font-size:13px;text-align:center}
-form.filtres-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}form.filtres-jour select{display:block!important;width:100%;max-width:none}form.filtres-jour button{grid-column:1/-1}
-table.candidats tr{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:10px 12px}
-table.candidats td{padding:0!important}
-table.candidats td.c-case{grid-column:1;grid-row:1}table.candidats td.c-depuis{grid-column:2;grid-row:1;display:flex!important;align-items:center;gap:8px;color:var(--texte)!important;font-size:13px!important}
-table.candidats td.c-montant{grid-column:3;grid-row:1;text-align:right!important}
-table.candidats td.c-client,table.candidats td.c-adresse,table.candidats td.c-travaux{grid-column:1/-1;display:flex!important;flex-wrap:wrap;gap:0 10px;align-items:baseline}
-table.candidats td.c-travaux{display:block!important}
-table.tableau.jour td.c-heures{color:var(--texte)!important;font-size:1rem!important}table.tableau.jour td.c-montant small{display:none}
-.note-heures{display:none}.resume-jour,.total-jour{display:inline;margin:0;font-size:14px}.resume-jour::after{content:" · "}.total-jour .total{white-space:nowrap}.total-jour .doux{display:none}.carte>h2{margin-bottom:6px}.resume-jour+.total-jour+.liste-defile{margin-top:8px}
-table.tableau.jour td{font-size:14px}table.tableau.jour td.c-heures{font-size:15px!important}
-table.tableau.jour td.c-client a{font-size:16px;font-weight:700}table.tableau.jour td.c-adresse a,table.tableau.jour td.c-travaux a{font-weight:400;color:var(--texte)}.pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;min-height:42px;text-align:center}
-table.tableau.jour.gestion td.col-ordre{display:flex!important;align-items:center;gap:6px;white-space:nowrap}table.tableau.jour.gestion .col-ordre .fleches{display:flex;gap:4px;margin:0}
-table.tableau.jour.gestion .col-ordre button.fleche{min-height:34px;width:34px;padding:0}table.tableau.jour.gestion .col-ordre .doux{display:none}
-table.candidats tr.ligne-urgente{border-left:4px solid var(--alerte)}table.candidats tr.ligne-surveiller{border-left:4px solid #e8c675}table.candidats td:first-child{box-shadow:none!important}
-table.candidats td.c-montant small{display:none}.sel-total{bottom:76px;padding:8px 12px;font-size:13px;gap:8px}.sel-total button{width:100%;min-height:40px;padding:6px 10px;font-size:14px}
-table.chantiers td.c-statut .doux{display:none}.tel-seul{display:inline!important}table.chantiers td.c-depuis:has(.tel-seul) .date-depuis{display:none}
-table.chantiers td.c-depuis:not(:has(.depuis)):not(:has(.tel-seul))::before{content:"Accepté le ";color:var(--doux)}
-
-/* Téléphone : calendrier léger (un point sous les jours chargés), recherche sur une ligne, fiches compactes */
-.pc-seul,.nav-droite .base{display:none}
-.cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:10px;align-items:center;gap:3px;padding:4px 0}
-.cal-jour.weekend{background:var(--vert-doux)!important;border-radius:0}
-.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:700;background:none;color:var(--texte);align-self:center}
-.cal-jour.aujourdhui .cal-n{background:var(--vert)!important;color:#fff!important}
-.cal-jour.selection{outline:0}.cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}.cal-jour.aujourdhui.selection .cal-n{background:var(--vert)}
-.cal-jour.occupe::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--vert);display:block}.cal-jour.chargee::after{background:var(--alerte)}
-.cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte{display:none}.cal-grille{gap:0}
-table.tableau.jour:not(.gestion) .c-adresse .doux,table.tableau.jour:not(.gestion) .ligne-duree,table.tableau.jour:not(.gestion) .ligne-options,table.tableau.jour:not(.gestion) .ligne-desc{display:none}
-.cal-nav{flex-wrap:nowrap;gap:6px}.cal-nav h2{min-width:0;font-size:1.05rem}.cal-nav .bouton{flex:0 0 auto;min-height:40px;padding:6px 12px;font-size:13px}
-.cal-nav a[aria-label]{font-size:0;padding:0;width:40px;position:relative}.cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:10px;height:10px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
-.cal-nav a[aria-label="Mois suivant"]::before{transform:translate(-70%,-50%) rotate(-135deg)}
-.cal-nav a[href="/"]{order:3}
-.recherche{flex-wrap:nowrap}.recherche input{flex:1 1 0;min-width:0}.recherche button{flex:0 0 auto}
-.resume-chantier{position:relative;gap:6px}.resume-chantier>div:first-child{padding-right:84px}
-.lien-pdf-coin{display:block}.documents-pc{display:none}
-.lecture-seule{padding:10px 12px}.lecture-seule .barre{gap:6px}.lecture-seule .bouton{min-height:36px;padding:5px 10px;font-size:13px}.lecture-seule h2{font-size:1rem}.lecture-seule p{margin-top:4px!important}
-.actions-page{gap:6px}.actions-page .bouton,.actions-page button{padding:8px 10px;font-size:14px;min-height:40px}
-table.soumissions tr{position:relative;display:grid;grid-template-columns:1fr auto;gap:3px 10px;padding:10px 12px}
-table.soumissions td{padding:0!important}
-table.soumissions td:nth-child(1),table.soumissions td:nth-child(2),table.soumissions td:nth-child(3),table.soumissions td:nth-child(6){grid-column:1/-1}
-table.soumissions td:nth-child(1),table.soumissions td:nth-child(2),table.soumissions td:nth-child(3),table.soumissions td:nth-child(4){display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
-table.soumissions td:nth-child(1){padding-right:90px!important;align-items:center}table.soumissions td:nth-child(1) div{margin:0}
-table.soumissions td:nth-child(2) .manque{flex-basis:100%;margin:0}
-table.soumissions td:nth-child(5){display:block;text-align:right!important;align-self:end}
-table.soumissions td.col-actions{margin-top:4px;min-width:0!important}
-table.soumissions .actions-ligne{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-table.soumissions .actions-ligne .mini{display:block;margin:0}
-table.soumissions .actions-ligne .bouton,table.soumissions .actions-ligne button{width:100%;min-height:40px;padding:6px 4px;font-size:14px}
-table.soumissions .lien-pdf{position:absolute;top:10px;right:12px;width:auto!important;min-height:0!important;padding:2px 4px!important;border:0;background:none;box-shadow:none;color:var(--doux);font-size:12.5px!important;text-decoration:underline}
-}
+.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary{display:none}
+main a.tel{color:inherit;font-weight:inherit;text-decoration:none}
 """
 
 
@@ -417,12 +295,25 @@ def _navigation(section):
             f'<nav class="nav-bureau">{nav}</nav><div class="nav-droite">{droite}</div></div></header>{surlignage}')
 
 
+_ICONES = {
+    "tableau": '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    "clients": '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><circle cx="17" cy="9.5" r="2.4"/><path d="M17.5 14.2c2 .3 3.2 1.8 3.5 4.3"/>',
+    "soumissions": '<path d="M7 3.5h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5a1.5 1.5 0 0 1 1-1.5z"/><path d="M14 3.5V8h4M9 13h6M9 16.5h4"/>',
+    "menu": '<path d="M4 7h16M4 12h16M4 17h16"/>',
+}
+
+
+def _icone(nom):
+    return f'<svg viewBox="0 0 24 24" aria-hidden="true">{_ICONES[nom]}</svg>'
+
+
 def _barre_mobile(section):
-    """Téléphone : en bas, Tableau de bord (administrateur), Soumissions (compte « soumission ») et Clients ; tout le reste dans la feuille « Menu »."""
+    """Téléphone : en bas, des onglets (icône + nom) : Tableau de bord et Clients (administrateur), Soumissions et Clients (compte « soumission »),
+    puis l'icône du menu ; tout le reste est dans la feuille « Menu »."""
     admin = est_admin()
 
-    def lien(href, texte, actif):
-        return f'<a href="{href}" class="{"actif" if actif else ""}">{texte}</a>'
+    def lien(href, texte, actif, icone):
+        return f'<a href="{href}" class="{"actif" if actif else ""}">{_icone(icone)}<span>{texte}</span></a>'
     if admin:
         principaux = [("/", "Tableau de bord", "tableau"), ("/clients", "Clients", "clients")]
         reste = [("/chantiers", "Chantiers", "chantiers"), ("/soumissions", "Soumissions", "soumissions"), ("/journee", "Journée", "journee"),
@@ -436,9 +327,10 @@ def _barre_mobile(section):
     sortie = '<form method="post" action="/deconnexion"><button type="submit">Se déconnecter</button></form>' if u else ""
     qui = f'<div class="menu-qui">{esc(u["nom"])}</div>' if u else ""
     menu_actif = any(section == code for _, _, code in reste)
-    bas = "".join(lien(h, t, section == c) for h, t, c in principaux)
-    bas += f'<button type="button" class="menu-bouton{" actif" if menu_actif else ""}" onclick="document.body.classList.toggle(\'menu-ouvert\')" aria-label="Menu" title="Menu"></button>'
-    feuille = "".join(lien(h, t, section == c) for h, t, c in reste)
+    bas = "".join(lien(h, t, section == c, c) for h, t, c in principaux)
+    bas += (f'<button type="button" class="menu-bouton{" actif" if menu_actif else ""}" onclick="document.body.classList.toggle(\'menu-ouvert\')" '
+            f'aria-label="Menu" title="Menu">{_icone("menu")}</button>')
+    feuille = "".join(f'<a href="{h}" class="{"actif" if section == c else ""}">{t}</a>' for h, t, c in reste)
     return (f'<nav class="barre-mobile">{bas}</nav><div class="menu-tel"><div class="menu-fond" onclick="document.body.classList.remove(\'menu-ouvert\')"></div>'
             f'<div class="menu-feuille">{qui}{feuille}{sortie}</div></div>')
 
@@ -448,7 +340,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     if erreur:
         msg += f'<div class="erreurs"><strong>Action refusée :</strong> {esc(erreur)}</div>'
     section = section or section_de(getattr(CONTEXTE, "chemin", ""))
-    tete = f'<style>{CSS}</style></head><body>'
+    tete = f'<style>{CSS}{CSS_TELEPHONE}</style></head><body>'
     entete = ('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">'
               f'<meta name="theme-color" content="#0e341d"><title>{esc(titre)} — SylvainCulteur</title>')
     if public:           # page de connexion et refus : pas de menu
@@ -488,6 +380,15 @@ def case_taxes(nom, cochee):
     """« Ajouter TPS et TVQ » : sur sa propre ligne de la grille (le libellé est trop long pour une colonne)."""
     return (f'<div class="large"><label class="coche"><input type="checkbox" name="{nom}" value="1"{" checked" if cochee else ""}>'
             'Ajouter TPS 5 % et TVQ 9,975 %</label></div>')
+
+
+def lien_tel(t):
+    """Numéro de téléphone cliquable : sur un téléphone, un toucher lance l'appel. Le texte reste « 819-555-0106 » (ordinateur : rien ne change)."""
+    if not t:
+        return ""
+    texte = f"{t[2:5]}-{t[5:8]}-{t[8:]}" if len(t) == 12 else t
+    chiffres = "+" * t.startswith("+") + "".join(c for c in t if c.isdigit())
+    return f'<a class="tel" href="tel:{esc(chiffres)}">{esc(texte)}</a>'
 
 
 def lien_maps(adresse_maps, texte):
@@ -574,7 +475,7 @@ def bloc_types(types, valeurs):
         lignes += (f'<div class="type"><label class="coche"><input type="checkbox" name="type_{esc(code)}" value="1"{coche}>{esc(libelle)}</label>'
                    f'<input type="text" name="precision_{esc(code)}" value="{esc(valeurs.get("precision_" + code, ""))}" '
                    f'placeholder="Précision (facultatif) : quel arbre, quelle haie, combien…" aria-label="Précision pour {esc(libelle)}"></div>')
-    return f'<div class="large"><label>Types de travaux : coche un ou plusieurs</label>{lignes}</div>'
+    return f'<div class="large types"><label>Types de travaux : coche un ou plusieurs</label>{lignes}</div>'
 
 
 def select_secteur(secteurs, valeurs, nom="client_secteur", requis=True, tout=None):

@@ -167,13 +167,13 @@ Seuils d'attente : `SEUIL_SURVEILLER` et `SEUIL_URGENT` dans `outils/noyau.py`.
 
 ## 4. Soumissions
 
-Menu **Soumissions** (à droite de Chantiers ; sur téléphone, dans la barre du bas). C'est ici que vit une demande, **du premier appel du client
+Menu **Soumissions** (à droite de Chantiers ; sur téléphone, dans le Menu de la barre du bas). C'est ici que vit une demande, **du premier appel du client
 jusqu'à sa réponse**.
 
 ### Ouvrir une soumission : rien n'est obligatoire
 
 Un client appelle et demande qu'on vienne faire une soumission : on **ouvre une soumission**. Boutons **+ Nouvelle soumission** (en haut de la page
-Soumissions, et sur la fiche d'un client déjà connu), **+ Nouveau client** (page Clients) et « + Soumission » (barre du bas du téléphone) : les trois
+Soumissions, et sur la fiche d'un client déjà connu), **+ Nouveau client** (page Clients ; sur téléphone, le bouton rond **+**) et le même formulaire depuis la fiche d'un client : tous
 ouvrent le même formulaire. Il ne demande **rien d'obligatoire** : on remplit ce qu'on sait (on peut même ouvrir une soumission vide et la remplir
 plus tard, après la visite). Une soumission sans nom s'affiche « (client à identifier) ».
 

@@ -120,7 +120,7 @@ class TestSuiviSupprime(BaseTableau):
                          [("/", "Tableau de bord"), ("/journee", "Journée"), ("/chantiers", "Chantiers"), ("/soumissions", "Soumissions"),
                           ("/clients", "Clients"), ("/archives", "Archives")])
         self.assertNotIn("+ Nouveau</a>", entete)                                # le bouton est dans la page Clients
-        self.assertIn('<a class="bouton" href="/nouveau">+ Nouveau client</a>', self.get("/clients")[1])
+        self.assertIn('href="/nouveau" aria-label="Nouveau client">+ Nouveau client</a>', self.get("/clients")[1])
 
 
 class TestChantiersListe(BaseTableau):

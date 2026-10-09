@@ -23,7 +23,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_
                    mettre_a_jour_fiche, remettre_en_soumission, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
                    valeurs_client)
 from vue import (libelle_statut, est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, MODES, adresses, argent, avance, badge, badge_statut, bloc_options_travaux,
-                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps,
+                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps, lien_tel,
                  redirection, texte_attente, url_fiche, utilisateur_courant, zone)
 
 
@@ -175,12 +175,12 @@ def carte_client_lecture(conn, client_id, retour=""):
     prenom, nom, entreprise, tel, tel2, courriel, adresse, ville, prov, cp, acces = r
     nom_complet = (" ".join(x for x in (prenom, nom) if x) + (f" · {entreprise}" if entreprise and (prenom or nom) else (entreprise or ""))) or "(client à identifier)"
     adresse_texte, adresse_maps = adresses(adresse, ville, prov, cp)
-    tels = " · ".join(f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12) or "—"
+    tels = " · ".join(lien_tel(t) for t in (tel, tel2) if t and len(t) == 12) or "—"
     return (f'<div class="lecture-seule"><div class="barre"><h2 style="margin:0">{esc(nom_complet)}</h2>'
             f'<a class="bouton secondaire" href="/client/{client_id}/modifier{"?retour=" + quote(retour, safe="") if retour else ""}">Modifier le client</a>'
             f'<a class="bouton secondaire" href="/client/{client_id}">Fiche client</a></div>'
             f'<p style="margin:8px 0 0"><b>Adresse :</b> {lien_maps(adresse_maps, adresse_texte)}</p>'
-            f'<p style="margin:4px 0 0"><b>Téléphone :</b> {esc(tels)}{" · <b>Courriel :</b> " + esc(courriel) if courriel else ""}'
+            f'<p style="margin:4px 0 0"><b>Téléphone :</b> {tels}{" · <b>Courriel :</b> " + esc(courriel) if courriel else ""}'
             f'{" · <b>Accès :</b> " + esc(acces) if acces else ""}</p>'
             '<p class="doux" style="margin:8px 0 0">Lecture seule : le nom, l\'adresse et les coordonnées du client ne se modifient que depuis sa fiche.</p></div>')
 
@@ -329,7 +329,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                        + f'<a class="bouton secondaire" href="/chantier/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">Changer la date</a>' + boutons)
         if statut == "annule" and est_admin():
             boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
-    actions = f'<div class="actions-bloc"><div class="actions-page">{boutons}</div>{manque}</div>'
+    actions = f'<div class="actions-bloc"><div class="actions-page{" actions-sou" if soumission and not refusee else ""}">{boutons}</div>{manque}</div>'
     documents_client = _bloc_documents(chantier_id, statut, genre, soumission)
     bandeau = ""
     if refusee:

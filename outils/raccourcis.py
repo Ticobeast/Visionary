@@ -213,7 +213,7 @@ def page_raccourcis(conn, query, erreurs=(), saisie=None):
                    f'<td><b>{esc(nom)}</b><div class="doux">{esc(decrire(page, filtre, secteurs))}</div></td>'
                    f'<td class="droite"><form class="mini" method="post" action="/raccourcis/{id_}/retirer"><input type="hidden" name="page" value="{page}">'
                    f'<button type="submit" class="secondaire">Retirer</button></form></td></tr>')
-    tableau = (f'<div class="liste-defile"><table><thead><tr><th>Ordre</th><th>Raccourci</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
+    tableau = (f'<div class="liste-defile"><table class="gerer"><thead><tr><th>Ordre</th><th>Raccourci</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
                if lignes else '<p class="doux">Aucun raccourci : ajoutes-en ci-dessous.</p>')
     presents = {f for _, _, f in actuels}
     propositions = ""

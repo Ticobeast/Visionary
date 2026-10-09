@@ -72,11 +72,11 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 28 | **Chantiers** : regarder une ligne et la page d'un chantier | pas de pastille « Nacelle requise » ni « Bois ... » (elles restent dans le tableau de bord et la Journée) |
 | 29 | **Tableau de bord** : choisir un jour avec des chantiers, « Télécharger la journée (PDF) » (en bas) | un fichier `journee-AAAA-MM-JJ.pdf` se télécharge ; il contient, pour chaque chantier : heures, client, téléphone, adresse, accès, travaux avec précisions, description, options, durée, prix et taxes, paiements, reste à encaisser et, si le dossier de photos existe, les photos en vignettes |
 | 30 | **Journée** : regarder les boutons d'un chantier planifié | **Terminer** et **Retirer** sont côte à côte, sur une même ligne |
-| 31 | **Téléphone** (après l'installation de `docs/acces_a_distance.md`) : ouvrir l'adresse sur un téléphone, parcourir Tableau de bord, Journée, Chantiers, Clients | aucune barre de défilement horizontale ; une carte par chantier ; boutons faciles à toucher ; « Terminer » et « Retirer » côte à côte |
+| 31 | **Téléphone** (après l'installation de `docs/acces_a_distance.md`) : ouvrir l'adresse sur un téléphone, parcourir Tableau de bord, Journée, Chantiers, Clients | aucune barre de défilement horizontale ; une carte par chantier ; boutons faciles à toucher ; « Terminer » et « Retirer » côte à côte ; barre du bas (Tableau de bord, Clients, Menu) |
 | 32 | **Deux appareils** : ouvrir le même chantier sur deux appareils, modifier la description sur le 1er et enregistrer, puis modifier sur le 2e et enregistrer | le 2e voit « Cette fiche vient d'être modifiée par quelqu'un d'autre », ses changements ne sont pas enregistrés, la fiche à jour s'affiche |
 | 33 | **Refus** : depuis un appareil qui n'est PAS dans ton Tailscale (ex. un ordinateur du Wi-Fi), ouvrir `http://adresse-de-l'atelier:8765` | la page ne s'ouvre pas (« Accès refusé » ou aucune réponse) |
 | 34 | **Comptes** : `gerer_utilisateurs.bat`, créer un administrateur et un compte « Soumission » ; relancer l'application | la page de connexion s'affiche partout (même sur l'ordinateur) ; un mauvais mot de passe est refusé ; 5 essais ratés bloquent 15 minutes |
-| 35 | **Compte Soumission** sur un téléphone | arrive sur les **Soumissions** ; barre du bas : Chantiers, Soumissions, Clients, + Soumission ; pas de Journée, de PDF, de paiements, de bouton Terminer ni Supprimer ; peut créer, modifier, accepter et refuser une soumission |
+| 35 | **Compte Soumission** sur un téléphone | arrive sur les **Soumissions** ; barre du bas : Soumissions, Clients, Menu (avec Chantiers et Se déconnecter) ; pas de Journée, de PDF, de paiements, de bouton Terminer ni Supprimer ; peut créer, modifier, accepter et refuser une soumission |
 | 36 | **Administrateur** : page Utilisateurs : changer le mot de passe du compte Soumission | l'appareil de cette personne est déconnecté ; elle se reconnecte avec le nouveau mot de passe |
 | 37 | **Soumissions > + Nouvelle soumission**, ne **rien remplir**, « Créer la soumission » | acceptée (rien n'est obligatoire) ; retour à la fiche du client ; dans Soumissions elle s'affiche « (client à identifier) » avec en rouge « Il manque : nom, téléphone, adresse, ... » |
 | 38 | Soumission à moitié remplie (nom, téléphone, un type de travaux), bouton **Accepter** | le programme **ne l'accepte pas** : il ouvre « Accepter la soumission » avec **seulement les champs manquants** (adresse, secteur, durée, prix) ; « Enregistrer et accepter » la place dans **Chantiers, À planifier** et elle quitte Soumissions |
@@ -104,6 +104,12 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 60 | Soumission **sans prix**, **sans nom**, puis une avec un texte de précision **très long** (plus d'une page) | « à confirmer » à la place du total ; « (client à identifier) » ; le long texte continue sur la page suivante, avec le rappel du document en haut et les coordonnées au bas de **chaque** page ; **aucune note interne** (accès, notes sur le client, description de la feuille de route) n'est imprimée |
 | 61 | Tableau de bord, un jour avec un chantier planifié : bouton **Facture** à côté de **Terminer** ; ouvrir la fenêtre « Terminer » | la facture s'ouvre en PDF (FACTURE, même numéro que la fiche, date du jour, solde à payer) ; la fenêtre offre « Facture (PDF) » à côté de « Oui, il est terminé » ; après avoir terminé, la facture porte la **date des travaux** ; si le client a payé : « Facture acquittée » et solde 0,00 $ |
 | 62 | Page d'un chantier accepté (carte « Documents pour le client »), page d'une soumission non acceptée, puis le compte « Soumission » | la soumission : Voir / Télécharger ; la **facture** seulement pour un chantier accepté et seulement pour l'administrateur (aucun lien pour le compte « Soumission », et `/facture/N/pdf` lui est refusé) ; sur une soumission non acceptée, ouvrir `/facture/N/pdf` à la main ramène à la fiche avec un message |
+| 63 | **Téléphone** : tour de toutes les pages (Tableau de bord, Journée, Chantiers, fiche chantier, Soumissions, fiche soumission, Clients, fiche client, Archives, Nouvelle soumission, Raccourcis, Menu) | rien ne déborde ; un grand titre sans bandeau ; une carte par ligne ; des flèches (jour, mois) plutôt que « Précédent / Suivant » ; la loupe à droite des recherches ; aucun texte coupé |
+| 64 | Téléphone, **Clients** : toucher un numéro de téléphone ; toucher le bouton rond **+** | l'appel se lance (ou le téléphone propose d'appeler) ; le formulaire d'un nouveau client s'ouvre |
+| 65 | Téléphone, **Archives** : toucher **Filtres**, choisir un type de travaux, toucher la loupe | les critères se déplient ; la liste se met à jour ; les filtres utilisés restent dépliés ; les idées de recherche défilent de gauche à droite |
+| 66 | Téléphone, **Nouvelle soumission** : cocher « Taille de haie » | la tuile devient verte et s'étire ; la case « Précision » apparaît dessous ; les options (nacelle, bois) sont des tuiles pleine largeur |
+| 67 | Téléphone, tableau de bord : toucher **Terminer** sur un chantier du jour | la fenêtre monte du bas, au-dessus de la barre d'onglets ; tous ses boutons (« Oui, il est terminé », Facture, Annuler) sont visibles |
+| 68 | Ordinateur : refaire les scénarios 1 à 30 après la refonte du téléphone | **aucune** différence d'affichage sur l'ordinateur |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -118,7 +124,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 62 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 68 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

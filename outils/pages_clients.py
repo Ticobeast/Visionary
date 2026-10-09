@@ -13,7 +13,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, resume_suppress
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, client_avance,
-                 client_essentiel, esc, gabarit, lien_maps, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
+                 client_essentiel, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
 
 def _types(conn):
@@ -50,10 +50,6 @@ def _introuvable():
     return gabarit("Introuvable", '<h1>Client introuvable</h1><p><a href="/clients">Retour aux clients</a></p>'), 404
 
 
-def _tel(t):
-    return f"{t[2:5]}-{t[5:8]}-{t[8:]}" if t and len(t) == 12 else (t or "")
-
-
 # ---------------------------------------------------------------------------
 # Liste et fiche
 # ---------------------------------------------------------------------------
@@ -73,15 +69,16 @@ def page_clients(conn, query):
     corps = ""
     for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, libelle_secteur in lignes[:300]:
         maps = adresses(adresse, ville, prov, cp)[1]
-        corps += (f'<tr><td><a href="/client/{cid}">{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</a></td>'
-                  f'<td>{esc(_tel(tel))}</td><td>{lien_maps(maps, adresse)}<div class="doux">{esc(libelle_secteur or ville)}</div></td></tr>')
-    tableau = (f'<div class="liste-defile"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th></tr></thead>'
+        corps += (f'<tr><td class="c-client"><a href="/client/{cid}">{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</a></td>'
+                  f'<td class="c-tel">{lien_tel(tel)}</td>'
+                  f'<td class="c-adresse">{lien_maps(maps, adresse)}<div class="doux">{esc(libelle_secteur or ville)}</div></td></tr>')
+    tableau = (f'<div class="liste-defile"><table class="clients"><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th></tr></thead>'
                f'<tbody>{corps}</tbody></table></div>'
                if corps else '<div class="carte">Aucun client. <a href="/nouveau">Créer le premier ?</a></div>')
     select_sect, _ = select_secteur(lister_secteurs(conn), {"secteur": secteur}, nom="secteur", requis=False, tout="Tous les secteurs")
     recherche = (f'<form class="recherche" method="get" action="/clients"><input type="search" name="q" value="{esc(q)}" '
                  f'placeholder="Chercher : nom, téléphone, adresse…">{select_sect}<button type="submit">Chercher</button></form>')
-    nouveau = '<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/nouveau">+ Nouveau client</a></div>'
+    nouveau = '<div class="barre barre-ajout" style="margin-bottom:16px"><a class="bouton" href="/nouveau" aria-label="Nouveau client">+ Nouveau client</a></div>'
     return gabarit("Clients", f'<h1>Clients</h1>{nouveau}{recherche}{tableau}', query.get("ok"))
 
 
@@ -99,7 +96,7 @@ def page_client(conn, client_id, query):
     historique = (f'<div class="liste-defile" style="margin-bottom:16px"><table><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
                   f'<tbody>{lignes}</tbody></table></div>'
                   if lignes else '<p class="doux">Aucune soumission ni chantier pour ce client.</p>')
-    tels = " · ".join(esc(_tel(t)) for t in (c["telephone"], c["telephone_2"]) if t) or "—"
+    tels = " · ".join(lien_tel(t) for t in (c["telephone"], c["telephone_2"]) if t) or "—"
 
     def ligne(libelle, contenu_html):
         return f'<p style="margin:6px 0 0"><b>{libelle} :</b> {contenu_html}</p>'
@@ -110,7 +107,7 @@ def page_client(conn, client_id, query):
              + (ligne("Courriel", esc(c["courriel"])) if c["courriel"] else "")
              + (ligne("Accès", esc(c["notes_acces"])) if c["notes_acces"] else "")
              + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
-    actions = (f'<div class="barre" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>'
+    actions = (f'<div class="barre actions-client" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>'
                f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a></div>')
     n, termines, paiements = resume_suppression_client(conn, client_id)
     nb_soumissions = sum(1 for f in fiches if f[5] == "soumission")

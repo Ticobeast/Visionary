@@ -197,9 +197,12 @@ class TestTelephone(unittest.TestCase):
     def test_feuille_de_style_pour_petits_ecrans(self):
         import vue
         self.assertIn('name="viewport" content="width=device-width,initial-scale=1"', vue.gabarit("t", "x"))
-        mobile = vue.CSS[vue.CSS.index("Téléphone"):]
-        for attendu in ("min-height:44px", "font-size:16px", "table.tableau tr{display:block", ".liste-defile table tr", "table.liste tr"):
+        from telephone import CSS_TELEPHONE as mobile
+        self.assertTrue(mobile.lstrip().startswith("@media (max-width:700px)"))               # rien de tout cela sur ordinateur
+        for attendu in ("min-height:44px", "font-size:16px", "table:not(.stat) tr{display:block", ".barre-mobile", "env(safe-area-inset-bottom)",
+                        ".filtres-det", "table.archive", "table.clients", ".actions-sou", ".types", ".barre-ajout", ".modale{align-items:flex-end;padding:0;z-index:1100}"):
             self.assertIn(attendu, mobile)
+        self.assertIn(mobile, vue.gabarit("t", "x"))
 
 
 if __name__ == "__main__":

@@ -97,7 +97,7 @@ def page_journee(conn, query):
     retour = "/journee?" + urlencode({k: v for k, v in (("date", jour), ("statut", f_statut), ("attente", f_attente), ("secteur", f_secteur), ("tri", tri)) if v})
     precedent, suivant = (d - datetime.timedelta(days=1)).isoformat(), (d + datetime.timedelta(days=1)).isoformat()
     navigation = (f'<form class="recherche nav-jour" method="get" action="/journee"><a class="bouton secondaire" href="/journee?date={precedent}">Précédent</a>'
-                  f'<input type="date" name="date" value="{jour}" style="max-width:170px" aria-label="Journée"><button type="submit">Afficher</button>'
+                  f'<input type="date" name="date" value="{jour}" style="max-width:170px" aria-label="Journée" onchange="this.form.submit()"><button type="submit">Afficher</button>'
                   f'<a class="bouton secondaire" href="/journee?date={suivant}">Suivant</a>'
                   f'<a class="bouton secondaire" href="/journee?date={demain}">Demain</a>'
                   f'<a class="bouton secondaire" href="/?date={jour}">Voir au calendrier</a></form>')

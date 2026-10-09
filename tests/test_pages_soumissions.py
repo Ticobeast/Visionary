@@ -1009,9 +1009,10 @@ class TestComptesEtSoumissions(BaseComptes):
         self.assertNotIn('href="/"', barre)                                           # le tableau de bord est réservé à l'administrateur
         admin = self.get("/soumissions", cookie=self.admin, agent=telephone)
         barre = admin[admin.index('class="barre-mobile"'):]
-        self.assertIn('<a href="/" class="">Tableau de bord</a>', barre)
+        self.assertRegex(barre, r'<a href="/" class="">.*?<span>Tableau de bord</span></a>')
         self.assertLess(barre.index("Tableau de bord"), barre.index('href="/chantiers"'))
-        self.assertIn('class="actif">Tableau de bord', self.get("/", cookie=self.admin, agent=telephone)[self.get("/", cookie=self.admin, agent=telephone).index('class="barre-mobile"'):])
+        accueil = self.get("/", cookie=self.admin, agent=telephone)
+        self.assertRegex(accueil[accueil.index('class="barre-mobile"'):], r'<a href="/" class="actif">.*?<span>Tableau de bord</span>')
         self.assertLess(barre.index('href="/chantiers"'), barre.index('href="/soumissions"'))
 
 

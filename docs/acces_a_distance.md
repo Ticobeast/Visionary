@@ -45,17 +45,25 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 2. Ouvrir Safari / Chrome, aller à l'adresse ci-dessus, se connecter. La session reste ouverte 30 jours.
 3. **Ajouter à l'écran d'accueil** : iPhone / iPad : bouton Partager > « Sur l'écran d'accueil » ; Android : menu > « Ajouter à l'écran d'accueil ».
 
-## Version téléphone : volontairement simple
-Sur un téléphone, il n'y a que ce qu'il faut pour une soumission, avec une barre en bas : **Chantiers**, **Soumissions**, **Clients** et **+ Soumission**.
-- **Chantiers** : la liste (une carte par chantier accepté), avec les pastilles de raccourcis et la recherche.
-- **Soumissions** : la liste des soumissions en cours (une carte chacune) avec, sur chaque carte, les boutons **Accepter**, **En attente** et **Refuser**, puis
-  le bouton **Soumission** (le PDF à envoyer au client à envoyer au client : sur téléphone, le PDF s'ouvre et se partage avec les boutons de l'appareil) ; en bas, les refusées.
+## Version téléphone : légère, façon application
+Sur un téléphone (écran de 700 px et moins), le même programme s'affiche **autrement** : un grand titre, des cartes blanches arrondies, des champs gris
+clair, des boutons faciles à toucher (44 px), des **flèches plutôt que des mots** (mois, jour) et des **icônes** (recherche, menu). L'ordinateur ne change pas.
+La mise en forme est dans `outils/telephone.py`.
+
+**Barre du bas** (administrateur) : **Tableau de bord**, **Clients** et le bouton **Menu** (trois barres) qui ouvre une feuille avec **Chantiers**,
+**Soumissions**, **Journée**, **Archives**, **Utilisateurs** et **Se déconnecter**. Le compte « Soumission » a **Soumissions**, **Clients** et le Menu (Chantiers).
+- **Tableau de bord** : un calendrier comme celui d'Apple (un point sous les jours chargés ; le fond vert pâle des fins de semaine ; le jour courant en
+  cercle vert, le jour choisi en vert foncé), et dessous la journée choisie avec **Terminer** et un lien discret **Facture** en haut à droite de chaque chantier.
+- **Journée** : flèches pour changer de jour (ou toucher la date), **Demain**, **Voir au calendrier**, et la gestion de la journée (ordre, retirer, ajouter).
+- **Chantiers** : une carte par chantier (client, statut, adresse, travaux, montant, pastille d'attente, paiement), les raccourcis en pastilles à faire défiler,
+  la recherche avec la loupe à droite.
+- **Soumissions** : une carte par soumission avec **Accepter**, **En attente**, **Refuser** ; le PDF est un lien discret « Soumission » en haut à droite de la carte.
   Si on appuie sur Accepter (ou En attente) alors qu'il manque des renseignements, le programme demande seulement ceux qui manquent.
-- **Clients** : la liste, avec recherche ; la fiche d'un client permet d'ouvrir une nouvelle soumission.
-- **+ Soumission** : on ouvre une soumission dès que le client appelle (rien n'est obligatoire : on remplit ce qu'on sait ; le formulaire propose d'abord de
-  chercher si le client existe déjà).
-Le tableau de bord et la Journée n'apparaissent pas sur téléphone ; ils restent sur l'ordinateur (administrateur).
-Le compte « Soumission » arrive directement sur **Soumissions** et n'a de toute façon jamais accès à ces pages.
+- **Clients** : une liste « contacts » (nom, numéro, adresse) ; **toucher un numéro lance l'appel** ; le bouton rond **+** ouvre un nouveau client.
+- **Archives** : la recherche, un bouton **Filtres** qui déplie les critères, les idées de recherche et les chiffres en pastilles qu'on fait défiler, puis une carte par résultat.
+- **Fiches et formulaires** : les types de travaux et les options sont des **tuiles** à cocher ; le bouton principal prend toute la largeur ; « Terminer » monte
+  du bas de l'écran comme une feuille.
+Le compte « Soumission » arrive directement sur **Soumissions** et n'a de toute façon jamais accès au tableau de bord, aux paiements ni aux factures.
 
 ## Deux personnes sur la même fiche
 La deuxième à enregistrer reçoit « Cette fiche vient d'être modifiée par quelqu'un d'autre » ; ses changements ne sont pas enregistrés, la fiche

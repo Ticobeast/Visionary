@@ -421,6 +421,49 @@ class TestExport(BaseArchives):
         self.assertEqual(len(self.lire("/archives.csv")[1]) - 1, 237)
 
 
+class TestPresentationTelephone(BaseArchives):
+    """Ce que le téléphone utilise (la mise en forme elle-même est dans outils/telephone.py) : filtres repliables, pastilles, classes des cellules,
+    numéros qui lancent l'appel. L'ordinateur voit la même chose qu'avant."""
+
+    def test_les_filtres_sont_repliables_et_s_ouvrent_quand_on_en_utilise(self):
+        page = self.get("/archives")
+        self.assertIn('<details class="filtres-det" id="filtres-det"><summary>Filtres</summary>', page)
+        self.assertIn("window.innerWidth>700", page)                                   # ordinateur : toujours ouverts
+        self.assertIn('<details class="filtres-det" id="filtres-det" open>', self.get("/archives?type=taille_haie"))
+        self.assertIn('<details class="filtres-det" id="filtres-det" open>', self.get("/archives?resultat=tout"))
+        self.assertIn('<details class="filtres-det" id="filtres-det" open>', self.get("/archives?par_client=1"))
+        self.assertNotIn(" open>", self.get("/archives?q=hamel").split("<summary>")[0].split("<details")[-1])        # le texte seul ne les ouvre pas
+
+    def test_les_idees_sont_des_liens_separes_a_faire_defiler(self):
+        page = self.get("/archives")
+        idees = page.split('<span class="idees-liens">')[1].split("</p>")[0]
+        self.assertGreaterEqual(idees.count('<span class="sep">'), 3)
+        self.assertIn("Idées de recherche", page)
+
+    def test_les_cellules_ont_leur_classe(self):
+        for chemin in ("/archives", "/archives?par_client=1"):
+            ligne = self.get(chemin).split("<tbody>")[1].split("</tr>")[0]
+            for classe in ("c-date", "c-client", "c-adresse", "c-travaux", "c-statut", "c-montant", "col-actions"):
+                self.assertIn(classe, ligne, (chemin, classe))
+        self.assertRegex(self.get("/archives?par_client=1&resultat=tout"), r'c-statut">\d+<span class="tel-seul"> chantiers?</span>')
+
+    def test_les_numeros_lancent_l_appel(self):
+        self.sql_exec("UPDATE clients SET telephone = '+18195550106' WHERE nom = 'Hamel'")
+        lien = '<a class="tel" href="tel:+18195550106">819-555-0106</a>'
+        self.assertIn(lien, self.get("/archives?resultat=tout"))
+        self.assertIn(lien, self.get("/clients"))
+        self.assertIn(lien, self.get("/client/%d" % self.sql("SELECT id FROM clients WHERE nom = 'Hamel'")[0][0]))
+
+    def test_lien_tel(self):
+        self.assertEqual(vue.lien_tel("+18195550106"), '<a class="tel" href="tel:+18195550106">819-555-0106</a>')
+        self.assertEqual(vue.lien_tel(""), "")
+        self.assertEqual(vue.lien_tel(None), "")
+        self.assertEqual(vue.lien_tel("poste 12"), '<a class="tel" href="tel:12">poste 12</a>')
+        mauvais = vue.lien_tel('"><script>alert(1)</script>')
+        self.assertNotIn("<script>", mauvais)
+        self.assertTrue(mauvais.startswith('<a class="tel" href="tel:1">'))              # seuls les chiffres (et un + au début) vont dans le lien
+
+
 class TestAcces(BaseComptes):
     def test_reserve_a_l_administrateur(self):
         for chemin in ("/archives", "/archives?q=cedre", "/archives.csv"):

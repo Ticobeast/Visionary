@@ -17,7 +17,7 @@ sans retranscription.
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
 **Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
-(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. Connexion par nom et mot de passe (`gerer_utilisateurs.bat`), droits « administrateur » et « soumission », affichage simplifié sur téléphone (Chantiers, Soumissions, Clients, + Soumission).
+(gratuit, chiffré, rien d'ouvert sur Internet) : voir **docs/acces_a_distance.md**. Connexion par nom et mot de passe (`gerer_utilisateurs.bat`), droits « administrateur » et « soumission », affichage pensé pour le téléphone (léger, façon applications d'Apple : barre d'onglets en bas, cartes, flèches plutôt que des mots).
 
 ## Modèle
 
@@ -61,6 +61,7 @@ outils/entreprise.py                    nom, NEQ, téléphone, courriel, numéro
 outils/logo.py, outils/ressources/      logo de l'entreprise (SVG converti en dessin vectoriel dans les PDF)
 outils/auth.py, outils/reseau.py        comptes et connexion ; accès par téléphone / iPad (Tailscale)
 outils/vue.py                           composants d'affichage partagés
+outils/telephone.py                     la mise en forme du téléphone (écrans de 700 px et moins) ; l'ordinateur n'est pas touché
 outils/noyau.py                         règles de validation et d'écriture partagées, migrations
 outils/donnees_test.py                  crée une base d'ESSAI avec de fausses données
 gerer_utilisateurs.bat / .py            créer les comptes (administrateur, soumission) ; lancer_reseau.bat / .py : accès à distance

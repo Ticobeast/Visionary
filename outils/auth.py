@@ -356,7 +356,7 @@ def page_utilisateurs(conn, query):
                    f'<button class="secondaire" type="submit">Changer</button></form>'
                    f'<form class="mini" method="post" action="/utilisateurs/{u["id"]}/actif"><input type="hidden" name="actif" value="{0 if u["actif"] else 1}">'
                    f'<button class="secondaire" type="submit">{bascule}</button></form></td></tr>')
-    ajout = ('<div class="carte"><h2>Ajouter un compte</h2><form method="post" action="/utilisateurs/ajouter"><div class="grille">'
+    ajout = ('<div class="carte"><h2>Ajouter un compte</h2><form method="post" action="/utilisateurs/ajouter"><div class="grille une-colonne">'
              '<div><label for="n">Nom d\'utilisateur</label><input id="n" name="nom" required autocapitalize="none"></div>'
              '<div><label for="m">Mot de passe</label><input id="m" name="mot_de_passe" type="password" autocomplete="new-password" required></div>'
              '<div><label for="r">Droits</label><select id="r" name="role"><option value="soumission">Soumission (clients et chantiers)</option>'
