@@ -67,6 +67,7 @@ outils/donnees_test.py                  crée une base d'ESSAI avec de fausses d
 gerer_utilisateurs.bat / .py            créer les comptes (administrateur, soumission) ; lancer_reseau.bat / .py : accès à distance
 lancer_interface.bat / .command         double-clic : ouvre l'interface sur la VRAIE base (Windows / Mac)
 lancer_essai.bat / .command / .py       double-clic (ou bouton « Exécuter » de VS Code) : base d'ESSAI (fausses données)
+lancer_essai_reseau.bat / .command / .py  idem, avec l'accès à distance (téléphone) et un compte temporaire « essai » (voir docs/acces_a_distance.md)
 lancer_interface.py                     idem, sur la VRAIE base
 docs/tableau_de_bord.md                 guide : tableau de bord, journée, chantiers et archives, fiche client
 docs/dictionnaire_donnees.md            toutes les colonnes : type, format, règle, exemple

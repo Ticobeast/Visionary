@@ -405,6 +405,50 @@ class TestServeurReel(BaseAuth):
         c.close()
 
 
+class TestCompteEssai(BaseAuth):
+    """Base d'essai en mode réseau : un compte administrateur temporaire « essai » (sans compte, l'accès à distance resterait fermé)."""
+
+    def test_cree_le_compte_quand_il_n_y_en_a_aucun(self):
+        c = self.conn()
+        try:
+            self.assertEqual(auth.nombre_actifs(c), 0)
+            self.assertFalse(auth.compte_essai_actif(c))
+            self.assertTrue(auth.preparer_compte_essai(c))
+            comptes = auth.lister_utilisateurs(c)
+            self.assertEqual([(u["nom"], u["role"], u["actif"]) for u in comptes], [("essai", "admin", 1)])
+            self.assertEqual(auth.connexion(c, *auth.COMPTE_ESSAI, "100.64.0.9")[0]["nom"], "essai")      # on peut s'y connecter
+            self.assertTrue(auth.preparer_compte_essai(c))                                              # sans effet la deuxième fois
+            self.assertEqual(len(auth.lister_utilisateurs(c)), 1)
+        finally:
+            c.close()
+
+    def test_ne_touche_pas_aux_comptes_existants(self):
+        self.creer("Alice", "motdepasse-alice", "admin")
+        c = self.conn()
+        try:
+            self.assertFalse(auth.preparer_compte_essai(c))
+            self.assertEqual([u["nom"] for u in auth.lister_utilisateurs(c)], ["Alice"])
+        finally:
+            c.close()
+
+    def test_le_compte_desactive_n_est_pas_annonce(self):
+        c = self.conn()
+        try:
+            auth.preparer_compte_essai(c)
+            self.creer("Alice", "motdepasse-alice", "admin")
+            self.assertEqual(auth.definir_actif(c, "essai", False), [])
+            self.assertFalse(auth.compte_essai_actif(c))
+            self.assertFalse(auth.preparer_compte_essai(c))                                             # il y a un autre compte : on n'en refait pas
+        finally:
+            c.close()
+
+    def test_les_lanceurs_d_essai_en_reseau_existent(self):
+        for nom in ("lancer_essai_reseau.py", "lancer_essai_reseau.bat", "lancer_essai_reseau.command"):
+            self.assertTrue((RACINE / nom).exists(), nom)
+        self.assertIn('["--essai", "--reseau"]', (RACINE / "lancer_essai_reseau.py").read_text(encoding="utf-8"))
+        self.assertIn("--essai --reseau", (RACINE / "lancer_essai_reseau.bat").read_text(encoding="utf-8"))
+
+
 class TestMigration(BaseAuth):
     """La migration v8 -> v9 (comptes) ; la suite v9 -> v10 est testée dans test_soumissions.py."""
 

@@ -67,6 +67,13 @@ Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes 
   du bas de l'écran comme une feuille.
 Le compte « Soumission » arrive directement sur **Soumissions** et n'a de toute façon jamais accès au tableau de bord, aux paiements ni aux factures.
 
+## Essayer sur le téléphone avec les fausses données
+Pour voir l'application sur un téléphone **sans toucher à tes vraies données** : double-clic sur **`lancer_essai_reseau.bat`** (Mac : `lancer_essai_reseau.command` ; VS Code : bouton « Exécuter » sur `lancer_essai_reseau.py`). C'est `lancer_essai` (base d'essai, fausses données) avec l'accès à distance de `lancer_reseau`.
+- Un compte administrateur **temporaire** est créé dans la base d'essai s'il n'y a encore aucun compte : nom **`essai`**, mot de passe **`essai1234`** (rappelés dans la fenêtre au démarrage). Il n'existe que dans `data/test.db` : la vraie base n'en reçoit jamais, et son mot de passe est connu de tous, donc ne le réutilise pas ailleurs.
+- Une fois ce compte créé, la page de connexion apparaît aussi sur l'ordinateur, y compris avec `lancer_essai.bat` : connecte-toi avec `essai`.
+- Pour le retirer : `python gerer_utilisateurs.py --essai` (le désactiver), ou supprimer le fichier `data/test.db` (il est recréé avec de nouvelles fausses données au prochain lancement).
+- Pour revenir à tes vraies données : `lancer_reseau.bat` (avec tes vrais comptes).
+
 ## Deux personnes sur la même fiche
 La deuxième à enregistrer reçoit « Cette fiche vient d'être modifiée par quelqu'un d'autre » ; ses changements ne sont pas enregistrés, la fiche
 à jour s'affiche, et elle refait sa modification au besoin. Rien n'est écrasé en silence.

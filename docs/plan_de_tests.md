@@ -115,6 +115,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 71 | Téléphone, **Journée** : flèches, date, **Aujourd'hui**, **Filtres** | flèches discrètes de chaque côté de la date ; un seul bouton Aujourd'hui (pas de Demain ni de Voir au calendrier) ; les quatre filtres sont repliés sous **Filtres** et restent dépliés quand on en utilise un |
 | 72 | Téléphone, **fiche client** | l'historique montre le statut à droite ; en bas, un petit bouton « Supprimer le client » sans texte ; le texte d'avertissement apparaît dans la fenêtre de confirmation |
 | 73 | Téléphone : comparer avec le site de l'entreprise | boutons secondaires blancs à bordure grise, champs blancs, cases à cocher vertes, bouton principal vert : même style que le site |
+| 74 | **Essai sur téléphone** : double-clic sur `lancer_essai_reseau.bat`, puis ouvrir l'adresse sur le téléphone et se connecter avec `essai` / `essai1234` | la fenêtre annonce « BASE D'ESSAI » et le compte d'essai ; la connexion fonctionne ; les fausses données s'affichent ; aucune donnée de la vraie base n'apparaît |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -129,7 +130,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 73 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 74 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

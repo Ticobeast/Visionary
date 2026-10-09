@@ -88,6 +88,23 @@ def creer_utilisateur(conn, nom, mot_de_passe, role="soumission"):
     return []
 
 
+# FAUX compte, seulement pour la base d'ESSAI (data/test.db) : sans compte, l'accès à distance reste fermé, donc impossible d'essayer sur un téléphone.
+COMPTE_ESSAI = ("essai", "essai1234")
+
+
+def compte_essai_actif(conn):
+    """True si le compte d'essai existe et n'est pas désactivé (pour rappeler son mot de passe au démarrage)."""
+    return any(u["nom"] == COMPTE_ESSAI[0] and u["actif"] for u in lister_utilisateurs(conn))
+
+
+def preparer_compte_essai(conn):
+    """Base d'essai en mode réseau : s'il n'y a encore aucun compte actif, crée le compte administrateur « essai » (temporaire, mot de passe
+    connu : ne jamais l'utiliser sur la vraie base, qui n'en reçoit jamais). Retourne True si ce compte est utilisable ensuite."""
+    if nombre_actifs(conn) == 0:
+        creer_utilisateur(conn, COMPTE_ESSAI[0], COMPTE_ESSAI[1], "admin")
+    return compte_essai_actif(conn)
+
+
 def lister_utilisateurs(conn):
     cur = conn.execute("SELECT id, nom, role, actif, cree_le FROM utilisateurs ORDER BY nom")
     return [dict(zip(("id", "nom", "role", "actif", "cree_le"), r)) for r in cur.fetchall()]

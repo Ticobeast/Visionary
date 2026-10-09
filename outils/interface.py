@@ -349,11 +349,20 @@ def main(argv=None):
         else:
             print("Tailscale n'a pas été trouvé sur cet ordinateur : installe-le (voir docs/acces_a_distance.md).")
         c_auth, _ = ouvrir_base(db)
+        if a.essai:
+            auth.preparer_compte_essai(c_auth)
         sans_compte = auth.nombre_actifs(c_auth) == 0
         c_auth.close()
         if sans_compte:
             print("ATTENTION : aucun compte n'existe encore : l'accès à distance reste FERMÉ. Lance gerer_utilisateurs.bat pour créer les comptes.")
         print("Laisse cette fenêtre ouverte et l'ordinateur allumé (mise en veille désactivée).\n")
+    if a.essai:
+        c_essai, _ = ouvrir_base(db)
+        compte_essai = auth.compte_essai_actif(c_essai)
+        c_essai.close()
+        if compte_essai:
+            print(f"\nCOMPTE D'ESSAI (cette base de fausses données seulement) : nom « {auth.COMPTE_ESSAI[0]} », mot de passe « {auth.COMPTE_ESSAI[1]} ».\n"
+                  "Pour le retirer : python gerer_utilisateurs.py --essai (le désactiver) ; ou supprimer data/test.db (la base d'essai est recréée).")
     if db.name == DB_DEFAUT.name:
         print("Pour t'entraîner sur de fausses données, lance plutôt :  python outils/interface.py --essai")
     nuage = service_nuage(db)
