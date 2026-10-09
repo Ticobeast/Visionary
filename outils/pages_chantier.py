@@ -54,6 +54,7 @@ def valeurs_chantier(conn, chantier_id):
         d[f"type_{code}"] = "1"
         d[f"precision_{code}"] = precision or ""
     client_id = r[0]
+    d["taxes_auto"] = "1" if (r[cols.index("tps")] or 0) + (r[cols.index("tvq")] or 0) > 0 else ""      # la case reflète la fiche : cochée si elle a des taxes
     d.update(valeurs_client(conn, client_id))
     return d, client_id
 
@@ -70,6 +71,14 @@ def appliquer_options(brut, form, travaux, exige=True):
     if exige and brut["debarrasser_bois"] == "0" and not brut["bois_format"] and any(code in TYPES_AVEC_BOIS for code, _ in travaux):
         return ["bois_format : précise le format du bois laissé sur place (16 pouces ou 4 pieds), ou coche « Débarrasser le bois »"]
     return []
+
+
+def _meme_montant(texte, valeur):
+    """Le montant saisi (« 34.00 », « 34,00 », vide) est-il celui de la base ?"""
+    try:
+        return round(float(str(texte or "0").replace(",", ".").replace(" ", "")), 2) == round(float(valeur or 0), 2)
+    except ValueError:
+        return False
 
 
 def lire_formulaire(conn, form, client_id=None, chantier_id=None):
@@ -97,6 +106,11 @@ def lire_formulaire(conn, form, client_id=None, chantier_id=None):
     if chantier_id is None:
         brut["date_soumission"] = brut["date_soumission"] or datetime.date.today().isoformat()
     brut["taxes_auto"] = "1" if form.get("taxes_auto") else ""
+    if chantier_id is not None and not form.get("taxes_auto"):
+        # case décochée sur une fiche qui avait des taxes : taxes remises à 0 (sauf si TPS ou TVQ ont été retouchées à la main)
+        actuel = conn.execute("SELECT tps, tvq FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+        if actuel and (actuel[0] or 0) + (actuel[1] or 0) > 0 and all(_meme_montant(brut.get(c), x) for c, x in zip(("tps", "tvq"), actuel)):
+            brut["tps"] = brut["tvq"] = "0"
     travaux, valeurs_travaux = travaux_depuis_formulaire(conn, form)
     brut.update(valeurs_travaux)
     brut["type_travaux"] = travaux
@@ -126,10 +140,6 @@ def cartes_chantier(conn, valeurs, creation, soumission=False):
     chantier « Planifié » et reste vide : à « Terminé », elle reprend la durée estimée.
     """
     taxes = " checked" if valeurs.get("taxes_auto") else ""
-    statut_date = ""
-    if not creation and valeurs.get("date_prevue"):
-        statut_date = (f'<div><label>Date des travaux</label><div><b>{esc(valeurs["date_prevue"])}</b> '
-                       '<span class="doux">(se change dans la page Journée)</span></div></div>')
     exige = {} if soumission else {"required": True}
     if soumission:
         aide = ('<p class="doux">Rien n\'est obligatoire : remplis ce que tu sais. Pour <b>accepter</b> la soumission, il faudra le nom, le téléphone, '
@@ -140,7 +150,6 @@ def cartes_chantier(conn, valeurs, creation, soumission=False):
     essentiel = f"""<div class="carte"><h2>Travaux</h2><div class="grille">
 {bloc_types(types_triees(conn), valeurs)}
 {bloc_options_travaux(valeurs)}
-{statut_date}
 {champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5", **exige)}
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
 {case_taxes("taxes_auto", taxes)}
@@ -412,7 +421,6 @@ def modifier(conn, chantier_id, form):
 
 def ajouter_paiement(conn, chantier_id, form):
     brut = {c: form.get(c, "") for c in ("paiement_date", "paiement_montant", "paiement_mode", "paiement_reference")}
-    avant = conn.execute("SELECT statut FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
     try:
         with transaction(conn):
             erreurs = encaisser(conn, chantier_id, brut["paiement_montant"], brut["paiement_mode"], brut["paiement_date"] or None,
@@ -421,9 +429,7 @@ def ajouter_paiement(conn, chantier_id, form):
         erreurs = [f"Refusé par la base : {e}"]
     if erreurs:
         return page_chantier(conn, chantier_id, {}, erreur_paiement=(erreurs, brut))
-    # chantier « Planifié » : on propose ensuite de le passer à « Terminé » (fenêtre de confirmation)
-    proposer = f"&terminer={chantier_id}" if avant and avant[0] == "planifie" else ""
-    return redirection(f"/chantier/{chantier_id}?ok=paiement{proposer}")
+    return redirection(f"/chantier/{chantier_id}?ok=paiement")
 
 
 def supprimer_paiement(conn, paiement_id):

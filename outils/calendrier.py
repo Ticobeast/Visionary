@@ -74,7 +74,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
     alerte_info = " info-alerte" if chargee or sans_duree else ""
     minimal = (f'<p class="resume-min">{len(chantiers)} chantier{"s" if len(chantiers) > 1 else ""} · {heures(total_h) if total_h else "durée ?"} · '
                f'<b>{esc(argent(total_jour))}</b>' + (' · <span class="attente a-urgente">chargée</span>' if chargee else "") + "</p>"
-               f'<button type="button" class="info-btn{alerte_info}" title="Détail de la journée" aria-label="Détail de la journée" onclick="this.closest(\'.carte\').classList.toggle(\'info-ouverte\')"></button>'
+               f'<button type="button" class="info-btn{alerte_info}" title="Détail de la journée" aria-label="Détail de la journée" onclick="var c=this.closest(\'.carte\'),o=getComputedStyle(this.nextElementSibling).display!==\'none\';c.classList.toggle(\'info-ouverte\',!o);c.classList.toggle(\'info-ferme\',o)" onmouseleave="this.closest(\'.carte\').classList.remove(\'info-ferme\')"></button>'
                f'<div class="info-pop"><b>{len(chantiers)} chantier{"s" if len(chantiers) > 1 else ""}</b><br>Durée totale : {heures(total_h) if total_h else "inconnue"}<br>'
                f'Début {heure_texte(DEBUT_JOURNEE)} · fin prévue {heure_texte(fin)}<br>Total de la journée : <b>{esc(argent(total_jour))}</b> <span class="doux">(taxes incluses)</span>'
                + (f'<br><span class="attente a-urgente">journée chargée (plus de {heures(JOURNEE_H)})</span>' if chargee else "")

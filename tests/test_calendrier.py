@@ -425,9 +425,9 @@ class TestConfirmationTermine(BaseJour):
         self.assertIn(f'href="/chantier/{i}?terminer={i}"', page)
         self.assertIn("Terminer ce chantier", self.get(f"/chantier/{i}", {"terminer": str(i)})[1])
         self.assertIn("Terminer ce chantier", self.ouvrir("Alpha", "/journee"))
-        # un paiement ajouté sur la page d'un chantier planifié propose aussi de le terminer
+        # un paiement ajouté sur la page d'un chantier planifié ne propose PAS de le terminer : il est simplement ajouté
         _, en_tetes, _ = self.post(f"/chantier/{i}/paiement", {"paiement_date": AUJOURDHUI.isoformat(), "paiement_montant": "50", "paiement_mode": "cheque"})
-        self.assertIn(f"terminer={i}", en_tetes["Location"])
+        self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=paiement")
         self.assertIn("250,00 $", self.get(f"/chantier/{i}", {"terminer": str(i)})[1])             # il reste 250 $ à payer
 
 

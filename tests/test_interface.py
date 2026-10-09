@@ -365,6 +365,27 @@ class TestModification(BaseInterface):
         self.assertEqual(en_tetes["Location"], "/chantier/3?ok=maj")
         self.assertEqual(self.tout(), avant)
 
+    def test_la_case_taxes_reflete_la_fiche_et_la_decocher_remet_les_taxes_a_zero(self):
+        self.assertIn('name="taxes_auto" value="1" checked', self.get("/chantier/3")[1])             # la fiche a des taxes : case cochée
+        f = self.formulaire_de(3)
+        self.assertEqual(f["taxes_auto"], "1")
+        f.pop("taxes_auto")                                                                          # décochée, TPS/TVQ non retouchées
+        self.assertEqual(self.post("/chantier/3", f)[1]["Location"], "/chantier/3?ok=maj")
+        self.assertEqual(self.sql("SELECT tps, tvq FROM chantiers WHERE id = 3"), [(0.0, 0.0)])
+        self.assertNotIn('name="taxes_auto" value="1" checked', self.get("/chantier/3")[1])
+        g = self.formulaire_de(3)                                                                    # on la recoche : les taxes sont recalculées
+        g["taxes_auto"] = "1"
+        self.post("/chantier/3", g)
+        tps, tvq = self.sql("SELECT tps, tvq FROM chantiers WHERE id = 3")[0]
+        self.assertTrue(tps > 0 and tvq > 0)
+
+    def test_taxes_retouchees_a_la_main_sont_gardees_meme_case_decochee(self):
+        f = self.formulaire_de(3)
+        f.pop("taxes_auto")
+        f["tps"] = "12.00"
+        self.post("/chantier/3", f)
+        self.assertEqual(self.sql("SELECT tps FROM chantiers WHERE id = 3"), [(12.0,)])
+
     def test_le_client_est_en_lecture_seule_sur_la_page_du_chantier(self):
         page = self.get("/chantier/3")[1]
         formulaire = page[page.index('<form method="post" action="/chantier/3">'):page.index("</form>", page.index('<form method="post" action="/chantier/3">'))]
@@ -437,7 +458,7 @@ class TestModification(BaseInterface):
     def test_la_date_des_travaux_se_change_dans_la_journee(self):
         page = self.get("/chantier/3")[1]
         self.assertNotIn('name="date_prevue"', page)                           # pas de champ date sur le chantier
-        self.assertIn("se change dans la page Journée", page)
+        self.assertNotIn("se change dans la page Journée", page)               # la date est déjà dans le résumé du haut
         self.post("/journee/planifier", {"date": "2026-10-16", "sel_3": "1", "retour": "/journee"})      # le chantier est déplacé
         self.assertEqual(self.sql("SELECT statut, date_prevue FROM chantiers WHERE id = 3"), [("planifie", "2026-10-16")])
         self.post("/action/terminer", {"chantier_id": "3", "retour": "/"})                               # puis il est fait ce jour-là
