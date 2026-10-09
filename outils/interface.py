@@ -68,14 +68,14 @@ def _table_chantiers(lignes, finances=True):
         if stp in ("a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
         duree_aff = f'<div class="doux">Durée {esc(heures(l["duree_estimee_h"]))}</div>' if l["duree_estimee_h"] else ""
-        colonne_paiement = f"<td>{paiement}</td>" if finances else ""
-        corps += (f'<tr><td>{date_}</td><td><a href="/chantier/{l["chantier_id"]}">{esc(nom_aff)}</a></td>'
-                  f'<td>{esc(l["adresse"])}<div class="doux">{esc(l["secteur"] or l["ville"])}</div></td>'
-                  f'<td>{esc(l["type_libelle"])}{duree_aff}</td>'
-                  f'<td>{badge_statut(st, l["genre"])}{prevu}</td>'
-                  f'{colonne_paiement}<td class="montant">{esc(argent(total)) if total else ""}</td></tr>')
+        colonne_paiement = f'<td class="c-paiement">{paiement}</td>' if finances else ""
+        corps += (f'<tr><td class="c-depuis">{date_}</td><td class="c-client"><a href="/chantier/{l["chantier_id"]}">{esc(nom_aff)}</a></td>'
+                  f'<td class="c-adresse">{esc(l["adresse"])}<div class="doux">{esc(l["secteur"] or l["ville"])}</div></td>'
+                  f'<td class="c-travaux">{esc(l["type_libelle"])}{duree_aff}</td>'
+                  f'<td class="c-statut">{badge_statut(st, l["genre"])}{prevu}</td>'
+                  f'{colonne_paiement}<td class="montant c-montant">{esc(argent(total)) if total else ""}</td></tr>')
     entete_paiement = "<th>Paiement</th>" if finances else ""
-    return ('<table class="liste"><thead><tr><th>Depuis</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
+    return ('<table class="liste chantiers"><thead><tr><th>Depuis</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
             f'{entete_paiement}<th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table>')
 
 

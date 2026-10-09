@@ -643,11 +643,12 @@ class TestBoutons(BaseDocuments):
         for chemin in ("/?date=2026-10-14", "/journee?date=2026-10-14"):
             page = self.get(chemin)
             self.assertRegex(page, r'<span class="groupe-actions"><a class="bouton" href="[^"]*terminer=3">Terminer</a>'
-                                   r'<a class="bouton secondaire" href="/facture/3/pdf" target="_blank" rel="noopener"[^>]*>Facture</a></span>')
+                                   r'<a class="bouton secondaire facture-pc" href="/facture/3/pdf" target="_blank" rel="noopener"[^>]*>Facture</a></span>')
+            self.assertIn('class="lien-pdf-coin" href="/facture/3/pdf"', page)                   # téléphone : « Facture » discret en haut à droite de la carte
         # chantier déjà terminé : « Terminé » et la facture reste à portée de la main
         jour = self.sql("SELECT date_prevue FROM chantiers WHERE id = 2")[0][0]
         page = self.get(f"/?date={jour}")
-        self.assertIn('<span class="groupe-actions"><span class="doux">Terminé</span><a class="bouton secondaire" href="/facture/2/pdf"', page)
+        self.assertIn('<span class="groupe-actions"><span class="doux">Terminé</span><a class="bouton secondaire facture-pc" href="/facture/2/pdf"', page)
 
     def test_la_fenetre_terminer_propose_aussi_la_facture(self):
         page = self.get("/?date=2026-10-14&terminer=3")

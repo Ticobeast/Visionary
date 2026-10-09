@@ -96,9 +96,9 @@ def cellule_montant(l):
     return f'<div class="montant">{argent(l["total_ttc"])}{avant}</div>'
 
 
-def lien_facture(chantier_id, texte="Facture"):
+def lien_facture(chantier_id, texte="Facture", classe=""):
     """Raccourci vers la facture en PDF (nouvel onglet) : la soumission acceptée devient une facture."""
-    return (f'<a class="bouton secondaire" href="/facture/{chantier_id}/pdf" target="_blank" rel="noopener" '
+    return (f'<a class="bouton secondaire{" " + classe if classe else ""}" href="/facture/{chantier_id}/pdf" target="_blank" rel="noopener" '
             f'title="Ouvrir la facture en PDF (nouvel onglet)">{esc(texte)}</a>')
 
 
@@ -114,9 +114,9 @@ def bouton_terminer(l, retour):
     À côté, le raccourci « Facture » (PDF) : sur place, on remet la facture avant ou après avoir confirmé."""
     if l["statut"] == "planifie":
         return (f'<span class="groupe-actions"><a class="bouton" href="{esc(avec_params(retour, terminer=l["chantier_id"], ok=None, err=None))}">Terminer</a>'
-                + lien_facture(l["chantier_id"]) + "</span>")
+                + lien_facture(l["chantier_id"], classe="facture-pc") + "</span>")
     if l["statut"] == "termine":
-        return '<span class="groupe-actions"><span class="doux">Terminé</span>' + lien_facture(l["chantier_id"]) + "</span>"
+        return '<span class="groupe-actions"><span class="doux">Terminé</span>' + lien_facture(l["chantier_id"], classe="facture-pc") + "</span>"
     return ""
 
 

@@ -131,7 +131,7 @@ class TestChantiersListe(BaseTableau):
         self.assertIn(">45 j<", page)                                      # Urgent : 45 jours d'attente
         self.assertIn("a-urgente", page)
         self.assertIn("Durée 2 h 30", page)
-        self.assertIn('class="montant"', page)
+        self.assertIn('class="montant c-montant"', page)
         self.assertIn("400,00 $", page)                                    # Urgent : 400 $, pas de taxes saisies
         self.assertIn("919,80 $", page)                                    # Fait : 800 + TPS + TVQ
 

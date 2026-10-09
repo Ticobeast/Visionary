@@ -1015,6 +1015,27 @@ class TestComptesEtSoumissions(BaseComptes):
         self.assertLess(barre.index('href="/chantiers"'), barre.index('href="/soumissions"'))
 
 
+class TestMenuTelephone(BaseComptes):
+    def test_le_menu_garde_le_reste_et_la_barre_le_plus_important(self):
+        page = self.get("/chantiers", cookie=self.admin)
+        bas = page[page.index('<nav class="barre-mobile">'):page.index("</nav>", page.index('<nav class="barre-mobile">'))]
+        for texte in ("Tableau de bord", "Chantiers", "Soumissions", ">Menu<"):
+            self.assertIn(texte, bas)
+        for texte in ("Journée", "Archives", "Clients", "Nouvelle soumission"):
+            self.assertNotIn(texte, bas)                                              # pas tout en bas : le reste est dans le menu
+        feuille = page[page.index('class="menu-feuille"'):]
+        for texte in ("Journée", "Clients", "Archives", "Nouvelle soumission", "Utilisateurs", "Se déconnecter"):
+            self.assertIn(texte, feuille)
+        self.assertIn("menu-ouvert", page)
+        # compte « soumission » : ses trois onglets en bas, un menu réduit (pas de journée ni d'archives)
+        page = self.get("/soumissions", cookie=self.alice)
+        feuille = page[page.index('class="menu-feuille"'):]
+        self.assertIn("Nouvelle soumission", feuille)
+        self.assertIn("Se déconnecter", feuille)
+        for interdit in ("Journée", "Archives", "Utilisateurs"):
+            self.assertNotIn(interdit, feuille)
+
+
 class TestAides(unittest.TestCase):
     def test_adresses_sans_virgule_en_trop(self):
         self.assertEqual(noyau.adresses("9 Rue des Lilas", "", "QC", ""), ("9 Rue des Lilas, QC", "9 Rue des Lilas, QC, Canada"))

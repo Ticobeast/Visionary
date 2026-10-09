@@ -213,7 +213,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
-.barre-mobile{display:none}
+.barre-mobile,.menu-tel{display:none}
 /* Téléphone : cibles tactiles de 44 px, champs à 16 px (sinon l'iPhone zoome), tableaux de la journée en cartes */
 @media (max-width:700px){
 main,main.large,main.conteneur{padding:16px 12px 24px}.navbar{position:static}.nav-contenu{padding:10px 14px;gap:10px}.nav-bureau{display:none}.nav-droite .admin-seul{display:none}.nav-droite{gap:8px}
@@ -245,13 +245,70 @@ table.tableau tr.ligne-actions td{text-align:left!important}.actions-ligne,.grou
 .liste-defile{overflow-x:visible}.carte{padding:12px}
 dl.lecture{grid-template-columns:1fr}.type{grid-template-columns:1fr}
 .modale-carte{padding:18px}
-/* Téléphone : calendrier à la façon d'Apple (un point sous le jour s'il y a des chantiers), recherche sur une ligne, fiches compactes */
-.cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:0;align-items:center;gap:3px;padding:4px 0}
-.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:600;background:none;color:var(--texte);align-self:center}
-.cal-jour.aujourdhui .cal-n{color:var(--alerte)}
+/* barre du bas + feuille « Menu » */
+.barre-mobile button.menu-bouton{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:10px;font-weight:700;font-size:.76rem;padding:0 2px;color:var(--vert-fonce);background:#fff;border:1px solid var(--trait);box-shadow:var(--ombre-sm)}
+.barre-mobile button.menu-bouton.actif,body.menu-ouvert .barre-mobile button.menu-bouton{background:var(--vert-doux);border-color:var(--vert-bord);color:var(--vert)}
+body.menu-ouvert .menu-tel{display:block}
+.menu-fond{position:fixed;left:0;right:0;top:0;bottom:80px;background:rgba(14,52,29,.45);z-index:1001}
+.menu-feuille{position:fixed;left:10px;right:10px;bottom:84px;z-index:1002;background:#fff;border-radius:18px;padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.menu-feuille a,.menu-feuille button{display:flex;align-items:center;justify-content:flex-start;width:100%;min-height:48px;padding:0 14px;border-radius:10px;border:0;background:none;box-shadow:none;font-weight:700;font-size:1rem;color:var(--vert-fonce);text-decoration:none}
+.menu-feuille a.actif{background:var(--vert-doux);color:var(--vert)}.menu-feuille form{margin:0;border-top:1px solid var(--trait-leger);margin-top:4px;padding-top:4px}.menu-feuille form button{color:var(--doux);font-weight:600}
+.menu-qui{padding:6px 14px;color:var(--doux);font-size:.85rem;font-weight:600}
+/* chantiers : carte compacte */
+table.chantiers tr{display:grid;grid-template-columns:1fr auto;gap:3px 10px;padding:10px 12px}
+table.chantiers td{display:block!important;padding:0!important;font-size:14px}
+table.chantiers td.c-client{grid-column:1;grid-row:1;font-size:16px;font-weight:700}
+table.chantiers td.c-statut{grid-column:2;grid-row:1;text-align:right!important}table.chantiers td.c-statut .doux{font-size:12px}
+table.chantiers td.c-adresse{grid-column:1/-1;grid-row:2;display:flex!important;flex-wrap:wrap;gap:0 8px}
+table.chantiers td.c-travaux{grid-column:1;grid-row:3;display:flex!important;flex-wrap:wrap;gap:0 8px;align-items:baseline}
+table.chantiers td.c-montant{grid-column:2;grid-row:3;text-align:right!important;font-size:16px;align-self:end}
+table.chantiers td.c-depuis{grid-column:1;grid-row:4;color:var(--texte)!important;font-size:13px!important}
+table.chantiers td.c-paiement{grid-column:2;grid-row:4;text-align:right!important}table.chantiers td.c-paiement .doux{font-size:12px}
+table.chantiers td.c-depuis .depuis{margin:2px 0 0}
+/* tableau de bord et journée : carte compacte, « Facture » en haut à droite */
+.lien-pdf-coin{position:absolute;top:10px;right:12px}
+table.tableau.jour tr.sans-bas,table.tableau.jour.gestion tr:not(.diner):not(.ligne-actions){position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:10px 12px}
+table.tableau.jour td{padding:0!important}
+table.tableau.jour td.c-heures{grid-column:1/-1;font-size:1rem;padding-right:70px!important}
+table.tableau.jour td.c-client,table.tableau.jour td.c-adresse{grid-column:1/-1;display:flex!important;flex-wrap:wrap;align-items:baseline;gap:0 10px}
+table.tableau.jour td.c-travaux{grid-column:1/3;display:block}
+table.tableau.jour td.c-montant{grid-column:3;text-align:right!important;align-self:end}
+table.tableau.jour .col-travaux{min-width:0!important}
+table.tableau.jour tr.ligne-actions{padding:0 12px 10px}
+table.tableau.jour tr.ligne-actions .groupe-actions{display:flex;width:100%}
+table.tableau.jour tr.ligne-actions .bouton{flex:1}
+table.tableau.jour .facture-pc{display:none}
+table.tableau.jour.gestion td.col-ordre{grid-column:1;grid-row:1}table.tableau.jour.gestion td.c-heures{grid-column:2/-1;grid-row:1;align-self:center}
+table.tableau.jour.gestion td.col-actions{grid-column:1/-1;margin-top:4px;min-width:0!important}
+table.tableau.jour.gestion .actions-ligne{display:flex;gap:8px}table.tableau.jour.gestion .actions-ligne>*{flex:1}table.tableau.jour.gestion .actions-ligne .bouton,table.tableau.jour.gestion .actions-ligne button{width:100%}
+table.tableau.jour.gestion .actions-ligne .groupe-actions{display:flex;flex:2;gap:8px}table.tableau.jour.gestion .actions-ligne .mini{display:block;flex:1}
+/* journée : navigation et filtres sur téléphone */
+form.nav-jour{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}form.nav-jour>*{width:100%!important;max-width:none!important;min-width:0}
+form.nav-jour a:nth-child(1){order:1}form.nav-jour input{order:2}form.nav-jour a:nth-child(4){order:3}form.nav-jour button{order:4}form.nav-jour a:nth-child(5){order:5}form.nav-jour a:nth-child(6){order:6}
+form.nav-jour .bouton,form.nav-jour button{padding:6px 4px;font-size:13px;text-align:center}
+form.filtres-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}form.filtres-jour select{display:block!important;width:100%;max-width:none}form.filtres-jour button{grid-column:1/-1}
+table.candidats tr{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:10px 12px}
+table.candidats td{padding:0!important}
+table.candidats td.c-case{grid-column:1;grid-row:1}table.candidats td.c-depuis{grid-column:2;grid-row:1;display:flex!important;align-items:center;gap:8px;color:var(--texte)!important;font-size:13px!important}
+table.candidats td.c-montant{grid-column:3;grid-row:1;text-align:right!important}
+table.candidats td.c-client,table.candidats td.c-adresse,table.candidats td.c-travaux{grid-column:1/-1;display:flex!important;flex-wrap:wrap;gap:0 10px;align-items:baseline}
+table.candidats td.c-travaux{display:block!important}
+table.tableau.jour td.c-heures{color:var(--texte)!important;font-size:1rem!important}table.tableau.jour td.c-montant small{display:none}
+.note-heures{display:none}.pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;min-height:42px;text-align:center}
+table.tableau.jour.gestion td.col-ordre{display:flex!important;align-items:center;gap:6px;white-space:nowrap}table.tableau.jour.gestion .col-ordre .fleches{display:flex;gap:4px;margin:0}
+table.tableau.jour.gestion .col-ordre button.fleche{min-height:34px;width:34px;padding:0}table.tableau.jour.gestion .col-ordre .doux{display:none}
+table.candidats tr.ligne-urgente{border-left:4px solid var(--alerte)}table.candidats tr.ligne-surveiller{border-left:4px solid #e8c675}table.candidats td:first-child{box-shadow:none!important}
+table.candidats td.c-montant small{display:none}.sel-total{bottom:76px;padding:8px 12px;font-size:13px;gap:8px}.sel-total button{width:100%;min-height:40px;padding:6px 10px;font-size:14px}
+table.chantiers td.c-depuis:not(:has(.depuis))::before{content:"Accepté le ";color:var(--doux)}
+
+/* Téléphone : calendrier compact aux couleurs de celui de l'ordinateur (un point sous les jours chargés), recherche sur une ligne, fiches compactes */
+.cal-jour{min-height:52px;padding:4px 0;gap:3px;align-items:center;border-radius:10px}
+.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1rem;font-weight:700;background:none;color:var(--texte);align-self:center}
+.cal-jour.aujourdhui .cal-n{background:var(--vert);color:#fff}
 .cal-jour.occupe::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--vert);display:block}.cal-jour.chargee::after{background:var(--alerte)}
-.cal-jour.selection{outline:0}.cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}.cal-jour.aujourdhui.selection .cal-n{background:var(--alerte);color:#fff}
-.cal-jour.autre-mois{opacity:.35}.cal-info,.cal-alerte{display:none}.cal-grille{gap:0}.cal-nav{flex-wrap:nowrap;gap:6px}.cal-nav h2{min-width:0;font-size:1.05rem}.cal-nav .bouton{flex:0 0 auto;min-height:40px;padding:6px 12px;font-size:13px}
+.cal-jour.selection{outline:2px solid var(--vert);outline-offset:-1px}
+.cal-jour.autre-mois{opacity:.45}.cal-info,.cal-alerte{display:none}.cal-grille{gap:3px}
+.cal-nav{flex-wrap:nowrap;gap:6px}.cal-nav h2{min-width:0;font-size:1.05rem}.cal-nav .bouton{flex:0 0 auto;min-height:40px;padding:6px 12px;font-size:13px}
 .cal-nav a[aria-label]{font-size:0;padding:0;width:40px;position:relative}.cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:10px;height:10px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
 .cal-nav a[aria-label="Mois suivant"]::before{transform:translate(-70%,-50%) rotate(-135deg)}
 .cal-nav a[href="/"]{order:3}
@@ -354,12 +411,27 @@ def _navigation(section):
 
 
 def _barre_mobile(section):
-    def lien(href, texte, classe=""):
-        return f'<a href="{href}" class="{classe}">{texte}</a>'
-    return ('<nav class="barre-mobile">' + (lien("/", "Tableau de bord", "actif" if section == "tableau" else "") if est_admin() else "")
-            + lien("/chantiers", "Chantiers", "actif" if section == "chantiers" else "")
-            + lien("/soumissions", "Soumissions", "actif" if section == "soumissions" else "")
-            + lien("/clients", "Clients", "actif" if section == "clients" else "") + "</nav>")
+    """Téléphone : en bas, le plus important ; le reste dans la feuille « Menu »."""
+    admin = est_admin()
+
+    def lien(href, texte, actif):
+        return f'<a href="{href}" class="{"actif" if actif else ""}">{texte}</a>'
+    principaux = ([("/", "Tableau de bord", "tableau")] if admin else []) + [("/chantiers", "Chantiers", "chantiers"), ("/soumissions", "Soumissions", "soumissions")]
+    reste = ([("/journee", "Journée", "journee"), ("/clients", "Clients", "clients"), ("/archives", "Archives", "archives")] if admin else [("/clients", "Clients", "clients")])
+    if not admin:                          # compte « soumission » : ses trois onglets restent en bas
+        principaux, reste = principaux + reste, []
+    reste.append(("/nouveau", "Nouvelle soumission", "nouveau"))
+    u = utilisateur_courant()
+    if u and u["role"] == "admin":
+        reste.append(("/utilisateurs", "Utilisateurs", "utilisateurs"))
+    sortie = '<form method="post" action="/deconnexion"><button type="submit">Se déconnecter</button></form>' if u else ""
+    qui = f'<div class="menu-qui">{esc(u["nom"])}</div>' if u else ""
+    menu_actif = any(section == code for _, _, code in reste)
+    bas = "".join(lien(h, t, section == c) for h, t, c in principaux)
+    bas += f'<button type="button" class="menu-bouton{" actif" if menu_actif else ""}" onclick="document.body.classList.toggle(\'menu-ouvert\')" aria-label="Ouvrir le menu">Menu</button>'
+    feuille = "".join(lien(h, t, section == c) for h, t, c in reste)
+    return (f'<nav class="barre-mobile">{bas}</nav><div class="menu-tel"><div class="menu-fond" onclick="document.body.classList.remove(\'menu-ouvert\')"></div>'
+            f'<div class="menu-feuille">{qui}{feuille}{sortie}</div></div>')
 
 
 def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False, section=None):

@@ -66,7 +66,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
               + (f' <span class="attente a-urgente">journée chargée (plus de {heures(JOURNEE_H)})</span>' if chargee else "")
               + "</p>"
               f'<p class="total-jour">Total de la journée : <span class="total">{esc(argent(total_jour))}</span> <span class="doux">(taxes incluses)</span></p>'
-              f'<p class="doux">Heures calculées d\'après l\'ordre et les durées estimées ; dîner {heure_texte(DINER_DEBUT)} - {heure_texte(DINER_FIN)} ; trajets non comptés.'
+              f'<p class="doux note-heures">Heures calculées d\'après l\'ordre et les durées estimées ; dîner {heure_texte(DINER_DEBUT)} - {heure_texte(DINER_FIN)} ; trajets non comptés.'
               + (f' <b>Attention : {sans_duree} chantier{"s" if sans_duree > 1 else ""} sans durée estimée : les heures sont approximatives.</b>' if sans_duree else "")
               + "</p>")
 
@@ -80,11 +80,13 @@ def panneau_jour(conn, jour, retour, gestion=False):
             horaire_html += '<div class="doux">dîner inclus</div>'
         if h["duree_inconnue"]:
             horaire_html += '<div class="doux">durée à estimer</div>'
-        base = (f'<td>{horaire_html}</td><td>{cellule_client(l)}</td><td>{cellule_adresse(l)}</td>'
-                f'<td class="col-travaux">{cellule_travaux(l)}</td>')
+        coin = (f'<a class="lien-pdf-coin" href="/facture/{l["chantier_id"]}/pdf" target="_blank" rel="noopener" '
+                f'title="Ouvrir la facture en PDF (nouvel onglet)">Facture</a>') if l["statut"] in ("planifie", "termine") else ""      # téléphone seulement
+        base = (f'<td class="c-heures">{horaire_html}{coin}</td><td class="c-client">{cellule_client(l)}</td><td class="c-adresse">{cellule_adresse(l)}</td>'
+                f'<td class="col-travaux c-travaux">{cellule_travaux(l)}</td>')
         if not gestion:
             # tableau de bord : le chantier, puis en bas son bouton Terminer (rien d'autre)
-            corps += (f'<tr class="sans-bas">{base}<td>{cellule_montant(l)}</td></tr>'
+            corps += (f'<tr class="sans-bas">{base}<td class="c-montant">{cellule_montant(l)}</td></tr>'
                       f'<tr class="ligne-actions"><td colspan="{colonnes}">{bouton_terminer(l, retour)}</td></tr>')
             continue
         actions = bouton_terminer(l, retour)
@@ -98,15 +100,15 @@ def panneau_jour(conn, jour, retour, gestion=False):
         fleches = (fleche % ("haut", "Monter", "Monter", "disabled" if rang == 0 else "", "&#9650;")
                    + fleche % ("bas", "Descendre", "Descendre", "disabled" if rang == len(chantiers) - 1 else "", "&#9660;"))
         corps += (f'<tr><td class="col-ordre"><div class="fleches">{fleches}</div><div class="doux">n° {rang + 1}</div></td>{base}'
-                  f'<td class="col-actions"><div class="actions-ligne">{actions}</div></td><td>{cellule_montant(l)}</td></tr>')
+                  f'<td class="col-actions"><div class="actions-ligne">{actions}</div></td><td class="c-montant">{cellule_montant(l)}</td></tr>')
     if gestion:
         entetes = '<th>Ordre</th><th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th></th><th class="droite">Montant</th>'
     else:
         entetes = '<th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th class="droite">Montant</th>'
-    table = (f'<div class="liste-defile"><table class="tableau"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
+    table = (f'<div class="liste-defile"><table class="tableau jour{" gestion" if gestion else ""}"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
     lien_pdf = (f'<a class="bouton" href="/journee.pdf?date={jour}" download title="Toute la journée, avec les détails de chaque chantier">'
                 f'Télécharger la journée (PDF)</a>')
-    pied = "" if gestion else f'<div class="barre" style="margin-top:12px">{lien_gerer}{lien_pdf}</div>'
+    pied = "" if gestion else f'<div class="barre pied-jour" style="margin-top:12px">{lien_gerer}{lien_pdf}</div>'
     return f'<div class="carte"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 
 

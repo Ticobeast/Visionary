@@ -448,7 +448,9 @@ class TestAcces(BaseComptes):
     def test_pas_d_archives_dans_la_barre_du_telephone(self):
         telephone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari/604.1"
         page = self.get("/chantiers", cookie=self.admin, agent=telephone)
-        self.assertNotIn("/archives", page[page.index('class="barre-mobile"'):])                                # le téléphone reste simple
+        bas = page[page.index('class="barre-mobile"'):page.index("</nav>", page.index('class="barre-mobile"'))]
+        self.assertNotIn("/archives", bas)                                                                      # la barre du bas reste simple : Archives est dans le menu
+        self.assertIn('href="/archives"', page[page.index('class="menu-feuille"'):])
 
 
 if __name__ == "__main__":

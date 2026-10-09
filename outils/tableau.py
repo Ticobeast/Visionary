@@ -96,7 +96,7 @@ def page_journee(conn, query):
 
     retour = "/journee?" + urlencode({k: v for k, v in (("date", jour), ("statut", f_statut), ("attente", f_attente), ("secteur", f_secteur), ("tri", tri)) if v})
     precedent, suivant = (d - datetime.timedelta(days=1)).isoformat(), (d + datetime.timedelta(days=1)).isoformat()
-    navigation = (f'<form class="recherche" method="get" action="/journee"><a class="bouton secondaire" href="/journee?date={precedent}">Précédent</a>'
+    navigation = (f'<form class="recherche nav-jour" method="get" action="/journee"><a class="bouton secondaire" href="/journee?date={precedent}">Précédent</a>'
                   f'<input type="date" name="date" value="{jour}" style="max-width:170px" aria-label="Journée"><button type="submit">Afficher</button>'
                   f'<a class="bouton secondaire" href="/journee?date={suivant}">Suivant</a>'
                   f'<a class="bouton secondaire" href="/journee?date={demain}">Demain</a>'
@@ -126,7 +126,7 @@ def page_journee(conn, query):
     opt_att = "".join(f'<option value="{c}"{" selected" if c == f_attente else ""}>{esc(t)}</option>' for c, t in FILTRES_ATTENTE)
     opt_sec = '<option value="">Tous les secteurs</option>' + "".join(f'<option value="{esc(s)}"{" selected" if s == f_secteur else ""}>{esc(s)}</option>' for s in secteurs)
     opt_tri = "".join(f'<option value="{c}"{" selected" if c == tri else ""}>{esc(t)}</option>' for c, t in TRIS)
-    filtres = (f'<form class="recherche" method="get" action="/journee"><input type="hidden" name="date" value="{jour}">'
+    filtres = (f'<form class="recherche filtres-jour" method="get" action="/journee"><input type="hidden" name="date" value="{jour}">'
                f'<select name="statut" aria-label="Statut">{opt_statut}</select><select name="attente" aria-label="Délai d\'attente">{opt_att}</select>'
                f'<select name="secteur" aria-label="Secteur">{opt_sec}</select><select name="tri" aria-label="Tri">{opt_tri}</select>'
                f'<button type="submit">Filtrer</button></form>')
@@ -147,15 +147,15 @@ def page_journee(conn, query):
         else:
             duree = f'<a href="/chantier/{l["chantier_id"]}">durée à estimer : ouvrir le chantier</a>'
             case = '<input type="checkbox" disabled title="La durée estimée est obligatoire pour planifier">'
-        corps += (f'<tr data-id="{l["chantier_id"]}" data-h="{l["duree_estimee_h"] or 0}" data-m="{l["total_ttc"] or 0}" class="ligne-{prio}"><td>{case}</td>'
-                  f'<td>{badge_attente(l["jours"], prio)}<div class="doux">depuis {esc(l["attente_depuis"])}</div></td>'
-                  f'<td>{cellule_client(l)}</td><td>{cellule_adresse(l)}</td><td><a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a>'
+        corps += (f'<tr data-id="{l["chantier_id"]}" data-h="{l["duree_estimee_h"] or 0}" data-m="{l["total_ttc"] or 0}" class="ligne-{prio}"><td class="c-case">{case}</td>'
+                  f'<td class="c-depuis">{badge_attente(l["jours"], prio)}<div class="doux">depuis {esc(l["attente_depuis"])}</div></td>'
+                  f'<td class="c-client">{cellule_client(l)}</td><td class="c-adresse">{cellule_adresse(l)}</td><td class="c-travaux"><a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a>'
                   f'<div>{duree}</div>{"<div class=doux>" + esc(l["description"]) + "</div>" if l["description"] else ""}{autre_jour}</td>'
-                  f'<td>{cellule_montant(l)}</td></tr>')
+                  f'<td class="c-montant">{cellule_montant(l)}</td></tr>')
     if candidats:
         liste = (f'<form method="post" action="/journee/planifier" id="lot" data-deja="{deja_h}" data-deja-m="{deja_m}" data-cap="{JOURNEE_H:g}">'
                  f'<input type="hidden" name="date" value="{jour}"><input type="hidden" name="retour" value="{esc(retour)}">'
-                 f'<div class="liste-defile"><table class="tableau"><thead><tr><th></th><th>Attente</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th>'
+                 f'<div class="liste-defile"><table class="tableau candidats"><thead><tr><th></th><th>Attente</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th>'
                  f'<th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table></div>'
                  f'<div class="sel-total barre"><span id="sel">0 sélectionné</span><button type="submit">Ajouter à la journée du {jour}</button></div></form>'
                  + _SCRIPT_SELECTION)
