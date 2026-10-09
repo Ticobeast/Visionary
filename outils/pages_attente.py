@@ -87,7 +87,7 @@ def page_attente(conn, i, query, erreurs=(), saisie=None):
                f'{" checked" if choix == "indefini" else ""}> Jusqu\'à nouvel ordre</label>'
                '<p class="doux" style="margin:8px 0 0">Il reste en attente tant que tu ne l\'as pas sorti toi-même (bouton « Sortir de l\'attente » sur sa fiche).</p></div>'
                f'<div class="barre"><button type="submit">{"Enregistrer" if deja else "Mettre en attente"}</button>'
-               f'<a class="bouton secondaire" href="{esc(url_fiche(i, genre))}">Annuler</a></div></form>{sortir}')
+               f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form>{sortir}')
     return gabarit("Mettre en attente", contenu, section="soumissions" if genre == "soumission" else "chantiers")
 
 

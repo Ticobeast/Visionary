@@ -164,7 +164,7 @@ def formulaire_nouveau(conn, valeurs, erreurs=()):
     essentiel, avance_chantier = cartes_chantier(conn, valeurs, creation=True, soumission=True)
     return (f'{_erreurs_html(erreurs)}<form method="post" action="/nouveau">{client_essentiel(valeurs, lister_secteurs(conn), exige=False)}{essentiel}'
             f'{avance(client_avance(valeurs) + avance_chantier, ouvert=bool(erreurs))}'
-            '<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire" href="/soumissions">Annuler</a></div></form>'
+            '<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire annuler" href="/soumissions">Annuler</a></div></form>'
             '<p class="doux">La soumission créée, tu reviens à la fiche du client. Elle s\'ouvre ensuite depuis l\'onglet Soumissions.</p>')
 
 
@@ -370,7 +370,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         formulaire = (f'{_erreurs_html(erreurs)}<form method="post" action="{base}/{chantier_id}">'
                       f'<input type="hidden" name="empreinte" value="{empreinte(depuis_base)}">{essentiel}'
                       '<div class="barre" style="margin-bottom:16px"><button type="submit">Enregistrer les modifications</button>'
-                      f'<a class="bouton secondaire" href="{fermer}">Fermer</a></div>'
+                      f'<a class="bouton secondaire fermer" href="{fermer}">Fermer</a></div>'
                       f'{avance(avance_chantier + autres + (danger if est_admin() else ""), ouvert=bool(erreurs))}</form>'
                       f'<form id="supprimer-chantier" method="post" action="{base}/{chantier_id}/supprimer"></form>'
                       f'<form id="annuler-chantier" method="post" action="/action/annuler"><input type="hidden" name="chantier_id" value="{chantier_id}">'
@@ -463,7 +463,7 @@ def _form_duplication(conn, chantier_id, valeurs, erreurs=()):
             f'{case_taxes("avec_taxes", taxes)}'
             f'{champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal")}'
             f'{zone("description", "Description (notes)", valeurs)}</div></div>'
-            f'<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire" href="{url_fiche(chantier_id, "soumission" if r[3] == "soumission" else "chantier")}">Annuler</a></div></form>')
+            f'<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire annuler" href="{url_fiche(chantier_id, "soumission" if r[3] == "soumission" else "chantier")}">Annuler</a></div></form>')
 
 
 def page_dupliquer(conn, chantier_id):

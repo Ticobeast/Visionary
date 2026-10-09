@@ -83,6 +83,7 @@ def _jour_valide(texte):
 
 
 def page_journee(conn, query):
+    aujourdhui_iso = datetime.date.today().isoformat()
     demain = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
     jour = _jour_valide(query.get("date")) or demain
     d = datetime.date.fromisoformat(jour)
@@ -96,11 +97,12 @@ def page_journee(conn, query):
 
     retour = "/journee?" + urlencode({k: v for k, v in (("date", jour), ("statut", f_statut), ("attente", f_attente), ("secteur", f_secteur), ("tri", tri)) if v})
     precedent, suivant = (d - datetime.timedelta(days=1)).isoformat(), (d + datetime.timedelta(days=1)).isoformat()
-    navigation = (f'<form class="recherche nav-jour" method="get" action="/journee"><a class="bouton secondaire" href="/journee?date={precedent}">Précédent</a>'
+    navigation = (f'<form class="recherche nav-jour" method="get" action="/journee"><a class="bouton secondaire nj-prec" href="/journee?date={precedent}" aria-label="Jour précédent">Précédent</a>'
                   f'<input type="date" name="date" value="{jour}" style="max-width:170px" aria-label="Journée" onchange="this.form.submit()"><button type="submit">Afficher</button>'
-                  f'<a class="bouton secondaire" href="/journee?date={suivant}">Suivant</a>'
-                  f'<a class="bouton secondaire" href="/journee?date={demain}">Demain</a>'
-                  f'<a class="bouton secondaire" href="/?date={jour}">Voir au calendrier</a></form>')
+                  f'<a class="bouton secondaire nj-suiv" href="/journee?date={suivant}" aria-label="Jour suivant">Suivant</a>'
+                  f'<a class="bouton secondaire pc-seul" href="/journee?date={demain}">Demain</a>'
+                  f'<a class="bouton secondaire pc-seul" href="/?date={jour}">Voir au calendrier</a>'
+                  f'<a class="bouton secondaire tel-seul nj-auj" href="/journee?date={aujourdhui_iso}">Aujourd\'hui</a></form>')
     deja_h = sum(l["duree_estimee_h"] or 0 for l in toutes if l["statut"] == "planifie" and l["date_prevue"] == jour)
     deja_m = sum(l["total_ttc"] or 0 for l in toutes if l["statut"] == "planifie" and l["date_prevue"] == jour)
     journee = panneau_jour(conn, jour, retour, gestion=True)
@@ -126,7 +128,9 @@ def page_journee(conn, query):
     opt_att = "".join(f'<option value="{c}"{" selected" if c == f_attente else ""}>{esc(t)}</option>' for c, t in FILTRES_ATTENTE)
     opt_sec = '<option value="">Tous les secteurs</option>' + "".join(f'<option value="{esc(s)}"{" selected" if s == f_secteur else ""}>{esc(s)}</option>' for s in secteurs)
     opt_tri = "".join(f'<option value="{c}"{" selected" if c == tri else ""}>{esc(t)}</option>' for c, t in TRIS)
-    filtres = (f'<form class="recherche filtres-jour" method="get" action="/journee"><input type="hidden" name="date" value="{jour}">'
+    ouvert = " ouvert" if (f_statut != "a_planifier" or f_attente or f_secteur or tri != "secteur") else ""        # téléphone : repliés sous « Filtres »
+    filtres = (f'<form class="recherche filtres-jour{ouvert}" method="get" action="/journee"><input type="hidden" name="date" value="{jour}">'
+               '<button type="button" class="filtres-bascule" onclick="this.form.classList.toggle(\'ouvert\')">Filtres</button>'
                f'<select name="statut" aria-label="Statut">{opt_statut}</select><select name="attente" aria-label="Délai d\'attente">{opt_att}</select>'
                f'<select name="secteur" aria-label="Secteur">{opt_sec}</select><select name="tri" aria-label="Tri">{opt_tri}</select>'
                f'<button type="submit">Filtrer</button></form>')

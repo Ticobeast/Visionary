@@ -48,19 +48,21 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 ## Version téléphone : légère, façon application
 Sur un téléphone (écran de 700 px et moins), le même programme s'affiche **autrement** : un grand titre, des cartes blanches arrondies, des champs gris
 clair, des boutons faciles à toucher (44 px), des **flèches plutôt que des mots** (mois, jour) et des **icônes** (recherche, menu). L'ordinateur ne change pas.
-La mise en forme est dans `outils/telephone.py`.
+Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes blanches à fine bordure, boutons secondaires **blancs** à bordure grise, bouton principal vert, champs blancs. La mise en forme est dans `outils/telephone.py`.
 
 **Barre du bas** (administrateur) : **Tableau de bord**, **Clients** et le bouton **Menu** (trois barres) qui ouvre une feuille avec **Chantiers**,
 **Soumissions**, **Journée**, **Archives**, **Utilisateurs** et **Se déconnecter**. Le compte « Soumission » a **Soumissions**, **Clients** et le Menu (Chantiers).
 - **Tableau de bord** : un calendrier comme celui d'Apple (un point sous les jours chargés ; le fond vert pâle des fins de semaine ; le jour courant en
   cercle vert, le jour choisi en vert foncé), et dessous la journée choisie avec **Terminer** et un lien discret **Facture** en haut à droite de chaque chantier.
-- **Journée** : flèches pour changer de jour (ou toucher la date), **Demain**, **Voir au calendrier**, et la gestion de la journée (ordre, retirer, ajouter).
+- **Journée** : une flèche de chaque côté de la date pour changer de jour (ou toucher la date), un seul bouton **Aujourd'hui**, les quatre filtres des chantiers à placer regroupés sous un seul bouton **Filtres**, et la gestion de la journée (ordre, retirer, ajouter).
 - **Chantiers** : une carte par chantier (client, statut, adresse, travaux, montant, pastille d'attente, paiement), les raccourcis en pastilles à faire défiler,
   la recherche avec la loupe à droite.
-- **Soumissions** : une carte par soumission avec **Accepter**, **En attente**, **Refuser** ; le PDF est un lien discret « Soumission » en haut à droite de la carte.
+- **Soumissions** : le bouton rond **+** (en haut à droite) ouvre une nouvelle soumission ; une carte par soumission avec **Accepter**, **En attente**, **Refuser** ; le PDF est un lien discret « Soumission » en haut à droite de la carte. Les raccourcis sont des bulles qu'on fait défiler, et la dernière, **Modifier**, ouvre leur gestion (Chantiers aussi).
   Si on appuie sur Accepter (ou En attente) alors qu'il manque des renseignements, le programme demande seulement ceux qui manquent.
 - **Clients** : une liste « contacts » (nom, numéro, adresse) ; **toucher un numéro lance l'appel** ; le bouton rond **+** ouvre un nouveau client.
 - **Archives** : la recherche, un bouton **Filtres** qui déplie les critères, les idées de recherche et les chiffres en pastilles qu'on fait défiler, puis une carte par résultat.
+- **Annuler / Fermer** : ramènent toujours à la page d'où tu viens (la liste filtrée, la fiche), même après une erreur de saisie.
+- **Fiche client** : l'historique avec le statut à droite de chaque ligne, et un petit bouton **Supprimer le client** (la mise en garde s'affiche dans la fenêtre de confirmation).
 - **Fiches et formulaires** : les types de travaux et les options sont des **tuiles** à cocher ; le bouton principal prend toute la largeur ; « Terminer » monte
   du bas de l'écran comme une feuille.
 Le compte « Soumission » arrive directement sur **Soumissions** et n'a de toute façon jamais accès au tableau de bord, aux paiements ni aux factures.

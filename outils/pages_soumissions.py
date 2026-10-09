@@ -91,7 +91,7 @@ def page_soumissions(conn, query):
     lien_attente = f' <a class="doux" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
     section_refusees = (f'<h2 id="refusees" style="margin-top:32px">Refusées <small class="doux">({total_refusees})</small></h2>'
                         '<p class="doux">Soumissions refusées par le client. Elles ne sont plus dans les chantiers ; « Rouvrir » la remet en cours.</p>' + bas)
-    contenu = (f'<h1>Soumissions{lien_attente}{lien_refusees}</h1><div class="barre" style="margin-bottom:16px"><a class="bouton" href="/nouveau">+ Nouvelle soumission</a></div>'
+    contenu = (f'<h1>Soumissions{lien_attente}{lien_refusees}</h1><div class="barre barre-ajout" style="margin-bottom:16px"><a class="bouton" href="/nouveau" aria-label="Nouvelle soumission">+ Nouvelle soumission</a></div>'
                f'{raccourcis.barre(conn, "soumissions", query)}{recherche}{tableau}{section_refusees}')
     return gabarit("Soumissions", contenu, query.get("ok"), query.get("err"), large=True)
 
@@ -181,7 +181,7 @@ def _formulaire_completer(conn, i, manques, valeurs, retour, erreurs=(), message
             f'<form method="post" action="/soumission/{i}/completer"><input type="hidden" name="retour" value="{esc(retour)}">{pour}'
             f'<div class="carte"><h2>À compléter</h2><div class="grille">{"".join(champs)}</div></div>'
             f'<div class="barre"><button type="submit">{bouton}</button>'
-            f'<a class="bouton secondaire" href="{esc(url_fiche(i, "soumission"))}">Annuler</a></div></form>')
+            f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form>')
 
 
 def page_completer(conn, i, query, erreurs=(), valeurs=None, message=None):

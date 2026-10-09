@@ -124,7 +124,9 @@ def barre(conn, page, query):
         detail = f" · {argent(somme)}" if criteres.get("paiement") in ("a_recevoir", "partiel") and somme else ""
         cible = adresse if actif else f"{adresse}?{filtre}"
         pastilles += (f'<a class="puce{" actif" if actif else ""}" href="{esc(cible)}"><b>{n}</b><span>{esc(nom)}{esc(detail)}</span></a>')
-    return (f'<div class="raccourcis-bloc"><div class="raccourcis">{pastilles}</div>'
+    modifier = (f'<a class="modifier-puce" href="/raccourcis?page={page}" title="Modifier les raccourcis" aria-label="Modifier les raccourcis">'
+                '<span>Modifier</span></a>')                                            # téléphone seulement : une bulle comme les autres filtres
+    return (f'<div class="raccourcis-bloc"><div class="raccourcis">{pastilles}{modifier}</div>'
             f'<a class="modifier" href="/raccourcis?page={page}">Modifier les raccourcis</a></div>')
 
 

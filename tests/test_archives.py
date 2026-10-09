@@ -454,6 +454,49 @@ class TestPresentationTelephone(BaseArchives):
         self.assertIn(lien, self.get("/clients"))
         self.assertIn(lien, self.get("/client/%d" % self.sql("SELECT id FROM clients WHERE nom = 'Hamel'")[0][0]))
 
+    def test_soumissions_et_chantiers_ont_la_bulle_modifier_et_le_plus_rond(self):
+        soumissions, chantiers = self.get("/soumissions"), self.get("/chantiers")
+        self.assertIn('class="barre barre-ajout"', soumissions)
+        self.assertIn('href="/nouveau" aria-label="Nouvelle soumission">+ Nouvelle soumission</a>', soumissions)
+        self.assertIn('<a class="modifier-puce" href="/raccourcis?page=soumissions"', soumissions)
+        self.assertIn('<a class="modifier-puce" href="/raccourcis?page=chantiers"', chantiers)
+        self.assertIn('class="modifier" href="/raccourcis?page=soumissions">Modifier les raccourcis</a>', soumissions)       # ordinateur : le lien d'avant
+
+    def test_annuler_et_fermer_ramenent_a_la_page_d_origine(self):
+        nouveau = self.get("/nouveau")
+        self.assertIn('class="bouton secondaire annuler" href="/soumissions">Annuler</a>', nouveau)
+        self.assertIn('sessionStorage.getItem("pile")', nouveau)                       # la pile des pages visitées
+        chantier = self.sql("SELECT id FROM chantiers WHERE statut = 'planifie' LIMIT 1")[0][0]
+        self.assertIn('class="bouton secondaire fermer" href="/chantiers">Fermer</a>', self.get(f"/chantier/{chantier}"))
+        self.assertIn('class="bouton secondaire annuler"', self.get(f"/chantier/{chantier}/dupliquer"))
+        self.assertIn('class="bouton secondaire annuler" href="/client/', self.get(f"/client/{self.sql('SELECT id FROM clients LIMIT 1')[0][0]}/soumission/nouveau"))
+        # la page d'attente et la page « à compléter » reviennent à la page demandée (retour), pas à la fiche
+        client = self.client("Attente", "9 Rue Neuve", "centre_ville")
+        a_planifier = self.fiche(client, "a_planifier", "taille_haie", "haie", None, 300)
+        page = self.get(f"/chantier/{a_planifier}/attente?retour=%2Fchantiers%3Fstatut%3Da_planifier")
+        self.assertIn('<a class="bouton secondaire" href="/chantiers?statut=a_planifier">Annuler</a>', page)
+        self.assertNotIn("javascript:", nouveau)
+
+    def test_la_page_du_jour_a_une_fleche_de_chaque_cote_un_seul_bouton_et_des_filtres_repliables(self):
+        page = self.get("/journee?date=2026-10-12")
+        self.assertIn('class="bouton secondaire nj-prec"', page)
+        self.assertIn('class="bouton secondaire nj-suiv"', page)
+        self.assertIn('class="bouton secondaire tel-seul nj-auj" href="/journee?date=' + AUJOURDHUI.isoformat() + '">Aujourd\'hui</a>', page)
+        demain = (AUJOURDHUI + datetime.timedelta(days=1)).isoformat()
+        self.assertIn(f'class="bouton secondaire pc-seul" href="/journee?date={demain}">Demain</a>', page)        # ordinateur : comme avant
+        self.assertIn('class="filtres-bascule"', page)
+        self.assertIn('class="recherche filtres-jour"', page)                          # repliés par défaut
+        self.assertIn('class="recherche filtres-jour ouvert"', self.get("/journee?date=2026-10-12&statut=planifie"))
+        self.assertIn('class="recherche filtres-jour ouvert"', self.get("/journee?date=2026-10-12&tri=duree"))
+
+    def test_la_fiche_client_a_un_historique_a_badge_et_une_suppression_discrete(self):
+        client = self.sql("SELECT client_id FROM chantiers LIMIT 1")[0][0]
+        page = self.get(f"/client/{client}")
+        self.assertIn('<table class="historique">', page)
+        self.assertIn('<td class="c-statut">', page)
+        self.assertIn('<div class="carte suppression">', page)
+        self.assertIn("Supprimer définitivement ce client", page)                      # le texte est dans la confirmation
+
     def test_lien_tel(self):
         self.assertEqual(vue.lien_tel("+18195550106"), '<a class="tel" href="tel:+18195550106">819-555-0106</a>')
         self.assertEqual(vue.lien_tel(""), "")

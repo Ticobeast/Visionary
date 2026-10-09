@@ -110,6 +110,11 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 66 | Téléphone, **Nouvelle soumission** : cocher « Taille de haie » | la tuile devient verte et s'étire ; la case « Précision » apparaît dessous ; les options (nacelle, bois) sont des tuiles pleine largeur |
 | 67 | Téléphone, tableau de bord : toucher **Terminer** sur un chantier du jour | la fenêtre monte du bas, au-dessus de la barre d'onglets ; tous ses boutons (« Oui, il est terminé », Facture, Annuler) sont visibles |
 | 68 | Ordinateur : refaire les scénarios 1 à 30 après la refonte du téléphone | **aucune** différence d'affichage sur l'ordinateur |
+| 69 | Téléphone, **Soumissions** : bouton rond **+** ; faire défiler les raccourcis vers la gauche ; toucher **Modifier** | le formulaire d'une nouvelle soumission s'ouvre ; la dernière bulle (**Modifier**) ouvre la gestion des raccourcis ; Chantiers a aussi la bulle |
+| 70 | Téléphone : ouvrir une page à partir d'une liste filtrée (ex. Soumissions, À relancer), toucher **+**, puis **Annuler**. Refaire avec Clients > **+**, la fiche d'un client > Nouvelle soumission, une fiche chantier > Modifier le client, Soumissions > En attente, et **Fermer** sur une fiche chantier | on revient à chaque fois à la page d'où on est parti (avec ses filtres), même après avoir fait une erreur de saisie |
+| 71 | Téléphone, **Journée** : flèches, date, **Aujourd'hui**, **Filtres** | flèches discrètes de chaque côté de la date ; un seul bouton Aujourd'hui (pas de Demain ni de Voir au calendrier) ; les quatre filtres sont repliés sous **Filtres** et restent dépliés quand on en utilise un |
+| 72 | Téléphone, **fiche client** | l'historique montre le statut à droite ; en bas, un petit bouton « Supprimer le client » sans texte ; le texte d'avertissement apparaît dans la fenêtre de confirmation |
+| 73 | Téléphone : comparer avec le site de l'entreprise | boutons secondaires blancs à bordure grise, champs blancs, cases à cocher vertes, bouton principal vert : même style que le site |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -124,7 +129,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 68 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 73 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

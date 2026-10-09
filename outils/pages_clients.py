@@ -90,10 +90,10 @@ def page_client(conn, client_id, query):
         "SELECT chantier_id, attente_depuis, type_libelle, statut, archive, genre"
         " FROM v_chantiers WHERE client_id = ? ORDER BY 2 DESC, chantier_id DESC", (client_id,)).fetchall()
     lignes = "".join(
-        f'<tr><td><a href="{url_fiche(i, g)}">{esc(d) or "sans date"}</a></td><td>{esc(t) or "<span class=doux>à préciser</span>"}</td>'
-        f'<td>{badge_statut(st, g)}{" <span class=doux>archivé</span>" if arch and g == "chantier" else ""}</td></tr>'
+        f'<tr><td class="c-date"><a href="{url_fiche(i, g)}">{esc(d) or "sans date"}</a></td><td class="c-travaux">{esc(t) or "<span class=doux>à préciser</span>"}</td>'
+        f'<td class="c-statut">{badge_statut(st, g)}{" <span class=doux>archivé</span>" if arch and g == "chantier" else ""}</td></tr>'
         for i, d, t, st, arch, g in fiches)
-    historique = (f'<div class="liste-defile" style="margin-bottom:16px"><table><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
+    historique = (f'<div class="liste-defile" style="margin-bottom:16px"><table class="historique"><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
                   f'<tbody>{lignes}</tbody></table></div>'
                   if lignes else '<p class="doux">Aucune soumission ni chantier pour ce client.</p>')
     tels = " · ".join(lien_tel(t) for t in (c["telephone"], c["telephone_2"]) if t) or "—"
@@ -121,7 +121,7 @@ def page_client(conn, client_id, query):
         efface.append(f"{paiements} paiement{'s' if paiements > 1 else ''}")
     detail = " et ".join(efface)
     confirmation = ("Supprimer définitivement ce client" + (f" avec {detail}" if detail else "") + " ? Tout disparaît, y compris des archives. Cette action est irréversible.")
-    suppression = ('<div class="carte"><h2>Supprimer ce client</h2><p class="doux">Efface le client et tout ce qui le concerne'
+    suppression = ('<div class="carte suppression"><h2>Supprimer ce client</h2><p class="doux">Efface le client et tout ce qui le concerne'
                    + (f" : {esc(detail)}" if detail else "") + ". Définitif, y compris dans les archives.</p>"
                    f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
                    '<button class="danger" type="submit">Supprimer le client</button></form></div>')
@@ -141,7 +141,7 @@ def _form_client(conn, client_id, valeurs, erreurs=(), retour=""):
     return (f'{err}<form method="post" action="/client/{client_id}/modifier"><input type="hidden" name="empreinte" value="{empreinte(actuel) if actuel else ""}">'
             f'<input type="hidden" name="retour" value="{esc(retour)}">'
             f'{client_essentiel(valeurs, lister_secteurs(conn), exige=exige)}{avance(client_avance(valeurs), ouvert=bool(erreurs))}'
-            f'<div class="barre"><button type="submit">Enregistrer</button><a class="bouton secondaire" href="{esc(annuler)}">Annuler</a></div></form>')
+            f'<div class="barre"><button type="submit">Enregistrer</button><a class="bouton secondaire{"" if retour else " annuler"}" href="{esc(annuler)}">Annuler</a></div></form>')
 
 
 def page_client_modifier(conn, client_id, query=None):
@@ -199,7 +199,7 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
 {zone("description", "Notes (description, imprimée sur la feuille de route)", valeurs)}</div>
 <p class="doux">Rien n'est obligatoire : remplis ce que tu sais. Pour <b>accepter</b> la soumission, il faudra la durée, le prix, les travaux, le téléphone, l'adresse et le secteur.</p></div>
 {avance('<div class="carte"><h2>Demande et règlement</h2><div class="grille">' + champ("date_soumission", "Date de la demande de soumission", valeurs, "date") + champ_modalite(valeurs) + "</div></div>", ouvert=bool(erreurs))}
-<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire" href="/client/{client_id}">Annuler</a></div></form>
+<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire annuler" href="/client/{client_id}">Annuler</a></div></form>
 <p class="doux">La soumission est créée « en cours » : tu reviens à la fiche du client. Elle se règle ensuite dans l'onglet Soumissions (Accepter ou Refuser).</p>"""
 
 

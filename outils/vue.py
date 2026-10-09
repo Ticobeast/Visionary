@@ -213,7 +213,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
-.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary{display:none}
+.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule{display:none}
 main a.tel{color:inherit;font-weight:inherit;text-decoration:none}
 """
 
@@ -354,7 +354,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
             '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
-            f'{_barre_mobile(section)}{SCRIPT_POSITION}</body></html>')
+            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}</body></html>')
 
 
 # Changer de jour, de mois ou de filtre sur la même page : on reste à la même hauteur au lieu de remonter en haut.
@@ -366,6 +366,15 @@ SCRIPT_POSITION = (
     'if(a&&!a.target&&a.pathname===location.pathname&&a.origin===location.origin&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey)g();});'
     'document.addEventListener("submit",function(e){var f=e.target;if(f.method&&f.method.toLowerCase()==="get"&&'
     'new URL(f.action||location.href,location.href).pathname===location.pathname)g();});})();</script>')
+
+# « Annuler » et « Fermer » ramènent à la page d'où l'on vient (pas à une page fixe) : le navigateur garde la pile des pages visitées pendant la session.
+# Un formulaire (liens a.annuler) ne se met pas dans la pile ; une page normale s'y met (revenir en arrière la dépile) ; « Fermer » (a.fermer) va à la page d'avant.
+SCRIPT_RETOUR = (
+    '<script>(function(){try{var s=JSON.parse(sessionStorage.getItem("pile")||"[]"),q=document.querySelectorAll("a.annuler"),'
+    'f=document.querySelectorAll("a.fermer"),l=new URL(location.href),i,p,t;["ok","err","terminer"].forEach(function(k){l.searchParams.delete(k);});'
+    'var u=l.pathname+l.search;if(q.length){t=s[s.length-1];if(t){for(i=0;i<q.length;i++){q[i].href=t;}}}'
+    'else{i=s.lastIndexOf(u);if(i>=0){s.length=i+1;}else{s.push(u);}if(s.length>30){s.shift();}'
+    'sessionStorage.setItem("pile",JSON.stringify(s));p=s[s.length-2];if(p){for(i=0;i<f.length;i++){f[i].href=p;}}}}catch(e){}})();</script>')
 
 
 def heures(h):
