@@ -301,13 +301,16 @@ table.candidats tr.ligne-urgente{border-left:4px solid var(--alerte)}table.candi
 table.candidats td.c-montant small{display:none}.sel-total{bottom:76px;padding:8px 12px;font-size:13px;gap:8px}.sel-total button{width:100%;min-height:40px;padding:6px 10px;font-size:14px}
 table.chantiers td.c-depuis:not(:has(.depuis))::before{content:"Accepté le ";color:var(--doux)}
 
-/* Téléphone : calendrier compact aux couleurs de celui de l'ordinateur (un point sous les jours chargés), recherche sur une ligne, fiches compactes */
-.cal-jour{min-height:52px;padding:4px 0;gap:3px;align-items:center;border-radius:10px}
-.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1rem;font-weight:700;background:none;color:var(--texte);align-self:center}
+/* Téléphone : calendrier léger (un point sous les jours chargés), recherche sur une ligne, fiches compactes */
+.pc-seul,.nav-droite .base{display:none}
+.cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:10px;align-items:center;gap:3px;padding:4px 0}
+.cal-jour.weekend{background:var(--vert-doux)!important}
+.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:700;background:none;color:var(--texte);align-self:center}
 .cal-jour.aujourdhui .cal-n{background:var(--vert);color:#fff}
+.cal-jour.selection{outline:0}.cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}.cal-jour.aujourdhui.selection .cal-n{background:var(--vert)}
 .cal-jour.occupe::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--vert);display:block}.cal-jour.chargee::after{background:var(--alerte)}
-.cal-jour.selection{outline:2px solid var(--vert);outline-offset:-1px}
-.cal-jour.autre-mois{opacity:.45}.cal-info,.cal-alerte{display:none}.cal-grille{gap:3px}
+.cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte{display:none}.cal-grille{gap:2px}
+table.tableau.jour:not(.gestion) .c-adresse .doux,table.tableau.jour:not(.gestion) .ligne-duree,table.tableau.jour:not(.gestion) .ligne-options,table.tableau.jour:not(.gestion) .ligne-desc{display:none}
 .cal-nav{flex-wrap:nowrap;gap:6px}.cal-nav h2{min-width:0;font-size:1.05rem}.cal-nav .bouton{flex:0 0 auto;min-height:40px;padding:6px 12px;font-size:13px}
 .cal-nav a[aria-label]{font-size:0;padding:0;width:40px;position:relative}.cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:10px;height:10px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
 .cal-nav a[aria-label="Mois suivant"]::before{transform:translate(-70%,-50%) rotate(-135deg)}
@@ -411,15 +414,18 @@ def _navigation(section):
 
 
 def _barre_mobile(section):
-    """Téléphone : en bas, le plus important ; le reste dans la feuille « Menu »."""
+    """Téléphone : en bas, Tableau de bord (administrateur), Soumissions (compte « soumission ») et Clients ; tout le reste dans la feuille « Menu »."""
     admin = est_admin()
 
     def lien(href, texte, actif):
         return f'<a href="{href}" class="{"actif" if actif else ""}">{texte}</a>'
-    principaux = ([("/", "Tableau de bord", "tableau")] if admin else []) + [("/chantiers", "Chantiers", "chantiers"), ("/soumissions", "Soumissions", "soumissions")]
-    reste = ([("/journee", "Journée", "journee"), ("/clients", "Clients", "clients"), ("/archives", "Archives", "archives")] if admin else [("/clients", "Clients", "clients")])
-    if not admin:                          # compte « soumission » : ses trois onglets restent en bas
-        principaux, reste = principaux + reste, []
+    if admin:
+        principaux = [("/", "Tableau de bord", "tableau"), ("/clients", "Clients", "clients")]
+        reste = [("/chantiers", "Chantiers", "chantiers"), ("/soumissions", "Soumissions", "soumissions"), ("/journee", "Journée", "journee"),
+                 ("/archives", "Archives", "archives")]
+    else:
+        principaux = [("/soumissions", "Soumissions", "soumissions"), ("/clients", "Clients", "clients")]
+        reste = [("/chantiers", "Chantiers", "chantiers")]
     reste.append(("/nouveau", "Nouvelle soumission", "nouveau"))
     u = utilisateur_courant()
     if u and u["role"] == "admin":

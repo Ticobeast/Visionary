@@ -82,10 +82,10 @@ def cellule_adresse(l):
 
 def cellule_travaux(l):
     duree = f'<span class="total">Durée {heures(l["duree_estimee_h"])}</span>' if l["duree_estimee_h"] else '<span class="doux">durée à estimer</span>'
-    desc = f'<div class="doux">{esc(l["description"])}</div>' if l["description"] else ""
+    desc = f'<div class="doux ligne-desc">{esc(l["description"])}</div>' if l["description"] else ""
     options = puces_options(l["nacelle"], l["debarrasser_bois"], l["bois_format"])
-    return (f'<a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a><div>{duree}</div>'
-            f'{f"<div>{options}</div>" if options else ""}{desc}')
+    return (f'<a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a><div class="ligne-duree">{duree}</div>'
+            f'{f"<div class=ligne-options>{options}</div>" if options else ""}{desc}')
 
 
 def cellule_montant(l):

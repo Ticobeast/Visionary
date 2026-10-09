@@ -62,7 +62,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
     fin = horaire[-1]["fin"]
     chargee = total_h > JOURNEE_H
     resume = (f'<p class="resume-jour"><b>{len(chantiers)} chantier{"s" if len(chantiers) > 1 else ""}</b> · durée totale <span class="total">{heures(total_h) if total_h else "inconnue"}</span>'
-              f' · début <b>{heure_texte(DEBUT_JOURNEE)}</b> · fin prévue <b>{heure_texte(fin)}</b>'
+              f' <span class="pc-seul">· début <b>{heure_texte(DEBUT_JOURNEE)}</b> · fin prévue <b>{heure_texte(fin)}</b></span>'
               + (f' <span class="attente a-urgente">journée chargée (plus de {heures(JOURNEE_H)})</span>' if chargee else "")
               + "</p>"
               f'<p class="total-jour">Total de la journée : <span class="total">{esc(argent(total_jour))}</span> <span class="doux">(taxes incluses)</span></p>'
@@ -107,7 +107,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
         entetes = '<th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th class="droite">Montant</th>'
     table = (f'<div class="liste-defile"><table class="tableau jour{" gestion" if gestion else ""}"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
     lien_pdf = (f'<a class="bouton" href="/journee.pdf?date={jour}" download title="Toute la journée, avec les détails de chaque chantier">'
-                f'Télécharger la journée (PDF)</a>')
+                f'Télécharger la journée<span class="pc-seul"> (PDF)</span></a>')
     pied = "" if gestion else f'<div class="barre pied-jour" style="margin-top:12px">{lien_gerer}{lien_pdf}</div>'
     return f'<div class="carte"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 

@@ -172,8 +172,8 @@ class TestBoutons(BasePdf):
     def test_bouton_pdf_en_bas_du_tableau_de_bord(self):
         page = self.get("/", {"date": self.jour})
         self.assertIn(f'href="/journee.pdf?date={self.jour}"', page)
-        self.assertIn("Télécharger la journée (PDF)", page)
-        self.assertGreater(page.index("Télécharger la journée (PDF)"), page.index("</table>"))        # sous la table
+        self.assertIn("Télécharger la journée<span class=\"pc-seul\"> (PDF)</span>", page)
+        self.assertGreater(page.index("Télécharger la journée<"), page.index("</table>"))        # sous la table
         self.assertNotIn("/journee.pdf", self.get("/journee", {"date": self.jour}))
 
     def test_pas_de_bouton_si_la_journee_est_vide(self):
