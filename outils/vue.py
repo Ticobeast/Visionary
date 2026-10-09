@@ -214,7 +214,13 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
-.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-btn,.info-pop,.lien-dl{display:none}
+.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.note-heures,.resume-jour,.total-jour{display:none}
+.carte-jour{position:relative}.carte-jour h2{padding-right:48px}
+.info-btn{--loupe:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E");position:absolute;top:12px;right:14px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;box-shadow:none;cursor:pointer}
+.info-btn,.info-btn:hover,.info-btn:focus{background:#fff var(--loupe) center/18px no-repeat}.info-btn:hover,.info-btn:focus{background-color:var(--vert-doux);border-color:var(--vert-bord)}
+.info-btn.info-alerte::after{content:"";position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:var(--alerte);border:2px solid #fff}
+.info-pop{position:absolute;z-index:20;top:48px;right:14px;width:min(380px,calc(100% - 28px));padding:14px 16px;border:1px solid var(--trait-leger);border-radius:14px;background:#fff;box-shadow:0 10px 30px rgba(15,23,42,.18);font-size:14px;line-height:1.7}
+.carte-jour.info-ouverte .info-pop,.info-btn:hover+.info-pop,.info-btn:focus+.info-pop,.info-pop:hover{display:block}
 main a.tel{color:inherit;font-weight:inherit;text-decoration:none}
 .photos-grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:12px}
 .photos .photo{display:block;padding:0;font-weight:400}.photos .photo img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border:1px solid var(--trait-leger);border-radius:10px;background:var(--puce)}

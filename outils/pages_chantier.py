@@ -152,10 +152,10 @@ def cartes_chantier(conn, valeurs, creation, soumission=False):
         duree_reelle = champ("duree_reelle_h", "Durée réelle (heures)", valeurs, inputmode="decimal", placeholder="comme l'estimée")
     avance_html = f"""<div class="carte"><h2>Dates et taxes</h2><div class="grille">
 {champ("date_soumission", "Date de la demande de soumission", valeurs, "date")}{duree_reelle}
-{champ("tps", "TPS ($) — vide : calculée si la case est cochée", valeurs, inputmode="decimal")}{champ("tvq", "TVQ ($)", valeurs, inputmode="decimal")}
+{champ("tps", "TPS ($)", valeurs, inputmode="decimal")}{champ("tvq", "TVQ ($)", valeurs, inputmode="decimal")}
 {champ_modalite(valeurs)}</div>
-<p class="doux">Le statut ne se choisit pas : il change avec les boutons (Accepter ou Refuser une soumission, la page Journée pour planifier, Terminer, Annuler). À « Terminé », la durée réelle reprend la durée estimée.</p></div>"""
-    avance_html += f"""<div class="carte"><h2>Fichiers</h2><div class="grille">
+<p class="doux pc-seul">TPS : laisse vide pour la calculer (case « Ajouter TPS et TVQ » cochée). Le statut ne se choisit pas : il change avec les boutons (Accepter ou Refuser une soumission, la page Journée pour planifier, Terminer, Annuler). À « Terminé », la durée réelle reprend la durée estimée.</p></div>"""
+    avance_html += f"""<div class="carte pc-seul"><h2>Fichiers</h2><div class="grille">
 {champ("dossier_photos", "Dossier de photos (chemin dans data/)", valeurs, placeholder="photos/2026/2026-06-14_gagnon")}</div></div>"""
     return essentiel, avance_html
 
@@ -219,7 +219,7 @@ def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
         ajout = '<p class="doux">Ce chantier est entièrement payé. Un solde négatif est interdit : aucun autre paiement ne peut être ajouté.</p>'
     else:
         ajout = f"""{err}<form method="post" action="/chantier/{chantier_id}/paiement"><div class="grille">
-{champ("paiement_date", "Date", ev, "date", required=True)}{champ("paiement_montant", f"Montant ($) — au plus {solde:.2f}".replace(".", ","), ev, inputmode="decimal", required=True)}
+{champ("paiement_date", "Date", ev, "date", required=True)}{champ("paiement_montant", "Montant ($)", ev, inputmode="decimal", required=True)}
 {liste("paiement_mode", "Mode", [(m, LIBELLES_MODE[m]) for m in MODES], ev, required=True)}{champ("paiement_reference", "Référence (n° de chèque…)", ev)}
 <div><label>&nbsp;</label><button type="submit">Ajouter le paiement</button></div></div></form>"""
     if prix is None or (solde is not None and solde <= 0):          # rien à ajouter : simple message
@@ -234,7 +234,7 @@ def _autres_chantiers(conn, client_id, chantier_id):
                           " FROM v_chantiers WHERE client_id = ? AND chantier_id <> ? ORDER BY 3 DESC", (client_id, chantier_id)).fetchall()
     liste_html = ("<ul>" + "".join(f'<li><a href="{url_fiche(i, g)}">{esc(d)} — {esc(t)}</a> {badge_statut(st, g)}</li>'
                                    for i, t, d, st, g in autres) + "</ul>") if autres else '<p class="doux">Aucune autre fiche pour ce client.</p>'
-    return (f'<div class="carte"><h2>Autres soumissions et chantiers de ce client</h2>{liste_html}'
+    return (f'<div class="carte pc-seul"><h2>Autres soumissions et chantiers de ce client</h2>{liste_html}'
             f'<div class="barre"><a class="bouton secondaire" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission pour ce client</a></div></div>')
 
 

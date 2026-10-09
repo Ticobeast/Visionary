@@ -38,7 +38,7 @@ textarea{min-height:90px}
 label{font-size:.8rem;font-weight:600;color:var(--doux);margin-bottom:5px}
 label.coche,span.coche{font-size:1rem;color:var(--texte);font-weight:500}
 input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;width:100%;max-width:100%;text-align:left}
-.grille>div{min-width:0}
+.grille>div{min-width:0;display:flex;flex-direction:column;justify-content:flex-end}
 input[type=radio]{min-height:0;width:24px;height:24px;padding:0;accent-color:var(--vert)}
 input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:0 0 auto;min-height:0;width:22px;height:22px;padding:0;border:2px solid var(--trait);border-radius:6px;background:#fff center/14px no-repeat}
 input[type=checkbox]:checked{background-color:var(--vert);border-color:var(--vert);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")}
@@ -125,7 +125,7 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 .lien-pdf-coin{display:block}.documents-pc{display:none}
 
 /* fiche : résumé et boutons */
-.resume-chantier{position:relative;gap:4px}.resume-chantier>div:first-child{padding-right:84px}.resume-chantier h2{font-size:1.15rem}
+.resume-chantier{position:relative;gap:4px}.resume-chantier>div:first-child{padding-right:84px}.resume-chantier h2{font-size:1.15rem;flex-basis:100%}
 .resume-chantier .montant{font-size:1.2rem}
 .actions-bloc{margin-bottom:12px}
 
@@ -144,12 +144,8 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 .cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte,.cal-ligne{display:none}
 
 /* jour du tableau de bord et page de gestion du jour */
-.note-heures,.resume-jour,.total-jour{display:none}
-.carte-jour{position:relative}.carte-jour h2{padding-right:44px}
 .carte-jour .info-pop+*{margin-top:4px}
-.info-btn{display:block;position:absolute;top:10px;right:10px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E") center/18px no-repeat;box-shadow:none}
-.carte-jour.info-ouverte .info-pop{display:block}
-.info-pop{position:absolute;z-index:20;top:52px;right:10px;left:10px;padding:14px 16px;border:1px solid var(--trait-leger);border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(15,23,42,.18);font-size:14px;line-height:1.7}
+.carte-jour h2{padding-right:44px}.info-btn{right:10px;top:10px}.info-pop{top:52px;right:10px;left:10px;width:auto}
 .bouton.lien-dl{width:44px;padding:0;font-size:0;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 11l5 5 5-5M5 20h14'/%3E%3C/svg%3E") center/20px no-repeat}
 .ligne-document .actions-page{display:grid;grid-template-columns:1fr 44px;gap:6px}.ligne-document .actions-page .lien-dl{display:flex;width:44px}
 .pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;text-align:center}
