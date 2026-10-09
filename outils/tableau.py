@@ -102,7 +102,8 @@ def page_journee(conn, query):
                   f'<a class="bouton secondaire nj-suiv" href="/journee?date={suivant}" aria-label="Jour suivant">Suivant</a>'
                   f'<a class="bouton secondaire pc-seul" href="/journee?date={demain}">Demain</a>'
                   f'<a class="bouton secondaire pc-seul" href="/?date={jour}">Voir au calendrier</a>'
-                  f'<a class="bouton secondaire tel-seul nj-auj" href="/journee?date={aujourdhui_iso}">Aujourd\'hui</a></form>')
+                  + (f'<a class="bouton secondaire tel-seul nj-auj" href="/journee?date={aujourdhui_iso}">Aujourd\'hui</a>' if jour != aujourdhui_iso else "")
+                  + '</form>')
     deja_h = sum(l["duree_estimee_h"] or 0 for l in toutes if l["statut"] == "planifie" and l["date_prevue"] == jour)
     deja_m = sum(l["total_ttc"] or 0 for l in toutes if l["statut"] == "planifie" and l["date_prevue"] == jour)
     journee = panneau_jour(conn, jour, retour, gestion=True)

@@ -203,6 +203,8 @@ class TestTelephone(unittest.TestCase):
                         ".filtres-det", "table.archive", "table.clients", ".actions-sou", ".types", ".barre-ajout", ".modale{align-items:flex-end;padding:0;z-index:1100}",
                         "a.nj-prec", ".modifier-puce", ".filtres-bascule", "table.historique", ".carte.suppression"):
             self.assertIn(attendu, mobile)
+        self.assertIn(".cal-jour.aujourdhui .cal-n{font-weight:800}", mobile)         # aujourd'hui : en gras, sans cercle tant qu'il n'est pas choisi
+        self.assertNotIn("background:var(--vert)!important", mobile)
         self.assertNotIn("--teinte", mobile)                                           # boutons secondaires : blancs, comme sur le site
         self.assertIn("button.secondaire,.bouton.secondaire{background:#fff;border:1px solid var(--trait)", mobile)
         self.assertIn(mobile, vue.gabarit("t", "x"))

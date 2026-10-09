@@ -135,8 +135,8 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 .cal-tete{font-size:11px}.cal-grille{gap:0}
 .cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:0;align-items:center;gap:3px;padding:4px 0}
 .cal-jour.weekend{background:var(--vert-doux)!important}
-.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:700;background:none;color:var(--texte);align-self:center}
-.cal-jour.aujourdhui .cal-n{background:var(--vert)!important;color:#fff!important}
+.cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:500;background:none;color:var(--texte);align-self:center}
+.cal-jour.aujourdhui .cal-n{font-weight:800}
 .cal-jour.selection{outline:0}.cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}.cal-jour.aujourdhui.selection .cal-n{background:var(--vert)}
 .cal-jour.occupe::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--vert);display:block}.cal-jour.chargee::after{background:var(--alerte)}
 .cal-jour.autre-mois{opacity:.4}.cal-info,.cal-alerte,.cal-ligne{display:none}
@@ -168,14 +168,15 @@ table.tableau.jour.gestion .actions-ligne{display:flex;gap:8px}table.tableau.jou
 table.tableau.jour.gestion .actions-ligne .bouton,table.tableau.jour.gestion .actions-ligne button{width:100%}
 table.tableau.jour.gestion .actions-ligne .groupe-actions{display:flex;flex:2;gap:8px}table.tableau.jour.gestion .actions-ligne .mini{display:block;flex:1}
 /* page du jour : flèches sur les côtés (sans gros bouton), la date au centre, un seul bouton « Aujourd'hui » */
-form.nav-jour{display:grid;grid-template-columns:34px 1fr 34px;gap:0 6px;align-items:center;margin-bottom:10px}form.nav-jour>*{min-width:0}
+form.nav-jour{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;gap:0 6px;align-items:center;margin-bottom:12px}form.nav-jour>*{min-width:0}
 form.nav-jour button{display:none}
-form.nav-jour input{grid-column:2;grid-row:1;width:100%;max-width:none!important;text-align:center;font-weight:600}
-form.nav-jour a.nj-prec,form.nav-jour a.nj-suiv{grid-row:1;min-height:44px;width:34px;padding:0;border:0;background:none;box-shadow:none;font-size:0;position:relative}
+form.nav-jour input[type=date]{-webkit-appearance:none;appearance:none;display:block;grid-column:2;grid-row:1;width:100%;min-width:0;max-width:100%!important;margin:0;text-align:center;font-weight:600}
+form.nav-jour input[type=date]::-webkit-date-and-time-value{text-align:center;min-height:1.3em}
+form.nav-jour a.nj-prec,form.nav-jour a.nj-suiv{grid-row:1;min-height:44px;width:40px;padding:0;border:0;background:none;box-shadow:none;font-size:0;position:relative}
 form.nav-jour a.nj-prec{grid-column:1}form.nav-jour a.nj-suiv{grid-column:3}
 form.nav-jour a.nj-prec::before,form.nav-jour a.nj-suiv::before{content:"";position:absolute;top:50%;left:50%;width:11px;height:11px;border:solid var(--vert-fonce);border-width:0 0 2.6px 2.6px;transform:translate(-30%,-50%) rotate(45deg)}
 form.nav-jour a.nj-suiv::before{transform:translate(-70%,-50%) rotate(-135deg)}
-form.nav-jour a.nj-auj{display:flex!important;grid-column:1/-1;justify-self:center;margin-top:8px;min-height:36px;padding:4px 18px;font-size:13px}
+form.nav-jour a.nj-auj{display:flex!important;position:absolute;top:-50px;right:16px;margin:0;min-height:36px;padding:4px 16px;font-size:14px;font-weight:600;color:var(--vert)}
 /* page du jour : les quatre filtres sont repliés sous un seul bouton « Filtres » */
 form.filtres-jour{display:block;margin-bottom:12px}
 form.filtres-jour .filtres-bascule{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:46px;padding:0 16px;border:1px solid var(--trait);border-radius:12px;background:#fff;box-shadow:var(--ombre-carte);color:var(--vert-fonce);font-weight:700;font-size:16px}

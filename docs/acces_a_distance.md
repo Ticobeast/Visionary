@@ -53,8 +53,8 @@ Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes 
 **Barre du bas** (administrateur) : **Tableau de bord**, **Clients** et le bouton **Menu** (trois barres) qui ouvre une feuille avec **Chantiers**,
 **Soumissions**, **Journée**, **Archives**, **Utilisateurs** et **Se déconnecter**. Le compte « Soumission » a **Soumissions**, **Clients** et le Menu (Chantiers).
 - **Tableau de bord** : un calendrier comme celui d'Apple (un point sous les jours chargés ; le fond vert pâle des fins de semaine ; le jour courant en
-  cercle vert, le jour choisi en vert foncé), et dessous la journée choisie avec **Terminer** et un lien discret **Facture** en haut à droite de chaque chantier.
-- **Journée** : une flèche de chaque côté de la date pour changer de jour (ou toucher la date), un seul bouton **Aujourd'hui**, les quatre filtres des chantiers à placer regroupés sous un seul bouton **Filtres**, et la gestion de la journée (ordre, retirer, ajouter).
+  gras (et en cercle vert seulement quand il est choisi), un autre jour choisi en cercle vert foncé), et dessous la journée choisie avec **Terminer** et un lien discret **Facture** en haut à droite de chaque chantier.
+- **Journée** : une flèche de chaque côté de la date pour changer de jour (ou toucher la date), un seul bouton **Aujourd'hui** (en haut à droite du titre, absent quand on est déjà aujourd'hui), les quatre filtres des chantiers à placer regroupés sous un seul bouton **Filtres**, et la gestion de la journée (ordre, retirer, ajouter).
 - **Chantiers** : une carte par chantier (client, statut, adresse, travaux, montant, pastille d'attente, paiement), les raccourcis en pastilles à faire défiler,
   la recherche avec la loupe à droite.
 - **Soumissions** : le bouton rond **+** (en haut à droite) ouvre une nouvelle soumission ; une carte par soumission avec **Accepter**, **En attente**, **Refuser** ; le PDF est un lien discret « Soumission » en haut à droite de la carte. Les raccourcis sont des bulles qu'on fait défiler, et la dernière, **Modifier**, ouvre leur gestion (Chantiers aussi).

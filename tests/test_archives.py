@@ -485,6 +485,7 @@ class TestPresentationTelephone(BaseArchives):
         demain = (AUJOURDHUI + datetime.timedelta(days=1)).isoformat()
         self.assertIn(f'class="bouton secondaire pc-seul" href="/journee?date={demain}">Demain</a>', page)        # ordinateur : comme avant
         self.assertIn('class="filtres-bascule"', page)
+        self.assertNotIn('tel-seul nj-auj', self.get(f"/journee?date={AUJOURDHUI.isoformat()}"))                            # déjà aujourd'hui : pas de bouton
         self.assertIn('class="recherche filtres-jour"', page)                          # repliés par défaut
         self.assertIn('class="recherche filtres-jour ouvert"', self.get("/journee?date=2026-10-12&statut=planifie"))
         self.assertIn('class="recherche filtres-jour ouvert"', self.get("/journee?date=2026-10-12&tri=duree"))
