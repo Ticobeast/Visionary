@@ -379,6 +379,34 @@ class TestModification(BaseInterface):
         tps, tvq = self.sql("SELECT tps, tvq FROM chantiers WHERE id = 3")[0]
         self.assertTrue(tps > 0 and tvq > 0)
 
+    def test_taxes_recalculees_quand_le_prix_change_et_que_la_case_reste_cochee(self):
+        prix, tps, tvq = self.sql("SELECT prix_ht, tps, tvq FROM chantiers WHERE id = 3")[0]
+        self.assertTrue(tps > 0 and tvq > 0)
+        f = self.formulaire_de(3)                                                                    # TPS/TVQ préremplies avec les anciennes valeurs
+        f["prix_ht"] = "1000,00"
+        self.assertEqual(self.post("/chantier/3", f)[1]["Location"], "/chantier/3?ok=maj")
+        self.assertEqual(self.sql("SELECT prix_ht, tps, tvq FROM chantiers WHERE id = 3"), [(1000.0, 50.0, 99.75)])
+
+    def test_taxes_retouchees_a_la_main_sont_gardees_quand_le_prix_change(self):
+        f = self.formulaire_de(3)
+        f["prix_ht"], f["tps"], f["tvq"] = "1000,00", "40.00", "80.00"                               # retouchées dans le même formulaire
+        self.post("/chantier/3", f)
+        self.assertEqual(self.sql("SELECT prix_ht, tps, tvq FROM chantiers WHERE id = 3"), [(1000.0, 40.0, 80.0)])
+        g = self.formulaire_de(3)                                                                    # déjà particulières : un nouveau prix ne les écrase pas
+        g["prix_ht"] = "1200,00"
+        self.post("/chantier/3", g)
+        self.assertEqual(self.sql("SELECT prix_ht, tps, tvq FROM chantiers WHERE id = 3"), [(1200.0, 40.0, 80.0)])
+
+    def test_prix_efface_les_taxes_calculees_reviennent_a_zero(self):
+        c = sqlite3.connect(self.db)                                                                 # sans paiement : le prix peut être effacé
+        c.execute("DELETE FROM paiements WHERE chantier_id = 3")
+        c.commit()
+        c.close()
+        f = self.formulaire_de(3)
+        f["prix_ht"] = ""
+        self.post("/chantier/3", f)
+        self.assertEqual(self.sql("SELECT prix_ht, tps, tvq FROM chantiers WHERE id = 3"), [(None, 0.0, 0.0)])
+
     def test_taxes_retouchees_a_la_main_sont_gardees_meme_case_decochee(self):
         f = self.formulaire_de(3)
         f.pop("taxes_auto")

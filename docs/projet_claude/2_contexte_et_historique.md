@@ -20,6 +20,7 @@ Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), br
 - **Paiements** : sur la fiche du chantier ; jamais de solde négatif. Ajouter un paiement ne propose plus de terminer.
 - **Taxes** : case « Ajouter TPS 5 % et TVQ 9,975 % ». Elle reflète la fiche (cochée si la fiche a des taxes) ; décochée puis
   enregistrée, TPS et TVQ passent à 0 (sauf retouche manuelle).
+  Case cochée et prix changé : TPS et TVQ sont recalculées sur le nouveau prix (sauf retouche manuelle).
 - **Documents** : PDF de soumission et de facture (logo vectoriel, NEQ, coordonnées dans outils/entreprise.py ; TPS/TVQ :
   numéros à remplir quand l'entreprise sera inscrite). Facture : administrateur seulement.
 - **Photos** : carte Photos sur chaque fiche. Prendre une photo (appareil), Ajouter des photos (galerie ou ordinateur).
@@ -59,7 +60,6 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   pour chaque section 1, 2 ou 3 côtés à tailler. Idée retenue comme première étape : photographier le croquis papier,
   numéroter les sections, et une liste « section, endroit, nombre de côtés » dans la fiche, reprise dans le PDF de la journée.
   Plus tard peut-être : dessin au doigt dans l'app, ou tracé par-dessus une photo de la cour.
-- Taxes : si la case reste cochée et que le prix change, les taxes déjà enregistrées ne sont pas recalculées.
 - PDF dans l'app de l'écran d'accueil : la petite flèche « Télécharger » n'a pas été testée sur iPhone ; au besoin, ouvrir
   dans Safari. Le vrai bouton « Partager » d'iOS demanderait un accès HTTPS (possible avec Tailscale ; chantier à part).
 - À vérifier sur un vrai iPhone : « Prendre une photo », largeur des champs de date.

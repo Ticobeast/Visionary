@@ -13,6 +13,7 @@ Règles appliquées ici :
 """
 import datetime
 import sqlite3
+from decimal import Decimal
 
 from urllib.parse import quote, urlencode
 
@@ -21,7 +22,7 @@ from photos import bloc as bloc_photos
 from documents import facture_possible
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
                    dupliquer_chantier, empreinte, encaisser, libelles_manques, lire_ligne, lister_secteurs, manques_pour_accepter,
-                   mettre_a_jour_fiche, remettre_en_soumission, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
+                   mettre_a_jour_fiche, remettre_en_soumission, taxes_pour, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
                    valeurs_client)
 from vue import (libelle_statut, est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, MODES, adresses, argent, avance, badge, badge_statut, bloc_options_travaux,
                  bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps, lien_tel,
@@ -111,6 +112,14 @@ def lire_formulaire(conn, form, client_id=None, chantier_id=None):
         actuel = conn.execute("SELECT tps, tvq FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
         if actuel and (actuel[0] or 0) + (actuel[1] or 0) > 0 and all(_meme_montant(brut.get(c), x) for c, x in zip(("tps", "tvq"), actuel)):
             brut["tps"] = brut["tvq"] = "0"
+    elif chantier_id is not None:
+        # case cochée et prix changé : les taxes suivent le nouveau prix, si elles étaient celles calculées par le programme
+        # et qu'elles n'ont pas été retouchées à la main dans ce formulaire (sinon on garde ce qui est saisi)
+        prix, tps, tvq = conn.execute("SELECT prix_ht, tps, tvq FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+        if (tps or 0) + (tvq or 0) > 0 and prix is not None and not _meme_montant(brut.get("prix_ht"), prix):
+            automatiques = tuple(float(x) for x in taxes_pour(Decimal(str(prix))))
+            if (round(tps or 0, 2), round(tvq or 0, 2)) == automatiques and all(_meme_montant(brut.get(c), x) for c, x in (("tps", tps), ("tvq", tvq))):
+                brut["tps"] = brut["tvq"] = ""                                 # vides : lire_ligne les recalcule (ou 0 si le prix est effacé)
     travaux, valeurs_travaux = travaux_depuis_formulaire(conn, form)
     brut.update(valeurs_travaux)
     brut["type_travaux"] = travaux

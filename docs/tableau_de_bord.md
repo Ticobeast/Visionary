@@ -353,6 +353,8 @@ La **page d'une soumission** montre, de haut en bas :
 4. les champs à modifier : travaux, options, durée estimée, prix, description (rien d'obligatoire) ;
 5. **« Paramètres avancés »** (replié) : date de la demande, taxes, mode de règlement, fichiers, autres fiches du client, suppression (administrateur).
 
+**Taxes et changement de prix** : tant que la case « Ajouter TPS 5 % et TVQ 9,975 % » est cochée, changer le prix recalcule la TPS et la TVQ. Exception : des montants de TPS ou de TVQ retouchés à la main (Paramètres avancés) sont gardés tels quels.
+
 La **page d'un chantier** (accepté) ajoute les **paiements** (administrateur : liste, « + Ajouter un paiement ») et les boutons **Terminer** (chantier
 planifié), **Mettre en attente** (chantier « À planifier »), **Sortir de l'attente** et **Changer la date** (chantier en attente), **Remettre en soumission**
 (chantier « À planifier » ou « En attente »), **Rouvrir** (chantier annulé) et **Dupliquer**. Un chantier **Terminé** n'a pas de

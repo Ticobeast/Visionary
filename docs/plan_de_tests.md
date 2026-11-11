@@ -121,6 +121,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 77 | **Ordinateur** : la même fiche > **Ajouter des photos** (un ou plusieurs JPEG / PNG) | les vignettes apparaissent ; un fichier qui n'est pas une image (ex. un PDF renommé en .jpg) est refusé avec un message |
 | 78 | Planifier le chantier à une date, puis **Télécharger la journée (PDF)** | les photos de la fiche sont dans le PDF, en vignettes |
 | 79 | **Compte Soumission** sur un téléphone : ajouter une photo à une soumission | permis |
+| 80 | Chantier avec taxes (case « Ajouter TPS et TVQ » cochée) : changer le **prix**, enregistrer | TPS et TVQ suivent le nouveau prix (ex. 1 000,00 $ : 50,00 $ et 99,75 $) ; la facture PDF montre les nouveaux montants. Si TPS ou TVQ ont été retouchées à la main dans « Paramètres avancés », elles sont gardées |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
