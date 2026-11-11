@@ -23,10 +23,11 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
 import auth  # noqa: E402
+import sauvegardes  # noqa: E402
 import vue  # noqa: E402
 from listes import filtres_depuis, selection_chantiers  # noqa: E402
 from noyau import (DB_DEFAUT, Index, Resultat, cle, creer_chantier, jours_attente, lister_secteurs, ouvrir_base,  # noqa: E402
-                   priorite, reprendre_les_attentes, sauvegarder, service_nuage, transaction, trouver_ou_creer_client)
+                   priorite, reprendre_les_attentes, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
 from reseau import adresses_tailscale, client_autorise, hote_autorise  # noqa: E402
@@ -341,8 +342,8 @@ def main(argv=None):
         print(f"Base d'essai créée avec de fausses données : {res.chantiers} chantiers.")
     conn, existait = ouvrir_base(db)
     conn.close()
-    if existait and not list((db.parent / "sauvegardes").glob(f"{datetime.date.today():%Y-%m-%d}_*")):
-        print(f"Sauvegarde du jour : {sauvegarder(db, 'demarrage')}")
+    if existait:                                   # pas de sauvegarde pour une base qui vient d'être créée
+        sauvegardes.demarrer_sauvegarde_quotidienne(db)
     try:
         serveur = creer_serveur(db, a.port, a.reseau)
     except OSError:
@@ -350,6 +351,8 @@ def main(argv=None):
     url = f"http://localhost:{a.port}/"
     mode = "BASE D'ESSAI (fausses données)" if db.name != DB_DEFAUT.name else "BASE RÉELLE"
     print(f"{mode} : {db}\nInterface : {url}\nArrêter : Ctrl+C")
+    if db.name == DB_DEFAUT.name:
+        print(sauvegardes.message_copie_externe(db))
     if a.reseau:
         adresses = adresses_tailscale()
         print("\nACCÈS À DISTANCE ACTIVÉ (appareils de ton Tailscale seulement ; les autres sont refusés).")

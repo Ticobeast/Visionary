@@ -107,7 +107,21 @@ ailleurs, par exemple `C:\SylvainCulteur`. L'interface affiche un avertissement 
 
 `data/` et tous les fichiers `*.db` sont dans le `.gitignore` : les vraies données de tes clients ne doivent
 jamais être envoyées sur GitHub. Le dépôt ne contient que des exemples fictifs (téléphones en `555-01xx`,
-courriels `@example.com`). Une sauvegarde de la base est faite chaque jour au démarrage de l'interface (`data/sauvegardes/`).
+courriels `@example.com`). Les sauvegardes sont décrites plus bas (section « Sauvegardes »).
+
+## Sauvegardes
+
+- **Une par jour**, dans `data/sauvegardes/`, même si le programme reste allumé des semaines : une au démarrage, puis une vérification
+  toutes les heures. Une base qui vient d'être créée n'est pas sauvegardée (elle est vide).
+- **Ménage automatique** : toutes les sauvegardes des 30 derniers jours sont gardées ; au-delà, seule la plus ancienne de chaque mois reste.
+  Les copies `avant_migration` et `avant_restauration` ne sont jamais effacées.
+- **Copie hors de l'ordinateur** (clé USB, disque externe) : crée le fichier `data/copie_externe.txt` et écris dessus, en une seule ligne,
+  le dossier voulu (ex. `E:\SylvainCulteur`). Les sauvegardes et les photos y sont copiées (sous-dossiers `sauvegardes/` et `photos/`) ;
+  rien n'y est jamais effacé. La copie est refaite toutes les heures : les photos du jour suivent. Si la clé est débranchée, le programme continue, affiche un message, et rattrape tout dès qu'elle est rebranchée. Un dossier OneDrive, Dropbox, etc. est refusé.
+  Sans ce fichier, aucune copie externe n'est faite (le démarrage te le rappelle).
+- **Restaurer** : ferme le programme, puis double-clique `restaurer_sauvegarde.bat` (ou lance `python restaurer_sauvegarde.py`).
+  Choisis la sauvegarde dans la liste, tape « oui » pour confirmer. Elle est vérifiée avant, et tes données actuelles sont gardées dans
+  une copie `avant_restauration`. Pour la base d'essai : `python restaurer_sauvegarde.py --essai`.
 
 ## Prérequis
 
