@@ -122,6 +122,14 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 78 | Planifier le chantier à une date, puis **Télécharger la journée (PDF)** | les photos de la fiche sont dans le PDF, en vignettes |
 | 79 | **Compte Soumission** sur un téléphone : ajouter une photo à une soumission | permis |
 | 80 | Chantier avec taxes (case « Ajouter TPS et TVQ » cochée) : changer le **prix**, enregistrer | TPS et TVQ suivent le nouveau prix (ex. 1 000,00 $ : 50,00 $ et 99,75 $) ; la facture PDF montre les nouveaux montants. Si TPS ou TVQ ont été retouchées à la main dans « Paramètres avancés », elles sont gardées |
+| 81 | Regarder le dossier `data/sauvegardes` après avoir lancé l'interface | une sauvegarde datée d'aujourd'hui existe (une seule, même si tu relances) |
+| 82 | Laisser le programme allumé jusqu'au lendemain, sans le redémarrer | une nouvelle sauvegarde datée du lendemain apparaît |
+| 83 | Créer `data/copie_externe.txt` avec le dossier d'une clé USB sur une ligne, relancer | le démarrage affiche où va la copie ; `sauvegardes/` et `photos/` apparaissent sur la clé |
+| 84 | Débrancher la clé, laisser tourner puis relancer | le programme continue de fonctionner et affiche un message (clé introuvable) ; rien ne plante |
+| 85 | Mettre dans `copie_externe.txt` un dossier OneDrive ou Dropbox | la copie est refusée avec un message |
+| 86 | Supprimer `data/copie_externe.txt`, relancer | le démarrage dit qu'aucune copie externe n'est configurée et comment faire |
+| 87 | Programme fermé : double-clic sur `restaurer_sauvegarde.bat`, choisir une sauvegarde, répondre autre chose que « oui » | rien n'est changé |
+| 88 | Même chose, mais taper « oui » | message de fin ; une copie `avant_restauration` apparaît ; au lancement, les données sont celles de la sauvegarde |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

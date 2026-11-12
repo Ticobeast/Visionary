@@ -37,7 +37,8 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
 ### 2. L'ordinateur reste allumé
 - **Paramètres > Système > Alimentation** : mise en veille « Jamais » (branché).
 - Pour un redémarrage automatique : `Windows + R`, taper `shell:startup`, y glisser un **raccourci** vers `lancer_reseau.bat`.
-- La sauvegarde du jour se fait toute seule au démarrage (`data/sauvegardes`). Garder aussi une copie sur un disque externe.
+- La sauvegarde du jour se fait toute seule (`data/sauvegardes`), même sans redémarrage. Pour une copie sur une clé USB ou un disque externe,
+  crée `data/copie_externe.txt` avec le dossier voulu sur une ligne (voir README, section « Sauvegardes »). Pour restaurer : `restaurer_sauvegarde.bat`.
 
 ### 3. Sur chaque téléphone / iPad
 1. Installer **Tailscale** (App Store ou Google Play), se connecter au même compte ou y être invité
