@@ -86,7 +86,7 @@ python3 outils/interface.py                            # la VRAIE base (créée 
 ```
 
 Les mêmes tests sont lancés automatiquement sur GitHub à chaque pull request (Python 3.9 sous Windows, comme le PC, et Python 3.13 sous Linux) :
-une coche verte à côté de la pull request veut dire que tout passe ; une croix rouge, qu'il ne faut pas fusionner.
+une coche verte à côté de la pull request veut dire que tout passe ; une croix rouge, qu'il ne faut pas fusionner. Sous Windows, il faut compter environ 15 minutes.
 
 **Bouton « Exécuter » de VS Code** : ouvre `lancer_essai.py` (essai) ou `lancer_interface.py` (vraie base) ; ne lance pas
 `interface.py` directement, il ouvrirait toujours la vraie base. Les chemins contenant des espaces doivent être entre guillemets.
