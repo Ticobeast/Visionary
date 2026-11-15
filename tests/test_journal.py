@@ -158,10 +158,17 @@ class TestConnexion(BaseJournal):
         self.req("POST", "/connexion", {"nom": "Inconnu", "mot_de_passe": "motdepasse-admin"})
         self.req("POST", "/deconnexion", {}, cookie=cookie)
         self.assertEqual(self.lignes(), [("Admin", "Connexion refusée", None, "/connexion"), ("Admin", "Connexion", None, "/connexion"),
-                                         ("Inconnu", "Connexion refusée", None, "/connexion"), ("Admin", "Déconnexion", None, "/deconnexion")])
+                                         ("(nom inconnu)", "Connexion refusée", None, "/connexion"), ("Admin", "Déconnexion", None, "/deconnexion")])
         tout = self.tout_le_journal()
         for mot_de_passe in ("MOT-DE-PASSE-FAUX", "motdepasse-admin"):
             self.assertNotIn(mot_de_passe, tout)
+
+    def test_un_mot_de_passe_tape_dans_le_champ_du_nom_n_est_pas_enregistre(self):
+        self.comptes()
+        self.req("POST", "/connexion", {"nom": "SECRET-TAPE-AU-MAUVAIS-ENDROIT", "mot_de_passe": ""})
+        self.req("POST", "/connexion", {"nom": "admin", "mot_de_passe": "faux"})            # compte existant, autre casse : le nom du compte
+        self.assertEqual([r[0] for r in self.lignes()], ["(nom inconnu)", "Admin"])
+        self.assertNotIn("SECRET-TAPE", self.tout_le_journal())
 
     def test_trop_d_essais_est_une_connexion_refusee(self):
         self.comptes()

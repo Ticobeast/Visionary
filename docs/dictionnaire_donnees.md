@@ -220,7 +220,7 @@ personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendr
 |---|---|---|
 | `id` | entier | numéro, `AUTOINCREMENT` |
 | `quand` | date-heure `AAAA-MM-JJ HH:MM:SS` | heure locale, posée par la base |
-| `utilisateur` | texte | **nom** du compte au moment de l'action, copié en texte (**pas** de lien vers `utilisateurs` : la ligne survit à la suppression du compte). Vide quand il n'y a pas de comptes. Pour « Connexion refusée » : le nom tapé |
+| `utilisateur` | texte | **nom** du compte au moment de l'action, copié en texte (**pas** de lien vers `utilisateurs` : la ligne survit à la suppression du compte). Vide quand il n'y a pas de comptes. Pour « Connexion refusée » : le nom du compte visé s'il existe, sinon « (nom inconnu) » (un nom inconnu n'est jamais copié) |
 | `action` | texte, obligatoire | phrase courte en français (« Client modifié », « Paiement ajouté »...) ; table des libellés dans `outils/journal.py` |
 | `cible` | texte | la fiche touchée : `client 12`, `chantier 45`, `soumission 45`, `paiement 7`, `compte 2`... Vide s'il n'y en a pas |
 | `adresse` | texte, obligatoire | chemin de la requête (`/client/12/modifier`), sans paramètres |

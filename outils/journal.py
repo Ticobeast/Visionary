@@ -6,7 +6,7 @@ et il garde tout : il n'y a pas de purge automatique.
 
 Ce qui est enregistré : la date, le nom du compte (copié en texte), un libellé court, la cible (« client 12 ») et l'adresse de la
 requête sans ses paramètres. AUCUNE valeur de formulaire n'est enregistrée (ni mot de passe, ni contenu des fiches). Seule exception :
-le nom tapé à la connexion, pour « Connexion refusée » (jamais le mot de passe).
+le nom tapé à la connexion, et seulement s'il est celui d'un compte existant (sinon « (nom inconnu) ») ; jamais le mot de passe.
 
 « Réussi » veut dire : réponse 303 (redirection) dont l'adresse porte `ok=` et pas `err=` ; une page réaffichée avec des erreurs, un refus
 ou une 404 n'écrit rien. Exceptions : voir SANS_PARAMETRE_OK (réussite sans `ok=`), l'ajout de photo (réponse JSON 200 avec le nom de la
@@ -22,6 +22,7 @@ import vue
 from vue import esc, gabarit
 
 LIGNES_PAR_PAGE = 100
+NOM_INCONNU = "(nom inconnu)"
 
 # (motif de la route, libellé ou fonction(form) -> libellé, cible)
 # cible : genre de la fiche visée, dont le numéro est celui de l'adresse (premier groupe du motif) ;
@@ -165,7 +166,9 @@ def noter_requete(conn, methode, motif, chemin, groupes, form, resultat, utilisa
             nom = (form or {}).get("nom", "")
             reussie = not isinstance(resultat, str) and len(resultat) == 3 and resultat[0].startswith("303")      # refus : la page est réaffichée (200)
             action = "Connexion" if reussie else "Connexion refusée"
-            noter(conn, nom, action, None, chemin)
+            connu = conn.execute("SELECT nom FROM utilisateurs WHERE nom = ?", (str(nom).strip(),)).fetchone()
+            # Un nom qui n'est pas celui d'un compte n'est jamais copié : quelqu'un peut taper son mot de passe dans le mauvais champ.
+            noter(conn, connu[0] if connu else NOM_INCONNU, action, None, chemin)
             return
         if not a_reussi(motif, resultat):
             return
