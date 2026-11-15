@@ -255,6 +255,20 @@ def repondre(db_path, methode, chemin, query=None, form=None, requete=None):
 # ---------------------------------------------------------------------------
 # Serveur HTTP
 # ---------------------------------------------------------------------------
+LIMITE_FORMULAIRE = 1_000_000
+
+# Ajoutés à toute réponse (voir _envoyer). Les pages contiennent du CSS et du JavaScript « en ligne » : 'unsafe-inline'
+# est nécessaire. Tout le reste vient du serveur lui-même ; blob: et data: servent aux images (photos redimensionnées
+# avant l'envoi, petites icônes en CSS).
+EN_TETES_SECURITE = [
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Referrer-Policy", "same-origin"),
+    ("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"),
+]
+
+
 class Gestionnaire(BaseHTTPRequestHandler):
     db_path = DB_DEFAUT
     hotes_autorises = ()
@@ -279,22 +293,45 @@ class Gestionnaire(BaseHTTPRequestHandler):
         form = {}
         if methode == "POST" and (self.headers.get("Content-Type") or "").startswith("image/"):
             # une photo : le corps de la requête EST l'image (voir photos.py) ; trop lourde -> refusée sans être lue
-            taille = int(self.headers.get("Content-Length") or 0)
+            taille = self._taille_corps()
+            if taille is None:
+                return self._texte("400 Bad Request", "Requête invalide.")
             if taille > LIMITE_PHOTO:
                 return self._envoyer("413 Payload Too Large", [("Content-Type", "application/json; charset=utf-8")],
                                      '{"erreur": "photo trop lourde"}'.encode())
             form = {"_octets": self.rfile.read(taille)}
         elif methode == "POST":
-            taille = min(int(self.headers.get("Content-Length") or 0), 1_000_000)
+            taille = self._taille_corps()
+            if taille is None:
+                return self._texte("400 Bad Request", "Requête invalide.")
+            if taille > LIMITE_FORMULAIRE:
+                return self._texte("413 Payload Too Large", "Formulaire trop volumineux.")
             form = {k: v[0] for k, v in parse_qs(self.rfile.read(taille).decode("utf-8", "replace"), keep_blank_values=True).items()}
         requete = {"cookie": self.headers.get("Cookie", ""), "ip": self.client_address[0], "agent": self.headers.get("User-Agent", ""),
                    "https": self.headers.get("X-Forwarded-Proto", "") == "https" and self.client_address[0] in ("127.0.0.1", "::1")}
         self._envoyer(*repondre(self.db_path, methode, url.path, query, form, requete))
 
+    def _taille_corps(self):
+        """Taille annoncée du corps de la requête : 0 si absente, None si non numérique ou négative."""
+        valeur = (self.headers.get("Content-Length") or "").strip()
+        if not valeur:
+            return 0
+        if not (valeur.isascii() and valeur.isdigit()):
+            return None
+        return int(valeur)
+
+    def _texte(self, statut, message):
+        self._envoyer(statut, [("Content-Type", "text/plain; charset=utf-8")], message.encode())
+
     def _envoyer(self, statut, en_tetes, corps):
+        if any(c in x for k, v in en_tetes for x in (k, v) for c in "\r\n"):
+            # défense en profondeur : un en-tête avec CR ou LF permettrait d'en injecter d'autres
+            statut, en_tetes, corps = "400 Bad Request", [("Content-Type", "text/plain; charset=utf-8")], "Requête invalide.".encode()
         code, _, texte = statut.partition(" ")
         self.send_response(int(code), texte)
         for k, v in en_tetes:
+            self.send_header(k, v)
+        for k, v in EN_TETES_SECURITE:
             self.send_header(k, v)
         self.send_header("Content-Length", str(len(corps)))
         if not any(k.lower() == "cache-control" for k, _ in en_tetes):

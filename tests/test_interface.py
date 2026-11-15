@@ -3,6 +3,7 @@
     python3 -m unittest discover -s tests -v
 """
 import datetime
+import http.client
 import re
 import sqlite3
 import sys
@@ -18,6 +19,7 @@ RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
 sys.path.insert(0, str(RACINE / "tests"))
 import fixtures  # noqa: E402
+import composants  # noqa: E402
 import interface  # noqa: E402
 
 
@@ -816,6 +818,72 @@ class TestServeurReel(BaseInterface):
     def test_hote_inattendu_est_refuse(self):                     # protection « DNS rebinding »
         statut, _, _ = self.requete("/", en_tetes={"Host": "pirate.example"})
         self.assertEqual(statut, 403)
+
+    def brut(self, methode, chemin, en_tetes, corps=b""):
+        """Requête avec des en-têtes écrits à la main (ex. Content-Length bizarre) ; retourne (statut, en-têtes, corps)."""
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        try:
+            c.putrequest(methode, chemin)
+            for k, v in en_tetes.items():
+                c.putheader(k, v)
+            c.endheaders(corps)
+            r = c.getresponse()
+            return r.status, r.headers, r.read().decode()
+        finally:
+            c.close()
+
+    def test_content_length_invalide(self):
+        formulaire = {"Content-Type": "application/x-www-form-urlencoded"}
+        for valeur in ("abc", "-1", "1.5", "+5"):
+            statut, _, _ = self.brut("POST", "/nouveau", dict(formulaire, **{"Content-Length": valeur}))
+            self.assertEqual(statut, 400, valeur)
+        statut, _, _ = self.brut("POST", "/nouveau", {"Content-Type": "image/jpeg", "Content-Length": "-1"})
+        self.assertEqual(statut, 400)
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])
+
+    def test_content_length_trop_grand_pour_un_formulaire(self):
+        statut, _, corps = self.brut("POST", "/nouveau", {"Content-Type": "application/x-www-form-urlencoded",
+                                                          "Content-Length": "1000001"})
+        self.assertEqual(statut, 413)
+        self.assertIn("volumineux", corps)
+
+    def test_content_length_absent_est_accepte(self):
+        statut, _, _ = self.brut("POST", "/nouveau", {"Content-Type": "application/x-www-form-urlencoded"})
+        self.assertNotEqual(statut, 400)
+        statut, _, _ = self.brut("GET", "/chantiers", {})
+        self.assertEqual(statut, 200)
+
+    def test_en_tete_avec_retour_de_chariot_refuse(self):
+        vraie = interface.repondre
+        interface.repondre = lambda *a, **k: ("303 See Other", [("Location", "/\r\nSet-Cookie: x=1")], b"")
+        try:
+            statut, entetes, _ = self.requete("/chantiers")
+        finally:
+            interface.repondre = vraie
+        self.assertEqual(statut, 400)
+        self.assertIsNone(entetes.get("Set-Cookie"))
+        self.assertIsNone(entetes.get("Location"))
+
+    def test_en_tetes_de_securite(self):
+        page = self.requete("/chantiers")[1]
+        statut, redir, _ = self.requete("/nouveau", fiche())                         # 303
+        statut_403, refus, _ = self.requete("/", en_tetes={"Host": "pirate.example"})
+        self.assertEqual((statut, statut_403), (303, 403))
+        for entetes in (page, redir, refus):
+            self.assertEqual(entetes["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(entetes["X-Frame-Options"], "DENY")
+            self.assertEqual(entetes["Referrer-Policy"], "same-origin")
+            self.assertIn("frame-ancestors 'none'", entetes["Content-Security-Policy"])
+
+
+class TestRetourValide(unittest.TestCase):
+    def test_caracteres_de_controle_refuses(self):
+        for mauvais in ("/a\rb", "/a\nb", "/a\tb", "/a\x00b", "/a\x7fb", "/x\r\nSet-Cookie: a=b"):
+            self.assertEqual(composants.retour_valide(mauvais, "/defaut"), "/defaut", repr(mauvais))
+
+    def test_chemin_normal_accepte(self):
+        self.assertEqual(composants.retour_valide("/chantiers?q=lac&page=2", "/"), "/chantiers?q=lac&page=2")
+        self.assertEqual(composants.retour_valide("//evil.example", "/"), "/")
 
 
 if __name__ == "__main__":
