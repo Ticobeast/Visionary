@@ -5,6 +5,7 @@
 import sqlite3
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -301,7 +302,54 @@ class TestBaseEtVersions(unittest.TestCase):
             c.close()
             with self.assertRaises(SystemExit) as e:
                 noyau.ouvrir_base(db)
-            self.assertIn("supprime simplement ce fichier", str(e.exception))
+            self.assertIn("Ne supprime pas ce fichier", str(e.exception))
+            self.assertIn("trop ancien", str(e.exception))
+
+    def test_base_d_une_version_plus_recente_refusee_sans_conseiller_de_la_supprimer(self):
+        with tempfile.TemporaryDirectory() as t:
+            db = Path(t) / "data" / "s.db"
+            noyau.ouvrir_base(db)[0].close()
+            c = sqlite3.connect(db)
+            c.execute(f"PRAGMA user_version = {noyau.VERSION_SCHEMA + 1}")
+            c.close()
+            with self.assertRaises(SystemExit) as e:
+                noyau.ouvrir_base(db)
+            self.assertIn("plus récente", str(e.exception))
+            self.assertIn("Ne supprime pas ce fichier", str(e.exception))
+            self.assertFalse((db.parent / "sauvegardes").exists())             # aucune migration tentée
+
+    def test_deux_ecritures_en_meme_temps_la_seconde_attend_son_tour(self):
+        """Avant (BEGIN simple), la seconde échouait tout de suite avec « database is locked » au moment d'écrire."""
+        import threading
+        with tempfile.TemporaryDirectory() as t:
+            db = Path(t) / "data" / "s.db"
+            noyau.ouvrir_base(db)[0].close()
+            pret, erreurs = threading.Event(), []
+
+            def lente():
+                conn, _ = noyau.ouvrir_base(db)
+                try:
+                    with noyau.transaction(conn):
+                        conn.execute("SELECT count(*) FROM secteurs").fetchone()
+                        pret.set()
+                        time.sleep(0.3)
+                        conn.execute("INSERT INTO clients (nom) VALUES ('Premier')")
+                except Exception as e:  # noqa: BLE001
+                    erreurs.append(e)
+                finally:
+                    conn.close()
+
+            fil = threading.Thread(target=lente)
+            fil.start()
+            self.assertTrue(pret.wait(5))
+            conn, _ = noyau.ouvrir_base(db)
+            with noyau.transaction(conn):                                      # attend la fin de l'autre, puis écrit
+                conn.execute("SELECT count(*) FROM secteurs").fetchone()
+                conn.execute("INSERT INTO clients (nom) VALUES ('Second')")
+            fil.join(5)
+            self.assertEqual(erreurs, [])
+            self.assertEqual([r[0] for r in conn.execute("SELECT nom FROM clients ORDER BY id")], ["Premier", "Second"])
+            conn.close()
 
     def test_les_exemples_de_depart(self):
         with tempfile.TemporaryDirectory() as t:

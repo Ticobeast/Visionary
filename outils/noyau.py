@@ -418,9 +418,12 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
                 raise
         if version != VERSION_SCHEMA:
             conn.close()
-            raise SystemExit(f"La base {db_path} a été créée par une version précédente du programme (format v{version}, attendu v{VERSION_SCHEMA}).\n"
-                             "Comme il n'y a pas encore de vraies données, supprime simplement ce fichier : il sera recréé au prochain lancement "
-                             "(pour la base d'essai, relance lancer_essai).")
+            if version > VERSION_SCHEMA:
+                raise SystemExit(f"La base {db_path} a été écrite par une version plus récente du programme (format v{version}, ici v{VERSION_SCHEMA}).\n"
+                                 "Mets le programme à jour, puis relance. Ne supprime pas ce fichier : il contient tes données.")
+            raise SystemExit(f"La base {db_path} est d'un format trop ancien pour être mise à jour toute seule (format v{version}, attendu v{VERSION_SCHEMA}).\n"
+                             "Ne supprime pas ce fichier : il contient peut-être des données. Mets-le de côté et demande de l'aide "
+                             "(pour la base d'essai, relance simplement lancer_essai : elle est refaite).")
     return conn, existait
 
 
@@ -772,8 +775,11 @@ def mettre_a_jour_client(conn, client_id, v):
 # ---------------------------------------------------------------------------
 @contextmanager
 def transaction(conn):
-    """BEGIN ... COMMIT, ou ROLLBACK si une exception survient."""
-    conn.execute("BEGIN")
+    """BEGIN IMMEDIATE ... COMMIT, ou ROLLBACK si une exception survient.
+
+    IMMEDIATE : le droit d'écrire est pris dès le début. Si quelqu'un d'autre écrit au même moment, on attend son tour (quelques
+    secondes au plus) au lieu d'échouer tout de suite avec « database is locked » au milieu de la transaction."""
+    conn.execute("BEGIN IMMEDIATE")
     try:
         yield
     except BaseException:
