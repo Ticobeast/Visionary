@@ -13,7 +13,7 @@ sans retranscription.
 - **La base refuse les données invalides à la saisie** (dates, téléphones, montants, statuts incohérents) : un
   tableur, lui, réécrit silencieusement les dates et les décimales.
 - **Tout se fait dans une interface locale** (`outils/interface.py`) qui s'ouvre dans le navigateur : un **calendrier**
-  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / En attente / Refuser, et le **PDF de la soumission** à envoyer au client), des **raccourcis** à ton goût en haut des listes, les fiches clients, l'onglet **Archives** (tout l'historique, recherches, statistiques, export Excel), la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
+  des journées planifiées (en lecture seule), une page **Journée** pour créer et gérer une journée complète (heures de passage calculées, ordre modifiable), la liste des **chantiers** (actifs, puis archives), l'onglet **Soumissions** (boutons Accepter / En attente / Refuser, et le **PDF de la soumission** à envoyer au client), des **raccourcis** à ton goût en haut des listes, les fiches clients, l'onglet **Archives** (tout l'historique, recherches, statistiques, export Excel), le **Journal** des modifications (qui a fait quoi et quand ; administrateur, ordinateur), la saisie avec validation immédiate. L'interface est simple par défaut : les options rarement utilisées sont dans « Paramètres avancés ». Elle écoute
   uniquement sur l'ordinateur (`127.0.0.1`) : rien n'est exposé sur le réseau.
 
 **Sur téléphone et iPad (équipe sur le terrain).** `lancer_reseau.bat` ouvre l'interface aux appareils de ton réseau privé Tailscale
@@ -47,6 +47,7 @@ outils/interface.py                     serveur local, page Chantiers, nouvelle 
 outils/pages_soumissions.py             onglet Soumissions : liste, boutons Accepter / En attente / Refuser, page « Accepter » qui ne demande que ce qui manque
 outils/pages_attente.py                 « Mettre en attente » (date de reprise ou à nouvel ordre) et « Sortir de l'attente »
 outils/archives.py                      onglet Archives : recherche, relance par client, statistiques, export CSV (administrateur)
+outils/journal.py                       journal des modifications (qui a fait quoi et quand) : libellés, écriture, page /journal (administrateur, ordinateur)
 outils/raccourcis.py                    pastilles de raccourcis en haut de Chantiers et Soumissions (chaque compte garde les siennes)
 outils/listes.py                        sélections des listes Chantiers et Soumissions (filtres, recherche, délais)
 outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)
@@ -94,7 +95,7 @@ une coche verte à côté de la pull request veut dire que tout passe ; une croi
 Le coin supérieur droit de l'interface indique toujours la base ouverte : **« BASE D’ESSAI »** en orange pour
 les fausses données, « Base : sylvainculteur.db » pour la vraie.
 
-**Mises à jour du programme.** Une base des formats v8, v9, v10, v11, v12, v13 et v14 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien, ou plus récent que le programme, est refusé avec un message : ne supprime pas le fichier de base (`data/sylvainculteur.db`), il contient tes données ; mets le programme à jour ou demande de l'aide. La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
+**Mises à jour du programme.** Une base des formats v8, v9, v10, v11, v12, v13, v14 et v15 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien, ou plus récent que le programme, est refusé avec un message : ne supprime pas le fichier de base (`data/sylvainculteur.db`), il contient tes données ; mets le programme à jour ou demande de l'aide. La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
 
 Pas à pas : [`docs/plan_de_tests.md`](docs/plan_de_tests.md). Sous Windows, remplacer `python3` par `python`
 ou `py`. Outil graphique gratuit pour consulter la base : [DB Browser for SQLite](https://sqlitebrowser.org/).

@@ -309,6 +309,8 @@ RESERVE_ADMIN = (
     # comptes
     ("GET", r"^/utilisateurs$"), ("POST", r"^/utilisateurs/ajouter$"), ("POST", r"^/utilisateurs/(\d+)/mot-de-passe$"),
     ("POST", r"^/utilisateurs/(\d+)/actif$"),
+    # journal des modifications
+    ("GET", r"^/journal$"),
     # journée, tournée, suivi et actions sur les chantiers planifiés
     ("GET", r"^/journee\.pdf$"), ("GET", r"^/journee$"), ("POST", r"^/journee/planifier$"), ("GET", r"^/tournee$"), ("GET", r"^/suivi$"),
     ("POST", r"^/action/terminer$"), ("POST", r"^/action/annuler$"), ("POST", r"^/action/rouvrir$"), ("POST", r"^/action/retirer$"),
@@ -444,7 +446,8 @@ def page_utilisateurs(conn, query):
              '<div class="barre" style="margin-top:12px"><button type="submit">Ajouter</button></div></form>'
              f'<p class="doux">Mot de passe : {LONGUEUR_MIN} caractères au minimum. Avant de rendre l\'application accessible sur Internet, utilise des mots de passe longs.</p></div>')
     err = query.get("err")
-    contenu = (f'<h1>Utilisateurs</h1>{f"<div class=erreurs>{esc(err)}</div>" if err else ""}'
+    contenu = (f'<h1>Utilisateurs</h1><div class="barre pc-seul" style="margin-bottom:16px"><a class="bouton secondaire" href="/journal">Journal des modifications</a></div>'
+               f'{f"<div class=erreurs>{esc(err)}</div>" if err else ""}'
                f'<div class="liste-defile"><table><thead><tr><th>Nom</th><th>Droits</th><th>État</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>{ajout}')
     return gabarit("Utilisateurs", contenu, query.get("ok"))
 

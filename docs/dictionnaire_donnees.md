@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v15)
+# Dictionnaire de données (schéma v16)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -16,6 +16,7 @@ secteurs 1 ─── N clients (personne/entreprise + adresse) 1 ─── N cha
 | `chantier_travaux` | un type de travaux d'un chantier, avec sa précision | un chantier peut combiner plusieurs types (élagage + taille de haie) |
 | `paiements` | une somme reçue | acompte + solde, chèque en deux versements… |
 | `utilisateurs`, `sessions` | les comptes de l'équipe et leurs connexions ouvertes | accès par mot de passe (voir ci-dessous) ; absents du reste du modèle |
+| `journal` | une action réussie : qui, quoi, quand | qui a fait quoi ; ne se modifie jamais (voir ci-dessous) |
 | `raccourcis` | une pastille en haut de la page Chantiers ou Soumissions, pour une personne | chaque compte choisit ses raccourcis (voir ci-dessous) |
 | `types_travaux` | un type de travaux | on ajoute un type avec un `INSERT`, sans modifier le schéma |
 | `secteurs` | un secteur desservi (liste fermée) : `code`, `libelle`, `ville` (inscrite sur l'adresse), `ordre` | une ville s'écrit toujours de la même façon (liste déroulante) ; sert à classer / filtrer les clients. Se gère dans la page *Secteurs* |
@@ -213,15 +214,37 @@ Au premier passage d'une personne sur une page, ses raccourcis de départ sont e
 Soumission : À planifier, Planifiés ; Soumissions : Mes soumissions, À relancer). Une ligne spéciale (`filtre` = `__vide__`, invisible) retient qu'une
 personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendraient.
 
+## `journal` (qui a fait quoi, et quand ; depuis le format v16)
+
+| Colonne | Type | Règle |
+|---|---|---|
+| `id` | entier | numéro, `AUTOINCREMENT` |
+| `quand` | date-heure `AAAA-MM-JJ HH:MM:SS` | heure locale, posée par la base |
+| `utilisateur` | texte | **nom** du compte au moment de l'action, copié en texte (**pas** de lien vers `utilisateurs` : la ligne survit à la suppression du compte). Vide quand il n'y a pas de comptes. Pour « Connexion refusée » : le nom du compte visé s'il existe, sinon « (nom inconnu) » (un nom inconnu n'est jamais copié) |
+| `action` | texte, obligatoire | phrase courte en français (« Client modifié », « Paiement ajouté »...) ; table des libellés dans `outils/journal.py` |
+| `cible` | texte | la fiche touchée : `client 12`, `chantier 45`, `soumission 45`, `paiement 7`, `compte 2`... Vide s'il n'y en a pas |
+| `adresse` | texte, obligatoire | chemin de la requête (`/client/12/modifier`), sans paramètres |
+
+Une ligne est écrite après chaque action **réussie** (une redirection avec `ok=` et sans `err=`), en un seul endroit (`interface.repondre`) : les fonctions
+métier ne savent rien du journal. Un refus, une erreur de saisie et les simples consultations n'écrivent rien. **Aucune valeur de formulaire n'est
+enregistrée** (ni mot de passe, ni contenu des fiches). Deux déclencheurs refusent tout `UPDATE` et tout `DELETE` : le journal ne se modifie pas, et il
+garde tout (pas de purge). Si l'écriture échoue (base occupée...), l'action de la personne réussit quand même et l'erreur s'affiche dans la console.
+Poids : environ 130 octets par ligne, soit à peu près 5 Mo pour un an à 100 actions par jour. Non journalisés : l'ordre de passage de la journée, l'ordre
+des raccourcis et la vignette d'une photo (suite technique de l'ajout). Page : `/journal`, administrateur, ordinateur (voir `docs/tableau_de_bord.md`).
+
 ## Numéros de fiche : jamais réutilisés (depuis le format v12)
 
 Le numéro (`id`) d'un client, d'un chantier, d'un paiement, d'un compte et d'un raccourci est en `INTEGER PRIMARY KEY AUTOINCREMENT` : quand une fiche est supprimée, son numéro n'est **jamais** repris par la suivante (SQLite garde le plus grand numéro déjà donné dans `sqlite_sequence`). C'est important parce que le numéro du chantier est celui de la soumission et de la facture remises au client (« N° 0042 ») et celui du dossier de photos par défaut (`photos/chantier-42`) : une nouvelle fiche ne peut pas hériter du numéro ni des photos d'une fiche supprimée. Des trous dans la numérotation sont donc normaux.
 
-## Migrations automatiques (v8, v9, v10, v11, v12, v13 et v14 vers v15)
+## Migrations automatiques (v8, v9, v10, v11, v12, v13, v14 et v15 vers v16)
 
-Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v14…`, ou `_v13`, `_v12`, `_v11`, `_v10`, `_v9`, `_v8`), puis
-migre. De v9, v10, v11, v12, v13 ou v14 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v15…`, ou `_v14`, `_v13`, `_v12`, `_v11`, `_v10`, `_v9`, `_v8`), puis
+migre. De v9, v10, v11, v12, v13, v14 ou v15 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
 vue `v_chantiers` est recréée à la fin, telle que dans `schema.sql`.
+
+### Étape v15 vers v16 : journal des modifications
+
+Crée la table `journal` et son index `idx_journal_quand` (`_etapes_15_16`), vides au départ, d'après `schema.sql` ; ses deux déclencheurs sont recréés avec les autres à la fin. Rien n'est copié ni reconstruit : aucune autre table n'est touchée. S'applique aussi aux départs v9 à v14 (une seule transaction). Un test part d'une vraie base v15 (`tests/schema_v15.sql`) et compare toutes les données.
 
 ### Étape v14 vers v15 : fusion de deux fiches
 

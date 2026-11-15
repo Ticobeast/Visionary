@@ -23,6 +23,7 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import noyau  # noqa: E402
 import auth  # noqa: E402
+import journal  # noqa: E402
 import sauvegardes  # noqa: E402
 import vue  # noqa: E402
 from listes import filtres_depuis, selection_chantiers  # noqa: E402
@@ -184,6 +185,7 @@ from auth import ROUTES_AUTH, controler  # noqa: E402
 import raccourcis  # noqa: E402
 from pages_clients import ROUTES_CLIENTS  # noqa: E402
 from archives import ROUTES_ARCHIVES  # noqa: E402
+from journal import ROUTES_JOURNAL  # noqa: E402
 from pages_attente import ROUTES_ATTENTE  # noqa: E402
 from pages_documents import ROUTES_DOCUMENTS  # noqa: E402
 from photos import ROUTES_PHOTOS, LIMITE_OCTETS as LIMITE_PHOTO  # noqa: E402
@@ -194,7 +196,7 @@ from calendrier import page_calendrier  # noqa: E402
 from composants import fenetre_terminer  # noqa: E402
 
 ROUTES = (ROUTES_AUTH + ROUTES_TABLEAU + ROUTES_CLIENTS + ROUTES_DOCUMENTS + ROUTES_SOUMISSIONS + ROUTES_ATTENTE + ROUTES_ARCHIVES
-          + ROUTES_RACCOURCIS + ROUTES_PHOTOS + ROUTES_CHANTIER + [
+          + ROUTES_RACCOURCIS + ROUTES_PHOTOS + ROUTES_CHANTIER + ROUTES_JOURNAL + [
     ("GET", r"^/$", lambda c, q, f, *g: page_calendrier(c, q)),
     ("GET", r"^/chantiers$", lambda c, q, f, *g: page_chantiers(c, q)),
     ("GET", r"^/nouveau$", lambda c, q, f, *g: page_nouveau(c, q)),
@@ -229,6 +231,8 @@ def repondre(db_path, methode, chemin, query=None, form=None, requete=None):
             if refus is not None:
                 return refus
         resultat = gestionnaire(conn, query, form, *correspondance.groups())
+        if methode == "POST":                     # journal : une ligne si l'action a réussi (n'échoue jamais, voir journal.py)
+            journal.noter_requete(conn, methode, motif, chemin, correspondance.groups(), form, resultat, vue.CONTEXTE.utilisateur)
         if isinstance(resultat, str):
             page, code = resultat, 200
         elif len(resultat) == 3:  # redirection

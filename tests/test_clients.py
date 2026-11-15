@@ -730,7 +730,7 @@ class TestFusion(BaseClients):
         self.doublon()
         liste = lambda: self.sql("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
         avant = liste()
-        self.assertEqual(len(avant), 7)
+        self.assertEqual(len(avant), 9)
         self.fusionner()
         self.assertEqual(liste(), avant)
         c = self.conn()

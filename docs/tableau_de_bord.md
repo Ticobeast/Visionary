@@ -341,6 +341,15 @@ de la page) : il s'ouvre dans Excel (accents lus correctement, montants avec la 
 - **que deviennent les soumissions ?** : combien ont été acceptées, refusées, sont en cours ; le **taux d'acceptation** ; le **délai de réponse** (jours entre la demande
   et l'acceptation) ; le même tableau **par personne qui a ouvert** les soumissions. Les chantiers en attente comptent comme acceptés.
 
+### Journal des modifications : qui a fait quoi et quand
+
+Page **Journal** (bouton **Journal des modifications** sous le titre de la page « Utilisateurs », sur l'ordinateur seulement ; **administrateur seulement** ; rien dans la barre du haut ni dans le menu du téléphone, mais l'adresse `/journal` s'ouvre aussi sur téléphone ; un lien « Utilisateurs » ramène à la page des comptes). Sans comptes, la page « Utilisateurs » n'a pas de lien : on ouvre directement l'adresse `/journal`. Un tableau, du plus récent au plus ancien : **date et heure**, **compte**, **action** (« Client modifié », « Paiement ajouté », « Chantier terminé »...) et **cible** (« client 12 », « chantier 45 » : un lien vers la fiche tant qu'elle existe). 100 lignes par page, avec **Plus anciens** et **Plus récents**. Deux filtres en haut : par **compte** et par **texte** (cherche dans l'action et la cible).
+
+- Une ligne est écrite pour chaque action **réussie** : créer, modifier, supprimer, accepter, refuser, planifier, terminer, paiement, photo, compte, raccourci, connexion (et « Connexion refusée » avec le nom du compte s'il existe, sinon « (nom inconnu) »). Un refus du programme, une erreur de saisie ou une simple consultation n'écrivent rien. L'ordre de passage de la journée et l'ordre des raccourcis ne sont pas notés (trop de clics).
+- **Aucun contenu n'est gardé** : ni mot de passe, ni ce qui est tapé dans une fiche ; seulement l'action et le numéro de la fiche.
+- Le journal **ne se modifie pas et ne s'efface pas** (la base le refuse) ; il garde tout, environ 5 Mo par année à 100 actions par jour. Le nom du compte reste même si le compte est supprimé. Sans comptes, la colonne Compte affiche « — ».
+- Si le journal ne peut pas s'écrire (base occupée par un autre programme), ton action réussit quand même ; seule la ligne manque et la fenêtre du terminal le dit.
+
 ## 7. Créer une soumission, voir une fiche : l'essentiel d'abord
 
 **Après l'enregistrement d'une modification**, on reste sur la fiche. **Fermer** ramène à la liste de son genre (Soumissions ou Chantiers).
