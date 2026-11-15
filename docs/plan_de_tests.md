@@ -102,7 +102,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 58 | Soumissions : sur une soumission **complète**, cliquer le bouton **Soumission** (puis, sur la fiche, le bouton de la carte « Documents pour le client ») | le PDF s'ouvre dans un nouvel onglet : logo, SOUMISSION, numéro, date, « valide jusqu'au », client, lieu, travaux avec précisions, montant avant taxes / TPS / TVQ / total, conditions, **case d'acceptation à signer**, **NEQ, téléphone et courriel au bas** ; le PDF s'enregistre avec le bouton du lecteur (nom `Soumission-00NN-Prénom-Nom.pdf`) ; la fiche n'a pas changé ; la fiche d'une soumission n'a **pas** de bouton PDF en haut, seulement la carte « Documents pour le client » |
 | 59 | Imprimer ce PDF sur du papier Lettre | tout tient sur la page, rien n'est coupé, le bas de page (NEQ, téléphone, courriel) est bien imprimé |
 | 60 | Soumission **sans prix**, **sans nom**, puis une avec un texte de précision **très long** (plus d'une page) | « à confirmer » à la place du total ; « (client à identifier) » ; le long texte continue sur la page suivante, avec le rappel du document en haut et les coordonnées au bas de **chaque** page ; **aucune note interne** (accès, notes sur le client, description de la feuille de route) n'est imprimée |
-| 61 | Tableau de bord, un jour avec un chantier planifié : bouton **Facture** à côté de **Terminer** ; ouvrir la fenêtre « Terminer » | la facture s'ouvre en PDF (FACTURE, même numéro que la fiche, date du jour, solde à payer) ; la fenêtre offre « Facture (PDF) » à côté de « Oui, il est terminé » ; après avoir terminé, la facture porte la **date des travaux** ; si le client a payé : « Facture acquittée » et solde 0,00 $ |
+| 61 | Tableau de bord, un jour avec un chantier planifié : bouton **Facture** à côté de **Terminer** ; ouvrir la fenêtre « Terminer » | la facture s'ouvre en PDF (FACTURE, même numéro que la fiche, date du jour, solde à payer ; cette date est alors fixée) ; la fenêtre offre « Facture (PDF) » à côté de « Oui, il est terminé » ; si la facture n'avait jamais été ouverte avant de terminer, elle porte la **date des travaux** ; sinon elle garde la date fixée à sa première ouverture ; si le client a payé : « Facture acquittée » et solde 0,00 $ |
 | 62 | Page d'un chantier accepté (carte « Documents pour le client »), page d'une soumission non acceptée, puis le compte « Soumission » | la soumission : Voir / Télécharger ; la **facture** seulement pour un chantier accepté et seulement pour l'administrateur (aucun lien pour le compte « Soumission », et `/facture/N/pdf` lui est refusé) ; sur une soumission non acceptée, ouvrir `/facture/N/pdf` à la main ramène à la fiche avec un message |
 | 63 | **Téléphone** : tour de toutes les pages (Tableau de bord, Journée, Chantiers, fiche chantier, Soumissions, fiche soumission, Clients, fiche client, Archives, Nouvelle soumission, Raccourcis, Menu) | rien ne déborde ; un grand titre sans bandeau ; une carte par ligne ; des flèches (jour, mois) plutôt que « Précédent / Suivant » ; la loupe à droite des recherches ; aucun texte coupé |
 | 64 | Téléphone, **Clients** : toucher un numéro de téléphone ; toucher le bouton rond **+** | l'appel se lance (ou le téléphone propose d'appeler) ; le formulaire d'un nouveau client s'ouvre |
@@ -131,6 +131,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 87 | Programme fermé : double-clic sur `restaurer_sauvegarde.bat`, choisir une sauvegarde, répondre autre chose que « oui » | rien n'est changé |
 | 88 | Même chose, mais taper « oui » | message de fin ; une copie `avant_restauration` apparaît ; au lancement, les données sont celles de la sauvegarde |
 | 89 | Noter le numéro de la **dernière** soumission (ex. N° 0042), la **supprimer** (fiche non acceptée, sans paiement), puis créer une nouvelle soumission | la nouvelle soumission a un numéro **plus grand** (0043, pas 0042) ; son PDF porte ce nouveau numéro ; elle ne reprend pas les photos de la fiche supprimée |
+| 90 | Chantier **planifié** : télécharger la facture, noter sa date ; changer la **date prévue** du chantier (modifier la fiche) ; télécharger la facture de nouveau, puis le lendemain | la **date de la facture ne change pas** (c'est celle du premier téléchargement) ; seule la ligne « Date prévue » des travaux suit la nouvelle date. Même chose pour un chantier terminé : la date de la facture reste celle des travaux |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -145,7 +146,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 79 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 90 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

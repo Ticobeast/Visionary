@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v12)
+# Dictionnaire de données (schéma v13)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -95,6 +95,7 @@ secteur **au moment d'accepter** la soumission, et pour modifier un client qui a
 | `accepte_le` | date | non | `AAAA-MM-JJ` : **jour où la soumission a été acceptée** (posé par le bouton Accepter). Vide : soumission en cours ou refusée. Rempli : c'est un chantier (même annulé plus tard). C'est ce qui distingue une soumission refusée d'un chantier annulé | `2026-10-07` |
 | `cree_par` | texte | non | **nom du compte** qui a ouvert la soumission (pour « Mes soumissions »). Vide : interface ouverte sans comptes, ou fiche d'avant les comptes | `Marc` |
 | `reprise_le` | date | non | `AAAA-MM-JJ` : tant que le chantier est `en_attente`, **le jour où il redevient `a_planifier` tout seul** (vide : jusqu'à nouvel ordre). Une fois revenu (à la date ou à la main), **le jour du retour** : son délai d'attente repart de là | `2026-06-01` |
+| `facture_le` | date | non | `AAAA-MM-JJ` : **date imprimée sur la facture PDF**, fixée la **première fois** que la facture est produite (chantier terminé : sa `date_prevue` ; sinon le jour de la production), puis qui ne bouge plus : une facture remise au client garde sa date, même si la date prévue change ensuite. Vide : facture jamais produite. Sur un chantier terminé (verrouillé), elle peut être posée une seule fois ; une fois fixée, elle ne se change plus. Non copiée par « Dupliquer ». Le numéro de la facture reste celui de la fiche | `2026-06-14` |
 
 ### Types de travaux d'un chantier : `chantier_travaux`
 
@@ -119,7 +120,7 @@ Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depui
 | `en_attente` | **chantier accepté mis de côté** (saison, client pas prêt...) : pas dans la Journée ; revient à `a_planifier` à la date `reprise_le`, ou quand on l'en sort | date effacée ; `accepte_le` rempli |
 | `a_planifier` | **soumission acceptée** (renseignements complets), pas encore de date (file d'attente classée par délai) | date effacée ; `accepte_le` rempli |
 | `planifie` | date fixée, rang dans la journée | `date_prevue` obligatoire |
-| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait : **fin des travaux**, point de départ de la pastille « depuis la fin des travaux » de Chantiers et date de la **facture** PDF) ; garde son rang dans la journée |
+| `termine` | travaux faits | `date_prevue` obligatoire (le jour où ça a été fait : **fin des travaux**, point de départ de la pastille « depuis la fin des travaux » de Chantiers et date de la **facture** PDF, si elle n'a pas déjà été produite plus tôt : voir `facture_le`) ; garde son rang dans la journée |
 | `annule` | **soumission refusée** (`accepte_le` vide) ou **chantier annulé** (`accepte_le` rempli) | |
 
 **Genre** (colonne `genre` de la vue `v_chantiers`, calculée) : `soumission` pour `soumission` et pour `annule` quand `accepte_le` est vide ;
@@ -214,11 +215,15 @@ personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendr
 
 Le numéro (`id`) d'un client, d'un chantier, d'un paiement, d'un compte et d'un raccourci est en `INTEGER PRIMARY KEY AUTOINCREMENT` : quand une fiche est supprimée, son numéro n'est **jamais** repris par la suivante (SQLite garde le plus grand numéro déjà donné dans `sqlite_sequence`). C'est important parce que le numéro du chantier est celui de la soumission et de la facture remises au client (« N° 0042 ») et celui du dossier de photos par défaut (`photos/chantier-42`) : une nouvelle fiche ne peut pas hériter du numéro ni des photos d'une fiche supprimée. Des trous dans la numérotation sont donc normaux.
 
-## Migrations automatiques (v8, v9, v10 et v11 vers v12)
+## Migrations automatiques (v8, v9, v10, v11 et v12 vers v13)
 
-Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v11…`, ou `_v10`, `_v9`, `_v8`), puis
-migre. De v9, v10 ou v11 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v12…`, ou `_v11`, `_v10`, `_v9`, `_v8`), puis
+migre. De v9, v10, v11 ou v12 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
 vue `v_chantiers` est recréée à la fin, telle que dans `schema.sql`.
+
+### Étape v12 vers v13 : date de la facture fixée
+
+Ajoute `chantiers.facture_le` (voir la colonne), recrée la vue (qui l'expose) et les déclencheurs (le verrou des chantiers terminés laisse poser `facture_le` une seule fois). Comme pour l'étape précédente, `chantiers` est **reconstruite** d'après `schema.sql` (et non `ALTER TABLE ... ADD COLUMN`, qui aurait donné une définition différente de celle d'une base neuve) ; ses lignes, ses numéros et son compteur `AUTOINCREMENT` sont conservés. Les factures déjà remises n'ont pas de date enregistrée : elle est fixée à la prochaine production. Un test part d'une vraie base v12 (`tests/schema_v12.sql`) et compare toutes les données.
 
 ### Étape v11 vers v12 : numéros jamais réutilisés
 
@@ -250,7 +255,7 @@ Ajouter un type : `INSERT INTO types_travaux (code, libelle) VALUES ('haubanage'
 
 ## La vue `v_chantiers` (ce que les scripts Python liront)
 
-Une ligne par fiche (soumission ou chantier), tout déjà joint : `genre` (`soumission` ou `chantier`), `accepte_le`, `cree_par`, `reprise_le`, client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
+Une ligne par fiche (soumission ou chantier), tout déjà joint : `genre` (`soumission` ou `chantier`), `accepte_le`, `cree_par`, `reprise_le`, `facture_le`, client (`client_nom_complet`, `telephone`, `sms_ok`), adresse
 (`adresse_maps`, `latitude`, `longitude`, `notes_acces`), travaux (`type_libelle`, `travaux_detail`,
 `description`, `date_prevue`, `duree_estimee_h`, `dossier_photos`…) et finances (`total_ttc`, `paye`, `solde`,
 `statut_paiement`). Exemple — le travail de la journée pour l'étape 2 :

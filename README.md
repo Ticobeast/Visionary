@@ -34,7 +34,7 @@ chantier dure en moyenne 2 h : plusieurs par journée ; il peut combiner plusieu
 qu'**une seule date** de travaux (prévue, puis réalisée ; elle se change dans la page Journée). Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
 
 Règles appliquées par l'application **et** par la base : le client ne se modifie que depuis sa fiche ; un chantier **Terminé** est
-verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : pas de registre de factures, mais une **facture en PDF** refaite à la demande) ; **jamais de solde négatif** ; un seul mode
+verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : pas de registre de factures, mais une **facture en PDF** refaite à la demande, avec une date fixée à sa première production : elle ne bouge plus ensuite) ; **jamais de solde négatif** ; un seul mode
 de règlement parmi cinq ; durée estimée obligatoire pour accepter une soumission ; le statut est **automatique** (Accepter = À planifier, Refuser = Refusée, Journée = Planifié, Retirer = À planifier, Annuler = archivé, Terminer = Terminé avec « payé ou pas ») ; un
 chantier annulé, ou terminé **et payé**, passe seul dans les *Archives* ; la ville d'un client se choisit dans une **liste de secteurs** (pas de doublons
 d'écriture) ; nacelle et sort du bois sont des options du travail.
@@ -91,7 +91,7 @@ python3 outils/interface.py                            # la VRAIE base (créée 
 Le coin supérieur droit de l'interface indique toujours la base ouverte : **« BASE D’ESSAI »** en orange pour
 les fausses données, « Base : sylvainculteur.db » pour la vraie.
 
-**Mises à jour du programme.** Une base des formats v8, v9, v10 et v11 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien est refusé : tant qu'il n'y a pas de vraies données, il suffit de supprimer le fichier de base (`data/sylvainculteur.db`). La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
+**Mises à jour du programme.** Une base des formats v8, v9, v10, v11 et v12 est **migrée automatiquement** au premier lancement de la nouvelle version, après une **copie de sécurité** (`data/sauvegardes/…avant_migration…`) : rien n'est perdu, et si la migration échoue la base reste intacte. Un format plus ancien est refusé : tant qu'il n'y a pas de vraies données, il suffit de supprimer le fichier de base (`data/sylvainculteur.db`). La base d'essai (`data/test.db`, fausses données) est simplement recréée toute seule par `--essai` quand son format est périmé.
 
 Pas à pas : [`docs/plan_de_tests.md`](docs/plan_de_tests.md). Sous Windows, remplacer `python3` par `python`
 ou `py`. Outil graphique gratuit pour consulter la base : [DB Browser for SQLite](https://sqlitebrowser.org/).

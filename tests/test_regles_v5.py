@@ -111,6 +111,21 @@ class TestTermineVerrouille(Base):
         self.refuse(f"DELETE FROM chantier_travaux WHERE chantier_id = {i}")
         self.refuse(f"UPDATE chantier_travaux SET precision = 'x' WHERE chantier_id = {i}")
 
+    def test_la_date_de_facture_se_pose_une_fois_sur_un_chantier_termine(self):
+        """facture_le : vide -> date reste possible sur un chantier terminé ; une fois posée, elle ne change plus (ni ne s'efface) ; rien d'autre n'est ouvert."""
+        i = self.termine()
+        self.conn.execute("UPDATE chantiers SET facture_le = '2026-10-02' WHERE id = ?", (i,))
+        self.assertEqual(self.conn.execute("SELECT facture_le FROM chantiers WHERE id = ?", (i,)).fetchone(), ("2026-10-02",))
+        self.conn.execute("UPDATE chantiers SET facture_le = '2026-10-02' WHERE id = ?", (i,))          # même valeur : rien ne change
+        self.refuse(f"UPDATE chantiers SET facture_le = '2026-10-09' WHERE id = {i}")
+        self.refuse(f"UPDATE chantiers SET facture_le = NULL WHERE id = {i}")
+        self.refuse(f"UPDATE chantiers SET facture_le = '2026-10-09', prix_ht = 1 WHERE id = {i}")
+        self.assertEqual(self.conn.execute("SELECT facture_le FROM chantiers WHERE id = ?", (i,)).fetchone(), ("2026-10-02",))
+        j = self.termine()
+        self.refuse(f"UPDATE chantiers SET facture_le = '2026-10-02', description = 'x' WHERE id = {j}")    # la pose n'ouvre aucune autre modification
+        self.refuse(f"UPDATE chantiers SET facture_le = '2026-02-30' WHERE id = {j}")                       # et la date doit être une vraie date
+        self.assertEqual(self.conn.execute("SELECT facture_le FROM chantiers WHERE id = ?", (j,)).fetchone(), (None,))
+
     def test_encaisser_reste_possible(self):
         i = self.termine()
         self.assertEqual(self.conn.execute("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (i,)).fetchone(), ("a_payer",))   # facturé d'office
@@ -191,6 +206,13 @@ class TestDuplication(Base):
         self.assertEqual(self.conn.execute("SELECT date_soumission FROM chantiers WHERE id = ?", (nouveau,)).fetchone()[0],
                          noyau.datetime.date.today().isoformat())
         self.assertEqual(self.conn.execute("SELECT statut, prix_ht FROM chantiers WHERE id = ?", (i,)).fetchone(), ("termine", 480.0))
+
+    def test_la_date_de_facture_n_est_pas_copiee(self):
+        i = self.chantier(statut="termine", duree=3, prix=480, tps=24, tvq=47.88, date="2026-06-14")
+        self.conn.execute("UPDATE chantiers SET facture_le = '2026-06-14' WHERE id = ?", (i,))
+        nouveau, _ = noyau.dupliquer_chantier(self.conn, i)
+        self.assertEqual(self.conn.execute("SELECT facture_le FROM chantiers WHERE id = ?", (nouveau,)).fetchone(), (None,))
+        self.assertEqual(self.conn.execute("SELECT facture_le FROM v_chantiers WHERE chantier_id = ?", (i,)).fetchone(), ("2026-06-14",))
 
     def test_prix_et_taxes_repris_par_defaut(self):
         i = self.chantier(statut="termine", duree=3, prix=480, tps=24, tvq=47.88, date="2026-06-14")

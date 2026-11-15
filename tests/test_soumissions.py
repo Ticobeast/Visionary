@@ -394,21 +394,86 @@ class TestMigrations(unittest.TestCase):
         c.close()
         return db
 
+    def base_v12(self, nom="v12.db"):
+        """Une vraie base du format v12 (schéma figé dans tests/schema_v12.sql), avec des fiches à tous les statuts."""
+        db = self.dossier / nom
+        c = sqlite3.connect(db, isolation_level=None)
+        c.executescript((RACINE / "tests" / "schema_v12.sql").read_text(encoding="utf-8"))
+        c.execute("PRAGMA foreign_keys = ON")
+        c.execute("INSERT INTO clients (nom, prenom, telephone, adresse, ville, secteur) VALUES ('Gagnon', 'Marie', '+14505550142', '1 Rue A', 'Mirabel', 'centre_ville')")
+        c.execute("INSERT INTO clients (entreprise) VALUES ('Syndicat X')")
+        c.execute("INSERT INTO clients (nom, adresse, ville) VALUES ('Roy', '3 Rue C', 'Blainville')")
+        for client, statut, accepte, prevue, reprise in ((1, "soumission", None, None, None), (1, "a_planifier", "2026-09-04", None, None),
+                                                         (2, "planifie", "2026-09-04", "2026-12-01", None), (2, "termine", "2026-08-03", "2026-08-10", None),
+                                                         (2, "annule", "2026-07-02", None, None), (1, "annule", None, None, None),
+                                                         (1, "en_attente", "2026-09-05", None, "2027-03-01")):
+            c.execute("INSERT INTO chantiers (client_id, statut, date_soumission, accepte_le, date_prevue, reprise_le, duree_estimee_h, prix_ht, tps, tvq, cree_par) "
+                      "VALUES (?, ?, '2026-08-01', ?, ?, ?, 2, 100, 5, 9.98, 'Marc')", (client, statut, accepte, prevue, reprise))
+        c.execute("INSERT INTO chantier_travaux VALUES (4, 'emondage', 'x')")
+        c.execute("INSERT INTO chantier_travaux VALUES (2, 'taille_haie', NULL)")
+        c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (4, '2026-08-10', 50, 'interac')")
+        c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode, reference) VALUES (4, '2026-08-11', 64.98, 'cheque', 'no 12')")
+        c.execute("INSERT INTO utilisateurs (nom, role, mot_de_passe) VALUES ('Marc', 'admin', 'x'), ('Alice', 'soumission', 'y')")
+        c.execute("INSERT INTO sessions (jeton_hash, utilisateur_id, expire_le) VALUES ('h1', 2, '2027-01-01 00:00:00')")
+        c.execute("INSERT INTO raccourcis (utilisateur_id, page, libelle, filtre, ordre) VALUES (1, 'chantiers', 'Planifiés', 'statut=planifie', 10)")
+        c.execute("INSERT INTO raccourcis (utilisateur_id, page, libelle, filtre, ordre) VALUES (NULL, 'soumissions', 'Mes soumissions', 'par=moi', 20)")
+        c.execute("INSERT INTO chantiers (client_id, statut) VALUES (1, 'soumission')")                  # le numéro 8 a été donné puis la fiche supprimée :
+        c.execute("DELETE FROM chantiers WHERE id = 8")                                                   # le compteur reste à 8, le plus grand numéro est 7
+        c.close()
+        return db
+
+    def test_migration_depuis_v12(self):
+        db = self.base_v12()
+        avant = sqlite3.connect(db)
+        tables = ("clients", "chantiers", "chantier_travaux", "paiements", "utilisateurs", "sessions", "raccourcis", "types_travaux", "secteurs")
+        lignes = {t: avant.execute(f"SELECT * FROM {t} ORDER BY 1, 2").fetchall() for t in tables}
+        colonnes_vue = ", ".join(r[1] for r in avant.execute("PRAGMA table_info(v_chantiers)"))
+        vue = avant.execute(f"SELECT {colonnes_vue} FROM v_chantiers ORDER BY chantier_id").fetchall()
+        avant.close()
+        conn, existait = noyau.ouvrir_base(db)
+        self.assertTrue(existait)
+        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], 13)
+        for t in tables:                                                       # tout est conservé à l'identique, numéros compris
+            colonnes = ", ".join(r[1] for r in sqlite3.connect(db).execute(f"PRAGMA table_info({t})") if r[1] != "facture_le")
+            self.assertEqual(conn.execute(f"SELECT {colonnes} FROM {t} ORDER BY 1, 2").fetchall(), lignes[t], t)
+        self.assertEqual(conn.execute("SELECT count(*) FROM chantiers WHERE facture_le IS NOT NULL").fetchone()[0], 0)    # aucune date fixée d'avance
+        self.assertEqual(conn.execute(f"SELECT {colonnes_vue} FROM v_chantiers ORDER BY chantier_id").fetchall(), vue)
+        self.assertIn("facture_le", [r[1] for r in conn.execute("PRAGMA table_info(v_chantiers)")])                       # la vue expose facture_le
+        self.assertEqual(dict(conn.execute("SELECT name, seq FROM sqlite_sequence"))["chantiers"], 8)                     # le compteur n'a pas reculé
+        conn.execute("INSERT INTO chantiers (client_id, statut) VALUES (1, 'soumission')")
+        self.assertEqual(conn.execute("SELECT max(id) FROM chantiers").fetchone()[0], 9)                                  # le numéro 8 n'est jamais repris
+        self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
+        self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(conn.execute("PRAGMA foreign_keys").fetchone()[0], 1)
+        self.assertEqual(conn.execute("SELECT count(*) FROM sqlite_master WHERE type = 'trigger'").fetchone()[0], 7)
+        with self.assertRaises(sqlite3.IntegrityError):                        # la nouvelle colonne a sa règle de date
+            conn.execute("UPDATE chantiers SET facture_le = '2026-02-30' WHERE id = 1")
+        with self.assertRaises(sqlite3.IntegrityError):                        # les liens fonctionnent encore
+            conn.execute("DELETE FROM clients WHERE id = 2")
+        conn.close()
+        copies = list((self.dossier / "sauvegardes").glob("*avant_migration_v12*.db"))
+        self.assertEqual(len(copies), 1)
+        ancienne = sqlite3.connect(copies[0])
+        self.assertEqual(ancienne.execute("PRAGMA user_version").fetchone()[0], 12)
+        self.assertEqual(ancienne.execute("SELECT count(*) FROM pragma_table_info('chantiers') WHERE name = 'facture_le'").fetchone()[0], 0)
+        ancienne.close()
+
     def test_migration_depuis_v11(self):
         db = self.base_v11()
         avant = sqlite3.connect(db)
         tables = ("clients", "chantiers", "chantier_travaux", "paiements", "utilisateurs", "sessions", "raccourcis", "types_travaux", "secteurs")
         lignes = {t: avant.execute(f"SELECT * FROM {t} ORDER BY 1, 2").fetchall() for t in tables}
-        vue = avant.execute("SELECT * FROM v_chantiers ORDER BY chantier_id").fetchall()
+        colonnes_vue = ", ".join(r[1] for r in avant.execute("PRAGMA table_info(v_chantiers)"))
+        vue = avant.execute(f"SELECT {colonnes_vue} FROM v_chantiers ORDER BY chantier_id").fetchall()
         avant.close()
         conn, existait = noyau.ouvrir_base(db)
         self.assertTrue(existait)
         self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
-        self.assertEqual(noyau.VERSION_SCHEMA, 12)
+        self.assertEqual(noyau.VERSION_SCHEMA, 13)
         for t in tables:                                                       # tout est conservé à l'identique, numéros compris, rien en double
-            colonnes = ", ".join(r[1] for r in sqlite3.connect(db).execute(f"PRAGMA table_info({t})"))
+            colonnes = ", ".join(r[1] for r in sqlite3.connect(db).execute(f"PRAGMA table_info({t})") if r[1] != "facture_le")
             self.assertEqual(conn.execute(f"SELECT {colonnes} FROM {t} ORDER BY 1, 2").fetchall(), lignes[t], t)
-        self.assertEqual(conn.execute("SELECT * FROM v_chantiers ORDER BY chantier_id").fetchall(), vue)
+        self.assertEqual(conn.execute(f"SELECT {colonnes_vue} FROM v_chantiers ORDER BY chantier_id").fetchall(), vue)
         self.assertEqual(conn.execute("SELECT count(*) FROM chantiers").fetchone()[0], 7)
         sequences = dict(conn.execute("SELECT name, seq FROM sqlite_sequence"))
         self.assertEqual({k: sequences[k] for k in noyau.TABLES_NUMEROTEES},
@@ -495,7 +560,7 @@ class TestMigrations(unittest.TestCase):
         ancienne.close()
 
     def test_les_protections_survivent_a_la_migration(self):
-        for base in (self.base_v9("a.db"), self.base_v10("b.db"), self.base_v11("c.db")):
+        for base in (self.base_v9("a.db"), self.base_v10("b.db"), self.base_v11("c.db"), self.base_v12("d.db")):
             conn, _ = noyau.ouvrir_base(base)
             noms = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")}
             self.assertEqual(len(noms), 7)
@@ -522,7 +587,7 @@ class TestMigrations(unittest.TestCase):
             return colonnes, sql
         sql_tables = lambda c, t: " ".join(c.execute("SELECT sql FROM sqlite_master WHERE name = ?", (t,)).fetchone()[0].replace('"', "").split())
         (col_n, sql_n) = structure(neuve)
-        for depart in (self.base_v9("a.db"), self.base_v10("b.db"), self.base_v11("c.db")):
+        for depart in (self.base_v9("a.db"), self.base_v10("b.db"), self.base_v11("c.db"), self.base_v12("d.db")):
             migree, _ = noyau.ouvrir_base(depart)
             col_m, sql_m = structure(migree)
             self.assertEqual(col_m, col_n, depart.name)
@@ -545,7 +610,7 @@ class TestMigrations(unittest.TestCase):
         conn.close()
 
     def test_une_migration_qui_echoue_ne_change_rien(self):
-        for fabrique, version in ((self.base_v9, 9), (self.base_v10, 10), (self.base_v11, 11)):
+        for fabrique, version in ((self.base_v9, 9), (self.base_v10, 10), (self.base_v11, 11), (self.base_v12, 12)):
             db = fabrique(f"echec{version}.db")
             c = sqlite3.connect(db, isolation_level=None)
             c.execute("PRAGMA foreign_keys = OFF")
@@ -555,9 +620,10 @@ class TestMigrations(unittest.TestCase):
                 noyau.ouvrir_base(db)
             c = sqlite3.connect(db)
             self.assertEqual(c.execute("PRAGMA user_version").fetchone()[0], version)
-            self.assertEqual(c.execute("SELECT count(*) FROM clients").fetchone()[0], 3 if version == 11 else 2)
-            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('chantiers') WHERE name = 'reprise_le'").fetchone()[0], 1 if version == 11 else 0)
-            self.assertEqual(c.execute("SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_sequence'").fetchone()[0], 0)       # rien reconstruit
+            self.assertEqual(c.execute("SELECT count(*) FROM clients").fetchone()[0], 3 if version >= 11 else 2)
+            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('chantiers') WHERE name = 'reprise_le'").fetchone()[0], 1 if version >= 11 else 0)
+            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('chantiers') WHERE name = 'facture_le'").fetchone()[0], 0)
+            self.assertEqual(c.execute("SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_sequence'").fetchone()[0], 1 if version == 12 else 0)       # rien reconstruit
             self.assertEqual(c.execute("SELECT count(*) FROM sqlite_master WHERE type = 'trigger'").fetchone()[0], 7)
             self.assertIsNotNone(c.execute("SELECT 1 FROM sqlite_master WHERE name = 'v_chantiers'").fetchone())
             c.close()

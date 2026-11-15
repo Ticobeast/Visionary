@@ -392,8 +392,71 @@ class TestFacturePdf(BaseDocuments):
         self.assertIn("- 500,00 $", ligne_avec(corps, "Reçu le 1 octobre 2026 (Chèque)".replace("1 octobre", "1er octobre")))
         self.assertIn("2 029,45 $", ligne_avec(corps, "SOLDE À PAYER"))
         self.assertIn("2 529,45 $", ligne_avec(corps, "Total"))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(AUJOURDHUI.isoformat(),)])    # fixée à la première production
+
+    def test_la_date_de_la_facture_est_fixee_a_la_premiere_production(self):
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(None,)])
         _, octets = self.document("facture", 3, datetime.date(2030, 5, 6))
         self.assertIn("Date : 6 mai 2030", texte_pdf(octets))
+        for jour in (datetime.date(2030, 5, 7), datetime.date(2031, 1, 1), None):                 # produite un autre jour : même date
+            self.assertIn("Date : 6 mai 2030", texte_pdf(self.document("facture", 3, jour)[1]))
+        self.assertIn("Date : 6 mai 2030", texte_pdf(self.pdf("/facture/3/pdf")))                  # aussi par la route de téléchargement
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [("2030-05-06",)])
+
+    def test_la_date_de_la_facture_ne_suit_pas_la_date_prevue(self):
+        self.assertIn("Date : 2 janvier 2031", texte_pdf(self.document("facture", 3, datetime.date(2031, 1, 2))[1]))
+        self.ecrire("UPDATE chantiers SET date_prevue = '2031-03-03' WHERE id = 3")              # le chantier (planifié) change de jour
+        texte = texte_pdf(self.document("facture", 3, datetime.date(2031, 2, 2))[1])
+        self.assertIn("Date : 2 janvier 2031", texte)
+        self.assertIn("3 mars 2031", texte)                                                        # la date prévue des travaux, elle, a bien changé
+
+    def test_la_facture_d_un_chantier_termine_est_fixee_a_sa_date_prevue(self):
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 2"), [(None,)])
+        self.assertIn("Date : 22 septembre 2026", texte_pdf(self.document("facture", 2, datetime.date(2031, 1, 1))[1]))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 2"), [("2026-09-22",)])      # posée malgré le verrou du chantier terminé
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 2"), [("termine",)])
+        self.assertIn("Date : 22 septembre 2026", texte_pdf(self.document("facture", 2, datetime.date(2032, 1, 1))[1]))
+
+    def test_la_soumission_n_est_pas_concernee(self):
+        i = self.soumission_complete()                                                             # une soumission en cours est datée du jour de la production
+        self.assertIn("Date : 6 mai 2030", texte_pdf(self.document("soumission", i, datetime.date(2030, 5, 6))[1]))
+        self.assertIn("Date : 7 mai 2030", texte_pdf(self.document("soumission", i, datetime.date(2030, 5, 7))[1]))
+        self.document("soumission", 3, datetime.date(2030, 5, 6))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id IN (3, ?)", (i,)), [(None,), (None,)])
+
+    def test_deux_productions_en_meme_temps_donnent_la_meme_date(self):
+        premiere, _ = noyau.ouvrir_base(self.db)
+        seconde, _ = noyau.ouvrir_base(self.db)
+        self.addCleanup(premiere.close)
+        self.addCleanup(seconde.close)
+        _, a = documents.facture_pdf(premiere, 3, datetime.date(2030, 5, 6))
+        seconde.execute("BEGIN")                                                                   # la seconde a lu avant (cas limite) : son UPDATE ne trouve plus rien à faire
+        _, b = documents.facture_pdf(seconde, 3, datetime.date(2030, 5, 9))
+        seconde.execute("COMMIT")
+        self.assertIn("Date : 6 mai 2030", texte_pdf(a))
+        self.assertIn("Date : 6 mai 2030", texte_pdf(b))
+        # la première écriture gagne : une date déjà posée n'est jamais remplacée
+        _, c = documents.facture_pdf(premiere, 3, datetime.date(2035, 1, 1))
+        self.assertIn("Date : 6 mai 2030", texte_pdf(c))
+
+    def test_la_seconde_connexion_perd_la_course_sans_changer_la_date(self):
+        """Les deux fiches ont été lues sans date ; la première pose la sienne, la seconde doit relire celle-là."""
+        premiere, _ = noyau.ouvrir_base(self.db)
+        seconde, _ = noyau.ouvrir_base(self.db)
+        self.addCleanup(premiere.close)
+        self.addCleanup(seconde.close)
+        d = documents._lire(seconde, 3)                                                            # lecture AVANT l'écriture de l'autre
+        self.assertIsNone(d["facture_le"])
+        documents.facture_pdf(premiere, 3, datetime.date(2030, 5, 6))
+        self.assertEqual(documents._jour_facture(seconde, d, datetime.date(2030, 5, 9)), datetime.date(2030, 5, 6))
+
+    def test_base_en_lecture_seule_la_facture_se_produit_quand_meme(self):
+        import sqlite3
+        lecture = sqlite3.connect(f"{self.db.resolve().as_uri()}?mode=ro", uri=True, isolation_level=None)
+        self.addCleanup(lecture.close)
+        _, octets = documents.facture_pdf(lecture, 3, datetime.date(2030, 5, 6))
+        self.assertIn("Date : 6 mai 2030", texte_pdf(octets))                                       # calculée comme avant, sans être enregistrée
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(None,)])
 
     def test_chantier_a_planifier_et_en_attente_ont_aussi_une_facture(self):
         accepte = self.soumission_complete()
