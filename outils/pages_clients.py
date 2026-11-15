@@ -10,9 +10,9 @@ from urllib.parse import urlencode
 
 from composants import retour_valide
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprimable, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
-                   lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
+                   client_remplacant, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
-from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, client_avance,
+from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, champ_secteur, client_avance,
                  client_essentiel, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
 
@@ -30,12 +30,12 @@ def _nom_client(c):
 
 def _client(conn, client_id):
     r = conn.execute("SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.telephone_2, cl.courriel, cl.sms_ok, cl.adresse, cl.ville,"
-                     " cl.province, cl.code_postal, cl.notes_acces, cl.notes, cl.geocode_statut, s.libelle FROM clients cl"
+                     " cl.province, cl.code_postal, cl.notes_acces, cl.notes, cl.geocode_statut, s.libelle, cl.remplace_par FROM clients cl"
                      " LEFT JOIN secteurs s ON s.code = cl.secteur WHERE cl.id = ?", (client_id,)).fetchone()
     if r is None:
         return None
     cols = ["id", "prenom", "nom", "entreprise", "telephone", "telephone_2", "courriel", "sms_ok", "adresse", "ville",
-            "province", "code_postal", "notes_acces", "notes", "geocode_statut", "secteur"]
+            "province", "code_postal", "notes_acces", "notes", "geocode_statut", "secteur", "remplace_par"]
     c = dict(zip(cols, r))
     c["adresse_texte"], c["adresse_maps"] = adresses(c["adresse"], c["ville"], c["province"], c["code_postal"])
     return c
@@ -59,19 +59,19 @@ def page_clients(conn, query):
     q = query.get("q", "").strip()
     secteur = query.get("secteur", "")
     lignes = conn.execute(
-        "SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.adresse, cl.ville, cl.province, cl.code_postal, s.libelle"
-        " FROM clients cl LEFT JOIN secteurs s ON s.code = cl.secteur"
+        "SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.adresse, cl.ville, cl.province, cl.code_postal, s.libelle,"
+        " cl.remplace_par IS NOT NULL FROM clients cl LEFT JOIN secteurs s ON s.code = cl.secteur"
         + (" WHERE cl.secteur = ?" if secteur else "") + " ORDER BY cl.nom, cl.entreprise, cl.prenom",
         (secteur,) if secteur else ()).fetchall()
     if q:
         mots = cle(q).split()
         lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in (r[1:9] + (r[9],)) if x)) for m in mots)]
     corps = ""
-    for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, libelle_secteur in lignes[:300]:
+    for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, libelle_secteur, ancienne in lignes[:300]:
         maps = adresses(adresse, ville, prov, cp)[1]
         corps += (f'<tr><td class="c-client"><a href="/client/{cid}">{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</a></td>'
                   f'<td class="c-tel">{lien_tel(tel)}</td>'
-                  f'<td class="c-adresse">{lien_maps(maps, adresse)}<div class="doux">{esc(libelle_secteur or ville)}</div></td></tr>')
+                  f'<td class="c-adresse">{lien_maps(maps, adresse)}<div class="doux">{esc(libelle_secteur or ville)}{" · ancienne adresse" if ancienne else ""}</div></td></tr>')
     tableau = (f'<div class="liste-defile"><table class="clients"><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th></tr></thead>'
                f'<tbody>{corps}</tbody></table></div>'
                if corps else '<div class="carte">Aucun client. <a href="/nouveau">Créer le premier ?</a></div>')
@@ -100,17 +100,27 @@ def page_client(conn, client_id, query):
 
     def ligne(libelle, contenu_html):
         return f'<p style="margin:6px 0 0"><b>{libelle} :</b> {contenu_html}</p>'
-    fiche = (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(_nom_client(c))}</h2></div>'
+    anciennes = conn.execute("SELECT id, adresse, ville FROM clients WHERE remplace_par = ? ORDER BY id", (client_id,)).fetchall()
+    nouvelle = _client(conn, c["remplace_par"]) if c["remplace_par"] else None
+    fiche = (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(_nom_client(c))}</h2>'
+             + ('<span class="badge">Ancienne adresse</span>' if c["remplace_par"] else "") + '</div>'
+             + (ligne("Nouvelle adresse", f'<a href="/client/{nouvelle["id"]}">{esc(nouvelle["adresse"] or nouvelle["ville"] or "voir la fiche")}</a>') if nouvelle else "")
+             + (ligne("Ancienne adresse" if len(anciennes) == 1 else "Anciennes adresses",
+                      " · ".join(f'<a href="/client/{i}">{esc(a or v or "voir la fiche")}</a>' for i, a, v in anciennes)) if anciennes else "")
              + ligne("Adresse", lien_maps(c["adresse_maps"], c["adresse_texte"]) if c["adresse"] else "<b>à saisir</b> (« Modifier le client »)")
              + ligne("Secteur", esc(c["secteur"]) if c["secteur"] else "<b>à choisir</b> (« Modifier le client »)")
              + ligne("Téléphone", tels + ("" if c["sms_ok"] else " · <b>pas de rappels par texto</b>"))
              + (ligne("Courriel", esc(c["courriel"])) if c["courriel"] else "")
              + (ligne("Accès", esc(c["notes_acces"])) if c["notes_acces"] else "")
              + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
-    actions = (f'<div class="barre actions-client" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>'
-               f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a></div>')
+    supprimable = client_supprimable(conn, client_id)
+    actions = (f'<div class="barre actions-client" style="margin-bottom:16px">'
+               + ("" if c["remplace_par"] else f'<a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>')
+               + f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a>'
+               + ("" if supprimable or c["remplace_par"] else f'<a class="bouton secondaire" href="/client/{client_id}/nouvelle-adresse">Nouvelle adresse</a>')
+               + '</div>')
     suppression = ""
-    if client_supprimable(conn, client_id):                # sinon : pas de bouton (le serveur refuse de toute façon)
+    if supprimable:                # sinon : pas de bouton (le serveur refuse de toute façon)
         n = resume_suppression_client(conn, client_id)[0]
         nb_soumissions = sum(1 for f in fiches if f[5] == "soumission")
         nb_chantiers = n - nb_soumissions
@@ -206,12 +216,18 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
 def page_soumission_nouvelle(conn, client_id):
     if _client(conn, client_id) is None:
         return _introuvable()
+    nouveau = client_remplacant(conn, client_id)
+    if nouveau != client_id:                      # le client a déménagé : les nouvelles soumissions se font à la nouvelle adresse
+        return redirection(f"/client/{nouveau}/soumission/nouveau")
     return gabarit("Nouvelle soumission", f'<h1>Nouvelle soumission</h1>{_form_simplifie(conn, client_id, {"date_soumission": datetime.date.today().isoformat()})}', section="soumissions")
 
 
 def soumission_creer(conn, client_id, form):
     if _client(conn, client_id) is None:
         return _introuvable()
+    nouveau = client_remplacant(conn, client_id)
+    if nouveau != client_id:
+        return redirection(f"/client/{nouveau}/soumission/nouveau")
     travaux, valeurs = travaux_depuis_formulaire(conn, form)
     saisie = {**valeurs, **{c: form.get(c, "") for c in ("prix_ht", "modalite_paiement", "description", "date_soumission", "duree_estimee_h")},
               "taxes_auto": "1" if form.get("taxes_auto") else ""}
@@ -237,6 +253,47 @@ def soumission_creer(conn, client_id, form):
     return gabarit("Nouvelle soumission", f'<h1>Nouvelle soumission</h1>{_form_simplifie(conn, client_id, saisie, erreurs)}', section="soumissions")
 
 
+# ---------------------------------------------------------------------------
+# Nouvelle adresse : le client déménage. Une nouvelle fiche est créée ; l'ancienne garde tout son historique.
+# ---------------------------------------------------------------------------
+LIBELLE_ACCES = "Accès : barrière, chien, où stationner, où est l'arbre"
+
+
+def _form_nouvelle_adresse(conn, client_id, valeurs, erreurs=()):
+    err = ""
+    if erreurs:
+        err = ('<div class="erreurs"><strong>À corriger :</strong><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>")
+    return (f'{err}<form method="post" action="/client/{client_id}/nouvelle-adresse"><div class="carte"><div class="grille">'
+            f'{champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, placeholder="123 Rue des Érables", required=True)}'
+            f'{champ_secteur(lister_secteurs(conn), valeurs, requis=True)}'
+            f'{champ("code_postal", "Code postal", valeurs, placeholder="J7Z 1A1")}'
+            f'{zone("notes_acces", LIBELLE_ACCES, valeurs)}</div></div>'
+            f'<div class="barre"><button type="submit">Enregistrer la nouvelle adresse</button>'
+            f'<a class="bouton secondaire annuler" href="/client/{client_id}">Annuler</a></div></form>')
+
+
+def page_nouvelle_adresse(conn, client_id, valeurs=None, erreurs=()):
+    c = _client(conn, client_id)
+    if c is None:
+        return _introuvable()
+    return gabarit("Nouvelle adresse", f"<h1>Nouvelle adresse</h1><p class='doux'>Les anciens chantiers et factures gardent l'ancienne adresse.</p>"
+                   f'{_form_nouvelle_adresse(conn, client_id, valeurs or {}, erreurs)}')
+
+
+def nouvelle_adresse_creer(conn, client_id, form):
+    if _client(conn, client_id) is None:
+        return _introuvable()
+    saisie = {c: form.get(c, "") for c in ("adresse", "client_secteur", "code_postal", "notes_acces")}
+    try:
+        with transaction(conn):
+            nouveau, erreurs = nouvelle_adresse_client(conn, client_id, saisie)
+    except sqlite3.IntegrityError as e:
+        nouveau, erreurs = None, [f"Refusé par la base : {e}"]
+    if erreurs:
+        return page_nouvelle_adresse(conn, client_id, saisie, erreurs)
+    return redirection(f"/client/{nouveau}?ok=nouvelle_adresse")
+
+
 def client_supprimer(conn, client_id):
     if _client(conn, client_id) is None:
         return _introuvable()
@@ -256,6 +313,8 @@ ROUTES_CLIENTS = [
     ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: page_client_modifier(c, int(i), q)),
     ("POST", r"^/client/(\d+)/modifier$", lambda c, q, f, i: client_modifier(c, int(i), f)),
     ("POST", r"^/client/(\d+)/supprimer$", lambda c, q, f, i: client_supprimer(c, int(i))),
+    ("GET", r"^/client/(\d+)/nouvelle-adresse$", lambda c, q, f, i: page_nouvelle_adresse(c, int(i))),
+    ("POST", r"^/client/(\d+)/nouvelle-adresse$", lambda c, q, f, i: nouvelle_adresse_creer(c, int(i), f)),
     ("GET", r"^/client/(\d+)/soumission/nouveau$", lambda c, q, f, i: page_soumission_nouvelle(c, int(i))),
     ("POST", r"^/client/(\d+)/soumission/nouveau$", lambda c, q, f, i: soumission_creer(c, int(i), f)),
     ("GET", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: redirection(f"/client/{i}/soumission/nouveau")),      # ancien lien

@@ -305,6 +305,20 @@ class TestDroits(BaseAuth):
             self.assertNotIn(absent, entete)
         self.assertIn("Soumission", entete)
 
+    def test_les_deux_roles_peuvent_declarer_une_nouvelle_adresse(self):
+        form = {"adresse": "45 Rue du Lac", "client_secteur": "shawinigan"}
+        for cookie, client, nouveau in ((self.admin, 1, 4), (self.soum, 2, 5)):
+            self.assertTrue(self.req("GET", f"/client/{client}/nouvelle-adresse", cookie=cookie)[0].startswith("200"))
+            statut, en_tetes, _ = self.req("POST", f"/client/{client}/nouvelle-adresse", form, cookie=cookie)
+            self.assertTrue(statut.startswith("303"), statut)
+            self.assertEqual(en_tetes["Location"], f"/client/{nouveau}?ok=nouvelle_adresse")
+            self.assertEqual(self.sql("SELECT remplace_par FROM clients WHERE id = ?", (client,)), [(nouveau,)])
+        for cookie in (self.admin, self.soum):                                     # la fiche montre le lien vers la nouvelle
+            self.assertIn("Nouvelle adresse :", self.req("GET", "/client/1" if cookie == self.admin else "/client/2", cookie=cookie)[2])
+        self.assertFalse(self.req("GET", "/client/3/nouvelle-adresse")[0].startswith("200"))      # sans connexion : refusé
+        self.req("POST", "/client/3/nouvelle-adresse", form)
+        self.assertEqual(self.sql("SELECT remplace_par FROM clients WHERE id = 3"), [(None,)])
+
     def test_soumission_pages_refusees(self):
         for chemin in ("/journee", "/journee.pdf", "/utilisateurs", "/tournee", "/suivi"):
             statut, _, corps = self.req("GET", chemin, cookie=self.soum)

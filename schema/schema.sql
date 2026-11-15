@@ -32,7 +32,8 @@ PRAGMA foreign_keys = ON;
 -- le numéro d'une fiche supprimée n'est JAMAIS repris par une nouvelle fiche (le numéro de chantier est celui de la
 -- soumission et de la facture remises au client, et du dossier de photos par défaut).
 -- Format v13 : chantiers.facture_le, la date de la facture, figée quand le chantier est terminé (elle ne bouge plus ensuite).
-PRAGMA user_version = 13;
+-- Format v14 : clients.remplace_par (une fiche à l'ancienne adresse d'un client qui a déménagé pointe vers la fiche à la nouvelle adresse).
+PRAGMA user_version = 14;
 
 
 -- -----------------------------------------------------------------------------
@@ -121,6 +122,10 @@ CREATE TABLE clients (
     notes       TEXT,                         -- préférences, historique utile
     cree_le     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime')),
 
+    -- Vide en temps normal. Sur une fiche à l'ANCIENNE adresse (le client a déménagé) : le numéro de la fiche à la nouvelle
+    -- adresse. L'ancienne fiche garde tout son historique ; si la nouvelle fiche est supprimée, l'ancienne redevient normale.
+    remplace_par INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+
     CONSTRAINT ck_clients_telephone
         CHECK (telephone IS NULL
                OR telephone GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
@@ -145,7 +150,8 @@ CREATE TABLE clients (
     -- Cohérence : coordonnées <=> statut qui en suppose.
     CONSTRAINT ck_clients_coordonnees
         CHECK ((latitude IS NULL) = (longitude IS NULL)
-               AND (geocode_statut IN ('a_faire','echec')) = (latitude IS NULL))
+               AND (geocode_statut IN ('a_faire','echec')) = (latitude IS NULL)),
+    CONSTRAINT ck_clients_remplace_par CHECK (remplace_par IS NULL OR remplace_par <> id)
 );
 
 

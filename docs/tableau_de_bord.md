@@ -371,6 +371,17 @@ Un client dont on ne sait presque rien (soumission vide) s'affiche « (client à
 
 **Supprimer un client** : possible seulement si le client n'a **aucun chantier terminé et aucun paiement** (sur aucune de ses fiches) : c'est de l'historique d'argent, il reste, et le bouton « Supprimer le client » n'est alors pas affiché. Pour un client supprimable, au bas de sa fiche, le bouton demande une confirmation (qui indique le nombre de chantiers et de soumissions) puis efface le client et toutes ses fiches (soumissions, chantiers annulés ou pas encore terminés) avec leurs types de travaux. C'est **définitif** (aucun retour en arrière ; la copie de sauvegarde du jour reste dans `data/sauvegardes`). Le serveur refuse aussi la demande si elle est envoyée à la main.
 
+**Un client déménage : bouton « Nouvelle adresse ».** Si on modifiait simplement l'adresse, tous les anciens chantiers et toutes les anciennes
+factures afficheraient la nouvelle. Pour un client qui a un **chantier terminé ou un paiement** (donc qui n'est pas supprimable), la fiche a un bouton
+**Nouvelle adresse** (blanc à bordure grise, à côté de « Modifier le client »). Il ouvre un formulaire court (adresse, secteur, code postal, notes d'accès) et
+crée une **nouvelle fiche** avec les mêmes coordonnées (nom, téléphones, courriel, notes). On arrive sur la nouvelle fiche. L'**ancienne fiche garde tout
+son historique** : chantiers, factures, paiements, PDF restent à l'ancienne adresse. Elle porte la mention **Ancienne adresse**, un lien « Nouvelle adresse : »
+vers la nouvelle fiche, et n'a plus le bouton « + Nouvelle soumission » (un lien ou une adresse tapée à la main mène à la nouvelle fiche). La nouvelle fiche
+montre « Ancienne adresse : » avec un lien. Dans la liste des clients, l'ancienne fiche reste (pour retrouver l'historique) avec « ancienne adresse » sous
+l'adresse ; elle n'est plus proposée quand on cherche un client pour une nouvelle soumission ni pour éviter un doublon. Refusé si l'adresse est vide, si
+elle est la même que l'actuelle, ou si la fiche est déjà une ancienne adresse. Si on supprime la nouvelle fiche (possible tant qu'elle n'a ni chantier
+terminé ni paiement), l'ancienne redevient une fiche normale. Pour un client sans historique, « Modifier le client » suffit.
+
 **Le client n'est modifiable qu'à un seul endroit : sa fiche** (bouton *Modifier le client*, même principe : l'essentiel d'abord, le reste dans
 « Paramètres avancés »). Partout ailleurs son nom, son adresse et ses coordonnées sont **affichés en lecture seule** : le serveur relit
 toujours le client dans la base et ignore tout ce que le navigateur enverrait. Depuis la page d'une soumission, « Modifier le client » **ramène à la

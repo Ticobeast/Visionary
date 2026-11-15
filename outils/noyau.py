@@ -18,9 +18,9 @@ SCHEMA = RACINE / "schema" / "schema.sql"
 MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"     # ajout des comptes
 MIGRATION_9_10 = RACINE / "schema" / "migration_v9_v10.sql"   # tables figées créées par l'étape 9 -> 10 (clients assouplis, raccourcis)
 # Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions), 10 -> 11 (en attente),
-# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture) ; les quatre dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
+# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client) ; les cinq dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 13
+VERSION_SCHEMA = 14
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -403,14 +403,14 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (8, 9, 10, 11, 12):                       # migrations automatiques, précédées d'une copie de sécurité
+        if version in (8, 9, 10, 11, 12, 13):                     # migrations automatiques, précédées d'une copie de sécurité
             try:
                 sauvegarder(db_path, f"avant_migration_v{version}")
                 if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
                     conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
                     conn.execute("PRAGMA foreign_keys = ON")
                     version = 9
-                if version in (9, 10, 11, 12):              # v9 -> v10 -> ... -> v13 : en UNE transaction, tout ou rien
+                if version in (9, 10, 11, 12, 13):          # v9 -> v10 -> ... -> v14 : en UNE transaction, tout ou rien
                     _migrer_vers_courant(conn, version)
                     version = VERSION_SCHEMA
             except BaseException:
@@ -532,8 +532,15 @@ def _etapes_12_13(conn):
     _reconstruire_tables(conn, ("chantiers",))
 
 
+def _etapes_13_14(conn):
+    """Format v13 -> v14 : `clients.remplace_par` (fiche à l'ancienne adresse -> fiche à la nouvelle adresse), vide partout au départ.
+    `clients` est reconstruite (et non ALTER TABLE ADD COLUMN, qui ne pose pas toutes les règles) pour que sa définition soit identique
+    à celle d'une base neuve ; ses lignes, ses numéros et son compteur de numéros sont conservés."""
+    _reconstruire_tables(conn, ("clients",))
+
+
 def _migrer_vers_courant(conn, version):
-    """Formats v9 à v12 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
+    """Formats v9 à v13 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
     début puis recréés à la fin, tels que dans schema.sql : la base migrée est identique à une base neuve (un test le vérifie)."""
     definitions = _definitions_du_schema()
     conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
@@ -547,9 +554,11 @@ def _migrer_vers_courant(conn, version):
         if version in (9, 10):
             _etapes_10_11(conn)
         if version in (9, 10, 11):
-            _etapes_11_12(conn)         # reconstruit déjà `chantiers` d'après le schéma courant (avec facture_le)
+            _etapes_11_12(conn)         # reconstruit déjà `clients` et `chantiers` d'après le schéma courant (facture_le, remplace_par)
         else:
-            _etapes_12_13(conn)
+            if version == 12:
+                _etapes_12_13(conn)
+            _etapes_13_14(conn)
         for genre, nom, _, sql in definitions:
             if genre in ("TRIGGER", "VIEW"):
                 conn.execute(sql)
@@ -607,7 +616,8 @@ class Index:
         self.par_adresse = {}    # (adresse, ville) comparables -> [id]
         self.par_telephone = {}  # téléphone -> id
         for ligne in conn.execute(
-                "SELECT id, prenom, nom, entreprise, telephone, telephone_2, adresse, ville FROM clients"):
+                "SELECT id, prenom, nom, entreprise, telephone, telephone_2, adresse, ville FROM clients"
+                " WHERE remplace_par IS NULL"):         # une fiche à l'ancienne adresse n'est jamais proposée ni réutilisée
             self.ajouter(*ligne)
 
     def ajouter(self, id_, prenom, nom, entreprise, tel, tel2, adresse, ville):
@@ -768,6 +778,54 @@ def mettre_a_jour_client(conn, client_id, v):
     }
     conn.execute(f"UPDATE clients SET {', '.join(f'{c} = ?' for c in champs)} WHERE id = ?",
                  (*champs.values(), client_id))
+
+
+def client_remplacant(conn, client_id):
+    """Fiche à utiliser pour une NOUVELLE soumission : si le client a déménagé, la fiche à la nouvelle adresse (on suit la chaîne,
+    avec une protection contre une boucle). Retourne client_id lui-même s'il n'a pas été remplacé."""
+    vus = {client_id}
+    courant = client_id
+    while True:
+        r = conn.execute("SELECT remplace_par FROM clients WHERE id = ?", (courant,)).fetchone()
+        if r is None or r[0] is None or r[0] in vus:
+            return courant
+        courant = r[0]
+        vus.add(courant)
+
+
+def nouvelle_adresse_client(conn, client_id, valeurs):
+    """Le client déménage : crée une NOUVELLE fiche (mêmes coordonnées, nouvelle adresse) et marque l'ancienne comme « ancienne adresse »
+    (remplace_par = la nouvelle). Aucun chantier, soumission ni paiement n'est déplacé : l'historique reste sur l'ancienne fiche.
+    `valeurs` : adresse, client_secteur (code ou libellé), code_postal, notes_acces (clés de la feuille de saisie).
+    À appeler dans une transaction. Retourne (nouvel_id, erreurs)."""
+    ancien = conn.execute("SELECT prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, notes, adresse, ville, province, remplace_par"
+                          " FROM clients WHERE id = ?", (client_id,)).fetchone()
+    if ancien is None:
+        return None, [f"Client #{client_id} introuvable."]
+    prenom, nom, entreprise, tel, tel2, courriel, sms_ok, notes, adresse_ancienne, ville_ancienne, province, remplace_par = ancien
+    if remplace_par is not None:
+        return None, ["Cette fiche est déjà une ancienne adresse : ouvre la fiche à la nouvelle adresse pour en faire une autre."]
+    brut = {c: "" for c in COLONNES}
+    brut.update({c: valeurs.get(c, "") or "" for c in ("adresse", "client_secteur", "code_postal", "notes_acces")})
+    brut["province"] = province
+    if not brut["adresse"].strip():
+        return None, ["Écris la nouvelle adresse."]
+    erreurs = appliquer_secteur(conn, brut, requis=True)             # la ville vient du secteur choisi
+    if erreurs:
+        return None, erreurs
+    v, erreurs = lire_client(brut, exige=False)                      # on ne valide que l'adresse : le nom et le téléphone viennent de la fiche existante
+    if erreurs:
+        return None, erreurs
+    if (cle(v["adresse"]), cle(v["ville"])) == (cle(adresse_ancienne), cle(ville_ancienne)):
+        return None, ["C'est la même adresse que l'actuelle : rien à changer."]
+    cur = conn.execute(
+        "INSERT INTO clients (prenom, nom, entreprise, telephone, telephone_2, courriel, sms_ok, adresse, ville, secteur, province,"
+        " code_postal, geocode_statut, notes_acces, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'a_faire',?,?)",
+        (prenom, nom, entreprise, tel, tel2, courriel, sms_ok, v["adresse"], v["ville"], v["secteur"], province,
+         v["code_postal"], v["notes_acces"], notes))
+    nouveau = cur.lastrowid
+    conn.execute("UPDATE clients SET remplace_par = ? WHERE id = ?", (nouveau, client_id))
+    return nouveau, []
 
 
 # ---------------------------------------------------------------------------
