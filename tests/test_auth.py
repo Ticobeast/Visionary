@@ -583,8 +583,9 @@ class TestRefusParDefaut(unittest.TestCase):
                 self.assertTrue(re.match(motif, chemin), (motif, chemin))
                 premiere = next(mt for m, mt, _ in interface.ROUTES if m == methode and re.match(mt, chemin))
                 self.assertEqual(premiere, motif, f"{methode} {chemin} serait servi par une autre route")
-                photo_supprimee = "/photos/" in chemin and chemin.endswith("/supprimer")      # seule différence voulue
-                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee
+                photo_supprimee = "/photos/" in chemin and chemin.endswith("/supprimer")      # différence voulue
+                fusion = chemin.endswith("/fusionner")                                        # autre différence voulue : réservée à l'administrateur
+                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee and not fusion
                 self.assertEqual(auth.permis("soumission", methode, chemin), attendu, f"{methode} {chemin}")
                 self.assertTrue(auth.permis("admin", methode, chemin), f"{methode} {chemin}")
                 verifies += 1
@@ -596,7 +597,8 @@ class TestRefusParDefaut(unittest.TestCase):
             for chemin in _chemins_exemples(motif):
                 if auth.permis("soumission", methode, chemin) != _ancien_permis_soumission(chemin):
                     differences.append(motif)
-        self.assertEqual(differences, [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2)
+        self.assertEqual(differences, [r"^/client/(\d+)/fusionner$"] * 2
+                         + [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2)
 
     def test_chemin_inconnu_refuse_au_role_soumission(self):
         for chemin in ("/nouvelle-page", "/admin", "/client/3/exporter", "/chantier/3/photos/x.jpg/autre", "/data/sylvainculteur.db", "/chantiers/"):
