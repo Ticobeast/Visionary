@@ -241,6 +241,18 @@ def reinitialiser_blocages():
         _ECHECS.clear()
 
 
+_BIDON = {}
+
+
+def _empreinte_bidon():
+    """Empreinte d'un mot de passe sans compte, calculée une seule fois : vérifier un nom inconnu coûte alors UN calcul, comme pour un
+    vrai compte. (Avant, elle était recalculée à chaque essai : un nom inconnu répondait deux fois plus lentement, ce qui laissait
+    deviner quels noms de compte existent.)"""
+    if ITERATIONS not in _BIDON:
+        _BIDON[ITERATIONS] = hacher("bidon", sel=b"0" * 16)
+    return _BIDON[ITERATIONS]
+
+
 def connexion(conn, nom, mot_de_passe, ip):
     """(utilisateur ou None, message d'erreur ou None)."""
     nom = (nom or "").strip()
@@ -248,7 +260,7 @@ def connexion(conn, nom, mot_de_passe, ip):
     if attente:
         return None, f"Trop d'essais. Réessaie dans {max(1, (attente + 59) // 60)} minute(s)."
     r = conn.execute("SELECT id, nom, role, mot_de_passe, actif FROM utilisateurs WHERE nom = ?", (nom,)).fetchone()
-    ok = verifier(mot_de_passe or "", r[3] if r else hacher("bidon", sel=b"0" * 16))     # même durée de calcul si le compte n'existe pas
+    ok = verifier(mot_de_passe or "", r[3] if r else _empreinte_bidon())     # même durée de calcul si le compte n'existe pas
     if r is None or not ok or r[4] != 1:
         noter_echec(nom, ip)
         return None, "Nom ou mot de passe incorrect."

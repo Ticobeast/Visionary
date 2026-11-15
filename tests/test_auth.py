@@ -92,6 +92,22 @@ class TestMotsDePasse(BaseAuth):
         self.assertNotIn(b"tres-secret-2008", brut)
 
 
+class TestDureeDeConnexion(BaseAuth):
+    def test_un_nom_inconnu_coute_un_seul_calcul_comme_un_vrai_compte(self):
+        """Sinon un nom inconnu répond deux fois plus lentement, et on peut deviner quels comptes existent."""
+        from unittest import mock
+        c = self.conn()
+        self.addCleanup(c.close)
+        self.assertEqual(auth.creer_utilisateur(c, "sylvain", "abcd1234", "admin"), [])
+        auth.connexion(c, "personne", "x", "10.0.0.1")                       # premier essai : prépare l'empreinte bidon
+        vrai = auth.hashlib.pbkdf2_hmac
+        for nom in ("sylvain", "personne", "autre-inconnu"):
+            auth.reinitialiser_blocages()
+            with mock.patch.object(auth.hashlib, "pbkdf2_hmac", side_effect=vrai) as calcul:
+                self.assertEqual(auth.connexion(c, nom, "mauvais", "10.0.0.1")[0], None)
+            self.assertEqual(calcul.call_count, 1, nom)
+
+
 class TestSessions(BaseAuth):
     def test_session_et_jeton_non_stocke(self):
         self.comptes()
