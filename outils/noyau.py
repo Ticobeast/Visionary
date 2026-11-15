@@ -523,8 +523,8 @@ def _etapes_11_12(conn):
 
 
 def _etapes_12_13(conn):
-    """Format v12 -> v13 : `chantiers.facture_le` (date de la facture, fixée à sa première production). Les factures déjà remises
-    n'ont pas de date enregistrée : elles seront fixées à la prochaine production. `chantiers` est reconstruite (et non ALTER TABLE
+    """Format v12 -> v13 : `chantiers.facture_le` (date de la facture, figée quand le chantier est terminé). Les chantiers déjà terminés
+    n'ont pas de date enregistrée : ils recevront une fois pour toutes le jour des travaux, à la prochaine ouverture de la facture. `chantiers` est reconstruite (et non ALTER TABLE
     ADD COLUMN) pour que sa définition soit identique à celle d'une base neuve ; le compteur de numéros est conservé."""
     _reconstruire_tables(conn, ("chantiers",))
 
@@ -908,7 +908,11 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
         colonnes["duree_estimee_h"] = float(h)
     if statut == "termine":
         colonnes["duree_reelle_h"] = float(hr) if hr is not None else (reelle_actuelle if reelle_actuelle is not None else duree_finale)
-    conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in colonnes)} WHERE id = ?",
+    marques = [c + " = ?" for c in colonnes]
+    if statut == "termine":             # la date de la facture se fige : la dernière fois qu'elle a été ouverte, sinon aujourd'hui (jour de la fermeture)
+        marques.append("facture_le = COALESCE(facture_le, ?)")
+        colonnes["facture_le"] = datetime.date.today().isoformat()
+    conn.execute(f"UPDATE chantiers SET {', '.join(marques)} WHERE id = ?",
                  (*colonnes.values(), chantier_id))
     ajuster_ordre(conn, chantier_id, ancienne_date)
     return []

@@ -34,7 +34,7 @@ chantier dure en moyenne 2 h : plusieurs par journée ; il peut combiner plusieu
 qu'**une seule date** de travaux (prévue, puis réalisée ; elle se change dans la page Journée). Détails : [`docs/dictionnaire_donnees.md`](docs/dictionnaire_donnees.md).
 
 Règles appliquées par l'application **et** par la base : le client ne se modifie que depuis sa fiche ; un chantier **Terminé** est
-verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : pas de registre de factures, mais une **facture en PDF** refaite à la demande, avec une date fixée à sa première production : elle ne bouge plus ensuite) ; **jamais de solde négatif** ; un seul mode
+verrouillé en lecture seule (on peut seulement l'encaisser et le dupliquer ; **le client est alors considéré comme facturé** : pas de registre de factures, mais une **facture en PDF** refaite à la demande, datée du jour à chaque ouverture tant que le chantier n'est pas terminé ; à la fermeture du chantier, la date se fige (la dernière ouverture, sinon le jour de la fermeture)) ; **jamais de solde négatif** ; un seul mode
 de règlement parmi cinq ; durée estimée obligatoire pour accepter une soumission ; le statut est **automatique** (Accepter = À planifier, Refuser = Refusée, Journée = Planifié, Retirer = À planifier, Annuler = archivé, Terminer = Terminé avec « payé ou pas ») ; un
 chantier annulé, ou terminé **et payé**, passe seul dans les *Archives* ; la ville d'un client se choisit dans une **liste de secteurs** (pas de doublons
 d'écriture) ; nacelle et sort du bois sont des options du travail.

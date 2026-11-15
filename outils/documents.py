@@ -9,9 +9,9 @@ Les coordonnées (nom, NEQ, téléphone, courriel, numéros de taxes, conditions
 ressources/logo-entreprise.svg (voir logo.py). Sans logo utilisable, le nom de l'entreprise est écrit en grosses lettres.
 Aucune dépendance : le PDF est écrit à la main par pdf.py.
 
-Numéro = numéro de la fiche (« Chantier #42 » -> 0042). Date : la soumission est datée du jour où on la produit ; la facture, de
-la date fixée à sa PREMIÈRE production (chantiers.facture_le : le jour de la fin des travaux si le chantier est terminé, sinon le jour
-de la production) : une facture remise au client garde ensuite toujours la même date.
+Numéro = numéro de la fiche (« Chantier #42 » -> 0042). Date : la soumission est datée du jour où on la produit ; la facture, du
+jour où on l'ouvre tant que le chantier n'est pas terminé ; une fois le chantier terminé, sa date est figée (chantiers.facture_le) :
+la dernière ouverture d'avant la fermeture, sinon le jour de la fermeture.
 """
 import datetime
 import re
@@ -408,28 +408,33 @@ def _construire(d, genre, aujourdhui):
 
 
 def _jour_facture(conn, d, aujourdhui):
-    """La date de la facture : celle déjà fixée (chantiers.facture_le) ; sinon on la calcule (chantier terminé : sa date prévue ;
-    sinon le jour de la production), on l'enregistre une fois pour toutes, puis on s'en sert. Si deux personnes ouvrent la facture en
-    même temps, la première écriture gagne (UPDATE ... WHERE facture_le IS NULL) et les deux voient la même date. Base en lecture seule
-    ou occupée : on garde la date calculée, sans l'enregistrer (la facture se produit quand même)."""
-    if d["facture_le"]:
+    """La date de la facture.
+
+    Tant que le chantier n'est pas terminé : le jour où on l'ouvre, noté à chaque fois dans chantiers.facture_le.
+    Chantier terminé : la date est figée. C'est la dernière ouverture d'avant la fermeture, sinon le jour de la fermeture
+    (posé par noyau.changer_statut). Un chantier terminé avant le format v13 n'a pas de date : on lui donne une fois pour toutes
+    le jour des travaux. Base en lecture seule ou occupée : on garde la date calculée, sans l'enregistrer (la facture se produit quand même)."""
+    if d["statut"] == "termine" and d["facture_le"]:
         return datetime.date.fromisoformat(d["facture_le"])
     jour = datetime.date.fromisoformat(d["date_prevue"]) if d["statut"] == "termine" and d["date_prevue"] else aujourdhui
     try:
         if conn.in_transaction:                      # l'appelant gère sa transaction : on n'en ouvre pas une deuxième
-            fixee = _fixer_date_facture(conn, d["chantier_id"], jour)
+            figee = _noter_date_facture(conn, d["chantier_id"], jour)
         else:
             with transaction(conn):
-                fixee = _fixer_date_facture(conn, d["chantier_id"], jour)
+                figee = _noter_date_facture(conn, d["chantier_id"], jour)
     except sqlite3.OperationalError:
         return jour
-    return datetime.date.fromisoformat(fixee) if fixee else jour
+    return datetime.date.fromisoformat(figee) if figee else jour
 
 
-def _fixer_date_facture(conn, chantier_id, jour):
-    conn.execute("UPDATE chantiers SET facture_le = ? WHERE id = ? AND facture_le IS NULL", (jour.isoformat(), chantier_id))
-    ligne = conn.execute("SELECT facture_le FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
-    return ligne[0] if ligne else None
+def _noter_date_facture(conn, chantier_id, jour):
+    """Note la date d'ouverture (chantier pas terminé) ou pose la date manquante (chantier terminé, une seule fois).
+    Retourne la date figée si le chantier est terminé (quelqu'un a pu le fermer entre-temps), sinon None."""
+    conn.execute("UPDATE chantiers SET facture_le = ? WHERE id = ? AND (statut <> 'termine' OR facture_le IS NULL)",
+                 (jour.isoformat(), chantier_id))
+    ligne = conn.execute("SELECT statut, facture_le FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    return ligne[1] if ligne and ligne[0] == "termine" else None
 
 
 def _document(conn, chantier_id, genre, aujourdhui):

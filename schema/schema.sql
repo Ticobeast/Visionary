@@ -31,7 +31,7 @@ PRAGMA foreign_keys = ON;
 -- Format v12 : les numéros de fiche (clients, chantiers, paiements, utilisateurs, raccourcis) sont en AUTOINCREMENT :
 -- le numéro d'une fiche supprimée n'est JAMAIS repris par une nouvelle fiche (le numéro de chantier est celui de la
 -- soumission et de la facture remises au client, et du dossier de photos par défaut).
--- Format v13 : chantiers.facture_le, la date de la facture, fixée la première fois qu'elle est produite en PDF (elle ne bouge plus).
+-- Format v13 : chantiers.facture_le, la date de la facture, figée quand le chantier est terminé (elle ne bouge plus ensuite).
 PRAGMA user_version = 13;
 
 
@@ -205,9 +205,9 @@ CREATE TABLE chantiers (
                               -- tout seul (vide : jusqu'à nouvel ordre). Une fois revenu (à la date ou à la main), le jour
                               -- du retour : le délai d'attente du chantier repart de là.
     facture_le      TEXT CONSTRAINT ck_chantiers_facture_le CHECK (facture_le IS NULL OR date(facture_le, '+0 days') IS facture_le),
-                              -- AAAA-MM-JJ : date imprimée sur la facture, fixée la PREMIÈRE fois que la facture est produite en PDF
-                              -- (chantier terminé : sa date prévue ; sinon le jour de la production). Vide : facture jamais produite.
-                              -- Sur un chantier terminé, elle peut être posée une seule fois (voir le déclencheur de verrouillage).
+                              -- AAAA-MM-JJ : date de la facture. Tant que le chantier n'est pas terminé : le dernier jour où la
+                              -- facture a été ouverte en PDF (elle est datée du jour à chaque ouverture). À la fermeture du chantier,
+                              -- elle se fige : la dernière ouverture, sinon le jour de la fermeture. Ensuite elle ne change plus.
 
     CONSTRAINT ck_chantiers_modalite
         CHECK (modalite_paiement IS NULL OR modalite_paiement IN ('comptant','cheque','interac','carte','autre')),
