@@ -9,17 +9,19 @@ Les coordonnées (nom, NEQ, téléphone, courriel, numéros de taxes, conditions
 ressources/logo-entreprise.svg (voir logo.py). Sans logo utilisable, le nom de l'entreprise est écrit en grosses lettres.
 Aucune dépendance : le PDF est écrit à la main par pdf.py.
 
-Numéro = numéro de la fiche (« Chantier #42 » -> 0042). Date : la soumission est datée du jour où on la produit ; la facture,
-du jour de la fin des travaux une fois le chantier terminé (elle ne bouge plus), sinon du jour où on la produit.
+Numéro = numéro de la fiche (« Chantier #42 » -> 0042). Date : la soumission est datée du jour où on la produit ; la facture, du
+jour où on l'ouvre tant que le chantier n'est pas terminé ; une fois le chantier terminé, sa date est figée (chantiers.facture_le) :
+la dernière ouverture d'avant la fermeture, sinon le jour de la fermeture.
 """
 import datetime
 import re
+import sqlite3
 import unicodedata
 from decimal import Decimal
 
 import entreprise
 import logo as logos
-from noyau import LIBELLES_BOIS, LIBELLES_MODE, taxes_pour
+from noyau import LIBELLES_BOIS, LIBELLES_MODE, taxes_pour, transaction
 from pdf import MOIS, Document, decouper, largeur
 from vue import argent, heures
 
@@ -359,7 +361,7 @@ def _construire(d, genre, aujourdhui):
             limite = jour + datetime.timedelta(days=entreprise.VALIDITE_SOUMISSION_JOURS)
             droite.append((f"Valide jusqu'au {date_longue(limite)}", False))
     else:
-        jour = datetime.date.fromisoformat(d["date_prevue"]) if d["statut"] == "termine" and d["date_prevue"] else aujourdhui
+        jour = d["jour_facture"]
         acquittee = d["paye"] > 0 and d["solde"] <= 0
         droite = [(f"N° {numero}", True), (f"Date : {date_longue(jour)}", False),
                   (f"Payée le {date_longue(d['paiements'][-1][0])}" if acquittee else "Échéance : à la réception", False)]
@@ -405,13 +407,46 @@ def _construire(d, genre, aujourdhui):
     return doc.octets()
 
 
+def _jour_facture(conn, d, aujourdhui):
+    """La date de la facture.
+
+    Tant que le chantier n'est pas terminé : le jour où on l'ouvre, noté à chaque fois dans chantiers.facture_le.
+    Chantier terminé : la date est figée. C'est la dernière ouverture d'avant la fermeture, sinon le jour de la fermeture
+    (posé par noyau.changer_statut). Un chantier terminé avant le format v13 n'a pas de date : on lui donne une fois pour toutes
+    le jour des travaux. Base en lecture seule ou occupée : on garde la date calculée, sans l'enregistrer (la facture se produit quand même)."""
+    if d["statut"] == "termine" and d["facture_le"]:
+        return datetime.date.fromisoformat(d["facture_le"])
+    jour = datetime.date.fromisoformat(d["date_prevue"]) if d["statut"] == "termine" and d["date_prevue"] else aujourdhui
+    try:
+        if conn.in_transaction:                      # l'appelant gère sa transaction : on n'en ouvre pas une deuxième
+            figee = _noter_date_facture(conn, d["chantier_id"], jour)
+        else:
+            with transaction(conn):
+                figee = _noter_date_facture(conn, d["chantier_id"], jour)
+    except sqlite3.OperationalError:
+        return jour
+    return datetime.date.fromisoformat(figee) if figee else jour
+
+
+def _noter_date_facture(conn, chantier_id, jour):
+    """Note la date d'ouverture (chantier pas terminé) ou pose la date manquante (chantier terminé, une seule fois).
+    Retourne la date figée si le chantier est terminé (quelqu'un a pu le fermer entre-temps), sinon None."""
+    conn.execute("UPDATE chantiers SET facture_le = ? WHERE id = ? AND (statut <> 'termine' OR facture_le IS NULL)",
+                 (jour.isoformat(), chantier_id))
+    ligne = conn.execute("SELECT statut, facture_le FROM chantiers WHERE id = ?", (chantier_id,)).fetchone()
+    return ligne[1] if ligne and ligne[0] == "termine" else None
+
+
 def _document(conn, chantier_id, genre, aujourdhui):
     d = _lire(conn, chantier_id)
     if d is None:
         return None
     if genre == "facture" and not facture_possible(d["statut"], d["genre"]):
         return None
-    octets = _construire(d, genre, aujourdhui or datetime.date.today())
+    aujourdhui = aujourdhui or datetime.date.today()
+    if genre == "facture":
+        d["jour_facture"] = _jour_facture(conn, d, aujourdhui)
+    octets = _construire(d, genre, aujourdhui)
     return nom_fichier(genre, chantier_id, d["client_nom_complet"]), octets
 
 

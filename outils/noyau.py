@@ -18,9 +18,9 @@ SCHEMA = RACINE / "schema" / "schema.sql"
 MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"     # ajout des comptes
 MIGRATION_9_10 = RACINE / "schema" / "migration_v9_v10.sql"   # tables figées créées par l'étape 9 -> 10 (clients assouplis, raccourcis)
 # Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions), 10 -> 11 (en attente),
-# 11 -> 12 (numéros jamais réutilisés) ; les trois dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
+# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture) ; les quatre dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 12
+VERSION_SCHEMA = 13
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -403,14 +403,14 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (8, 9, 10, 11):                         # migrations automatiques, précédées d'une copie de sécurité
+        if version in (8, 9, 10, 11, 12):                       # migrations automatiques, précédées d'une copie de sécurité
             try:
                 sauvegarder(db_path, f"avant_migration_v{version}")
                 if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
                     conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
                     conn.execute("PRAGMA foreign_keys = ON")
                     version = 9
-                if version in (9, 10, 11):                  # v9 -> v10 -> v11 -> v12 : en UNE transaction, tout ou rien
+                if version in (9, 10, 11, 12):              # v9 -> v10 -> ... -> v13 : en UNE transaction, tout ou rien
                     _migrer_vers_courant(conn, version)
                     version = VERSION_SCHEMA
             except BaseException:
@@ -489,30 +489,48 @@ def _definitions_du_schema():
     return resultat
 
 
-def _etapes_11_12(conn):
-    """Format v11 -> v12 : un numéro de fiche n'est plus jamais réutilisé (INTEGER PRIMARY KEY AUTOINCREMENT).
-
-    SQLite ne sait pas ajouter AUTOINCREMENT à une table existante : chaque table de TABLES_NUMEROTEES est reconstruite
-    (nouvelle table, copie des lignes avec leurs numéros, suppression de l'ancienne, renommage), puis ses index sont recréés.
+def _reconstruire_tables(conn, tables):
+    """Reconstruit chaque table de `tables` d'après sa définition dans schema.sql : nouvelle table, copie des lignes avec leurs numéros,
+    suppression de l'ancienne, renommage, puis ses index sont recréés. Le compteur AUTOINCREMENT (sqlite_sequence) est conservé tel quel :
+    un numéro déjà donné n'est jamais repris, même si la dernière fiche a été supprimée.
     Les définitions viennent de schema.sql (pas de copie figée : ce sont celles d'une base neuve, la base migrée leur est donc identique).
     Les déclencheurs et la vue, supprimés avant d'arriver ici, sont recréés par _migrer_vers_courant. Pas de ALTER TABLE ... RENAME
     d'une ancienne table : cela réécrirait les clés étrangères des autres tables pour les faire pointer vers elle."""
     definitions = _definitions_du_schema()
-    for table in TABLES_NUMEROTEES:
+    for table in tables:
+        compteur = None
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'sqlite_sequence'").fetchone():
+            compteur = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = ?", (table,)).fetchone()
         creation = next(sql for genre, nom, _, sql in definitions if genre == "TABLE" and nom == table)
         conn.execute(re.sub(r"(CREATE\s+TABLE\s+)" + table + r"\b", r"\1" + table + "_nouveau", creation, count=1, flags=re.IGNORECASE))
-        colonnes = ", ".join(r[1] for r in conn.execute(f"PRAGMA table_info({table}_nouveau)"))
+        anciennes = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        colonnes = ", ".join(r[1] for r in conn.execute(f"PRAGMA table_info({table}_nouveau)") if r[1] in anciennes)   # une colonne neuve reste à sa valeur par défaut
         conn.execute(f"INSERT INTO {table}_nouveau ({colonnes}) SELECT {colonnes} FROM {table}")
         conn.execute(f"DROP TABLE {table}")
         conn.execute(f"ALTER TABLE {table}_nouveau RENAME TO {table}")
         for genre, nom, cible, sql in definitions:
             if genre == "INDEX" and cible == table:
                 conn.execute(sql)
-        # le compteur (sqlite_sequence) vaut alors le plus grand numéro copié : un test le vérifie
+        if compteur is not None:
+            conn.execute("UPDATE sqlite_sequence SET seq = ? WHERE name = ?", (compteur[0], table))
+
+
+def _etapes_11_12(conn):
+    """Format v11 -> v12 : un numéro de fiche n'est plus jamais réutilisé (INTEGER PRIMARY KEY AUTOINCREMENT).
+    SQLite ne sait pas ajouter AUTOINCREMENT à une table existante : chaque table de TABLES_NUMEROTEES est reconstruite.
+    (Au format v11, aucune table n'avait de compteur : il vaut alors le plus grand numéro copié ; un test le vérifie.)"""
+    _reconstruire_tables(conn, TABLES_NUMEROTEES)
+
+
+def _etapes_12_13(conn):
+    """Format v12 -> v13 : `chantiers.facture_le` (date de la facture, figée quand le chantier est terminé). Les chantiers déjà terminés
+    n'ont pas de date enregistrée : ils recevront une fois pour toutes le jour des travaux, à la prochaine ouverture de la facture. `chantiers` est reconstruite (et non ALTER TABLE
+    ADD COLUMN) pour que sa définition soit identique à celle d'une base neuve ; le compteur de numéros est conservé."""
+    _reconstruire_tables(conn, ("chantiers",))
 
 
 def _migrer_vers_courant(conn, version):
-    """Formats v9, v10 et v11 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
+    """Formats v9 à v12 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
     début puis recréés à la fin, tels que dans schema.sql : la base migrée est identique à une base neuve (un test le vérifie)."""
     definitions = _definitions_du_schema()
     conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
@@ -525,7 +543,10 @@ def _migrer_vers_courant(conn, version):
             _etapes_9_10(conn)
         if version in (9, 10):
             _etapes_10_11(conn)
-        _etapes_11_12(conn)
+        if version in (9, 10, 11):
+            _etapes_11_12(conn)         # reconstruit déjà `chantiers` d'après le schéma courant (avec facture_le)
+        else:
+            _etapes_12_13(conn)
         for genre, nom, _, sql in definitions:
             if genre in ("TRIGGER", "VIEW"):
                 conn.execute(sql)
@@ -887,7 +908,11 @@ def changer_statut(conn, chantier_id, statut, date_prevue=None, duree=None, dure
         colonnes["duree_estimee_h"] = float(h)
     if statut == "termine":
         colonnes["duree_reelle_h"] = float(hr) if hr is not None else (reelle_actuelle if reelle_actuelle is not None else duree_finale)
-    conn.execute(f"UPDATE chantiers SET {', '.join(c + ' = ?' for c in colonnes)} WHERE id = ?",
+    marques = [c + " = ?" for c in colonnes]
+    if statut == "termine":             # la date de la facture se fige : la dernière fois qu'elle a été ouverte, sinon aujourd'hui (jour de la fermeture)
+        marques.append("facture_le = COALESCE(facture_le, ?)")
+        colonnes["facture_le"] = datetime.date.today().isoformat()
+    conn.execute(f"UPDATE chantiers SET {', '.join(marques)} WHERE id = ?",
                  (*colonnes.values(), chantier_id))
     ajuster_ordre(conn, chantier_id, ancienne_date)
     return []

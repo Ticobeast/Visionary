@@ -31,7 +31,8 @@ PRAGMA foreign_keys = ON;
 -- Format v12 : les numéros de fiche (clients, chantiers, paiements, utilisateurs, raccourcis) sont en AUTOINCREMENT :
 -- le numéro d'une fiche supprimée n'est JAMAIS repris par une nouvelle fiche (le numéro de chantier est celui de la
 -- soumission et de la facture remises au client, et du dossier de photos par défaut).
-PRAGMA user_version = 12;
+-- Format v13 : chantiers.facture_le, la date de la facture, figée quand le chantier est terminé (elle ne bouge plus ensuite).
+PRAGMA user_version = 13;
 
 
 -- -----------------------------------------------------------------------------
@@ -203,6 +204,10 @@ CREATE TABLE chantiers (
                               -- AAAA-MM-JJ : tant que le chantier est « En attente », le jour où il redevient « À planifier »
                               -- tout seul (vide : jusqu'à nouvel ordre). Une fois revenu (à la date ou à la main), le jour
                               -- du retour : le délai d'attente du chantier repart de là.
+    facture_le      TEXT CONSTRAINT ck_chantiers_facture_le CHECK (facture_le IS NULL OR date(facture_le, '+0 days') IS facture_le),
+                              -- AAAA-MM-JJ : date de la facture. Tant que le chantier n'est pas terminé : le dernier jour où la
+                              -- facture a été ouverte en PDF (elle est datée du jour à chaque ouverture). À la fermeture du chantier,
+                              -- elle se fige : la dernière ouverture, sinon le jour de la fermeture. Ensuite elle ne change plus.
 
     CONSTRAINT ck_chantiers_modalite
         CHECK (modalite_paiement IS NULL OR modalite_paiement IN ('comptant','cheque','interac','carte','autre')),
@@ -363,7 +368,7 @@ END;
 
 -- -----------------------------------------------------------------------------
 -- Verrouillage : un chantier « Terminé » est en lecture seule, définitivement. Restent possibles les suites
--- financières (paiements) et l'ordre dans la journée. Il ne peut pas être supprimé.
+-- financières (paiements), l'ordre dans la journée et la pose (une seule fois) de la date de facture. Il ne peut pas être supprimé.
 -- (Les types de travaux d'un chantier terminé ne peuvent être ni modifiés ni supprimés.)
 -- -----------------------------------------------------------------------------
 CREATE TRIGGER trg_chantiers_termine_verrouille BEFORE UPDATE ON chantiers
@@ -373,7 +378,9 @@ WHEN OLD.statut = 'termine' AND (
      OR NEW.duree_estimee_h IS NOT OLD.duree_estimee_h OR NEW.duree_reelle_h IS NOT OLD.duree_reelle_h
      OR NEW.prix_ht IS NOT OLD.prix_ht OR NEW.tps IS NOT OLD.tps OR NEW.tvq IS NOT OLD.tvq
      OR NEW.nacelle IS NOT OLD.nacelle OR NEW.debarrasser_bois IS NOT OLD.debarrasser_bois OR NEW.bois_format IS NOT OLD.bois_format
-     OR NEW.modalite_paiement IS NOT OLD.modalite_paiement OR NEW.dossier_photos IS NOT OLD.dossier_photos)
+     OR NEW.modalite_paiement IS NOT OLD.modalite_paiement OR NEW.dossier_photos IS NOT OLD.dossier_photos
+     -- facture_le : posée une seule fois (vide -> date), même sur un chantier terminé ; une fois fixée, elle ne change plus
+     OR (OLD.facture_le IS NOT NULL AND NEW.facture_le IS NOT OLD.facture_le))
 BEGIN
     SELECT RAISE(ABORT, 'Chantier terminé : verrouillé en lecture seule');
 END;
@@ -422,7 +429,7 @@ base AS (
         -- genre : « soumission » (ouverte ou refusée, onglet Soumissions) ou « chantier » (accepté, onglet Chantiers)
         CASE WHEN c.statut = 'soumission' OR (c.statut = 'annule' AND c.accepte_le IS NULL)
              THEN 'soumission' ELSE 'chantier' END AS genre,
-        c.accepte_le, c.cree_par, c.reprise_le,
+        c.accepte_le, c.cree_par, c.reprise_le, c.facture_le,
         (SELECT group_concat(code, '+') FROM (SELECT ct.type_travaux AS code FROM chantier_travaux ct
             WHERE ct.chantier_id = c.id ORDER BY ct.type_travaux)) AS types_codes,
         (SELECT group_concat(libelle, ' + ') FROM (SELECT t.libelle FROM chantier_travaux ct

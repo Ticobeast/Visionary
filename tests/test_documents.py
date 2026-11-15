@@ -392,8 +392,67 @@ class TestFacturePdf(BaseDocuments):
         self.assertIn("- 500,00 $", ligne_avec(corps, "Reçu le 1 octobre 2026 (Chèque)".replace("1 octobre", "1er octobre")))
         self.assertIn("2 029,45 $", ligne_avec(corps, "SOLDE À PAYER"))
         self.assertIn("2 529,45 $", ligne_avec(corps, "Total"))
-        _, octets = self.document("facture", 3, datetime.date(2030, 5, 6))
-        self.assertIn("Date : 6 mai 2030", texte_pdf(octets))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(AUJOURDHUI.isoformat(),)])    # dernière ouverture notée
+
+    def terminer(self, chantier_id):
+        conn, _ = noyau.ouvrir_base(self.db)
+        self.addCleanup(conn.close)
+        with noyau.transaction(conn):
+            self.assertEqual(noyau.terminer_chantier(conn, chantier_id), [])
+
+    def test_avant_la_fermeture_la_facture_est_datee_du_jour_a_chaque_ouverture(self):
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(None,)])
+        self.assertIn("Date : 6 mai 2030", texte_pdf(self.document("facture", 3, datetime.date(2030, 5, 6))[1]))
+        self.assertIn("Date : 9 mai 2030", texte_pdf(self.document("facture", 3, datetime.date(2030, 5, 9))[1]))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [("2030-05-09",)])    # la dernière ouverture est notée
+        self.assertIn(f"Date : {documents.date_longue(AUJOURDHUI)}", texte_pdf(self.pdf("/facture/3/pdf")))  # aussi par la route de téléchargement
+
+    def test_a_la_fermeture_la_derniere_ouverture_est_figee(self):
+        self.document("facture", 3, datetime.date(2030, 5, 6))
+        self.document("facture", 3, datetime.date(2030, 5, 9))
+        self.terminer(3)
+        for jour in (datetime.date(2030, 6, 1), datetime.date(2031, 1, 1), None):                  # ouverte plus tard : la date ne bouge plus
+            self.assertIn("Date : 9 mai 2030", texte_pdf(self.document("facture", 3, jour)[1]))
+        self.assertIn("Date : 9 mai 2030", texte_pdf(self.pdf("/facture/3/pdf")))
+        self.assertEqual(self.sql("SELECT statut, facture_le FROM chantiers WHERE id = 3"), [("termine", "2030-05-09")])
+
+    def test_fermeture_sans_facture_ouverte_la_date_est_le_jour_de_la_fermeture(self):
+        self.terminer(3)
+        fermeture = datetime.date.today()
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(fermeture.isoformat(),)])
+        self.assertIn(f"Date : {documents.date_longue(fermeture)}", texte_pdf(self.document("facture", 3, datetime.date(2035, 1, 1))[1]))
+
+    def test_chantier_ferme_pendant_qu_on_ouvre_la_facture(self):
+        """La fiche a été lue « planifiée » ; quelqu'un ferme le chantier juste avant l'écriture : la date figée gagne."""
+        conn, _ = noyau.ouvrir_base(self.db)
+        self.addCleanup(conn.close)
+        d = documents._lire(conn, 3)
+        self.document("facture", 3, datetime.date(2030, 5, 6))
+        self.terminer(3)
+        self.assertEqual(documents._jour_facture(conn, d, datetime.date(2030, 5, 9)), datetime.date(2030, 5, 6))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [("2030-05-06",)])
+
+    def test_un_chantier_termine_avant_ce_format_recoit_une_fois_le_jour_des_travaux(self):
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 2"), [(None,)])
+        self.assertIn("Date : 22 septembre 2026", texte_pdf(self.document("facture", 2, datetime.date(2031, 1, 1))[1]))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 2"), [("2026-09-22",)])      # posée malgré le verrou du chantier terminé
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = 2"), [("termine",)])
+        self.assertIn("Date : 22 septembre 2026", texte_pdf(self.document("facture", 2, datetime.date(2032, 1, 1))[1]))
+
+    def test_la_soumission_n_est_pas_concernee(self):
+        i = self.soumission_complete()                                                             # une soumission en cours est datée du jour de la production
+        self.assertIn("Date : 6 mai 2030", texte_pdf(self.document("soumission", i, datetime.date(2030, 5, 6))[1]))
+        self.assertIn("Date : 7 mai 2030", texte_pdf(self.document("soumission", i, datetime.date(2030, 5, 7))[1]))
+        self.document("soumission", 3, datetime.date(2030, 5, 6))
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id IN (3, ?)", (i,)), [(None,), (None,)])
+
+    def test_base_en_lecture_seule_la_facture_se_produit_quand_meme(self):
+        import sqlite3
+        lecture = sqlite3.connect(f"{self.db.resolve().as_uri()}?mode=ro", uri=True, isolation_level=None)
+        self.addCleanup(lecture.close)
+        _, octets = documents.facture_pdf(lecture, 3, datetime.date(2030, 5, 6))
+        self.assertIn("Date : 6 mai 2030", texte_pdf(octets))                                       # calculée comme avant, sans être enregistrée
+        self.assertEqual(self.sql("SELECT facture_le FROM chantiers WHERE id = 3"), [(None,)])
 
     def test_chantier_a_planifier_et_en_attente_ont_aussi_une_facture(self):
         accepte = self.soumission_complete()

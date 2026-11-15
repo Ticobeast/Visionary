@@ -243,6 +243,22 @@ class TestVerifierEtRestaurer(Base):
         self.assertEqual(conn.execute("SELECT nom FROM clients").fetchall(), [("Gagnon",)])
         conn.close()
 
+    def test_une_sauvegarde_v12_est_acceptee_puis_migree_au_lancement(self):
+        ancienne = self.dossier / "2026-11-01_080000_ancienne.db"
+        self.dossier.mkdir(exist_ok=True)
+        c = sqlite3.connect(ancienne)
+        c.executescript((Path(__file__).resolve().parent / "schema_v12.sql").read_text(encoding="utf-8"))
+        c.execute("INSERT INTO clients (nom) VALUES ('Gagnon')")
+        c.commit()
+        c.close()
+        ok, msg = sauvegardes.verifier(ancienne)
+        self.assertTrue(ok, msg)
+        sauvegardes.restaurer(self.db, ancienne)
+        conn, _ = noyau.ouvrir_base(self.db)
+        self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
+        self.assertEqual(conn.execute("SELECT nom FROM clients").fetchall(), [("Gagnon",)])
+        conn.close()
+
     def test_restaurer(self):
         self.assertEqual(nb_clients(self.db), 0)
         avant = sauvegardes.restaurer(self.db, self.copie)
