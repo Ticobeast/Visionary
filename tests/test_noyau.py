@@ -39,7 +39,7 @@ class TestSchema(unittest.TestCase):
 
     def test_version_et_integrite(self):
         self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
-        self.assertEqual(noyau.VERSION_SCHEMA, 15)
+        self.assertEqual(noyau.VERSION_SCHEMA, 16)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_un_numero_n_est_jamais_reutilise(self):

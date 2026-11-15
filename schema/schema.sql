@@ -34,7 +34,8 @@ PRAGMA foreign_keys = ON;
 -- Format v13 : chantiers.facture_le, la date de la facture, figée quand le chantier est terminé (elle ne bouge plus ensuite).
 -- Format v14 : clients.remplace_par (une fiche à l'ancienne adresse d'un client qui a déménagé pointe vers la fiche à la nouvelle adresse).
 -- Format v15 : clients.fusionne_dans (une fiche en double, fusionnée dans la fiche gardée : cachée, jamais supprimée).
-PRAGMA user_version = 15;
+-- Format v16 : table journal (qui a fait quoi et quand ; ne se modifie jamais).
+PRAGMA user_version = 16;
 
 
 -- -----------------------------------------------------------------------------
@@ -353,6 +354,34 @@ CREATE TABLE raccourcis (
 );
 
 CREATE INDEX idx_raccourcis_utilisateur ON raccourcis(utilisateur_id, page);
+
+
+-- -----------------------------------------------------------------------------
+-- Journal des modifications : une ligne par action réussie (qui, quoi, quand). Il ne se modifie jamais : ni UPDATE ni DELETE.
+-- `utilisateur` est le NOM du compte au moment de l'action, copié en texte (pas de clé étrangère) : la ligne survit à la
+-- suppression du compte. Vide quand l'interface fonctionne sans comptes. Aucune valeur de formulaire n'y est enregistrée.
+-- `cible` : « client 12 », « chantier 45 », « soumission 45 », « paiement 7 »... ; `adresse` : chemin de la requête, sans paramètres.
+-- -----------------------------------------------------------------------------
+CREATE TABLE journal (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    quand       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%S','now','localtime')),
+    utilisateur TEXT,
+    action      TEXT NOT NULL,
+    cible       TEXT,
+    adresse     TEXT NOT NULL
+);
+
+CREATE INDEX idx_journal_quand ON journal(quand);
+
+CREATE TRIGGER trg_journal_pas_de_modif BEFORE UPDATE ON journal
+BEGIN
+    SELECT RAISE(ABORT, 'Journal : une ligne ne peut pas être modifiée');
+END;
+
+CREATE TRIGGER trg_journal_pas_de_suppression BEFORE DELETE ON journal
+BEGIN
+    SELECT RAISE(ABORT, 'Journal : une ligne ne peut pas être supprimée');
+END;
 
 
 -- -----------------------------------------------------------------------------

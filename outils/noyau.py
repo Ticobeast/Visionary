@@ -18,9 +18,9 @@ SCHEMA = RACINE / "schema" / "schema.sql"
 MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"     # ajout des comptes
 MIGRATION_9_10 = RACINE / "schema" / "migration_v9_v10.sql"   # tables figées créées par l'étape 9 -> 10 (clients assouplis, raccourcis)
 # Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions), 10 -> 11 (en attente),
-# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client), 14 -> 15 (fusion de deux fiches) ; les six dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
+# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client), 14 -> 15 (fusion de deux fiches), 15 -> 16 (journal des modifications) ; les sept dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 15
+VERSION_SCHEMA = 16
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -403,14 +403,14 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (8, 9, 10, 11, 12, 13, 14):                   # migrations automatiques, précédées d'une copie de sécurité
+        if version in (8, 9, 10, 11, 12, 13, 14, 15):                 # migrations automatiques, précédées d'une copie de sécurité
             try:
                 sauvegarder(db_path, f"avant_migration_v{version}")
                 if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
                     conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
                     conn.execute("PRAGMA foreign_keys = ON")
                     version = 9
-                if version in (9, 10, 11, 12, 13, 14):      # v9 -> v10 -> ... -> v15 : en UNE transaction, tout ou rien
+                if version in (9, 10, 11, 12, 13, 14, 15):  # v9 -> v10 -> ... -> v16 : en UNE transaction, tout ou rien
                     _migrer_vers_courant(conn, version)
                     version = VERSION_SCHEMA
             except BaseException:
@@ -540,8 +540,16 @@ def _etapes_14_15(conn):
     _reconstruire_tables(conn, ("clients",))
 
 
+def _etapes_15_16(conn):
+    """Format v15 -> v16 : table `journal` (neuve : rien à copier) et son index, d'après schema.sql. Ses deux déclencheurs (journal
+    en lecture seule) sont recréés avec les autres à la fin de _migrer_vers_courant. S'applique aussi aux bases venues de v9 à v14."""
+    for genre, nom, _, sql in _definitions_du_schema():
+        if (genre == "TABLE" and nom == "journal") or (genre == "INDEX" and nom == "idx_journal_quand"):
+            conn.execute(sql)
+
+
 def _migrer_vers_courant(conn, version):
-    """Formats v9 à v14 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
+    """Formats v9 à v15 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
     début puis recréés à la fin, tels que dans schema.sql : la base migrée est identique à une base neuve (un test le vérifie)."""
     definitions = _definitions_du_schema()
     conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
@@ -559,7 +567,9 @@ def _migrer_vers_courant(conn, version):
         else:
             if version == 12:
                 _etapes_12_13(conn)
-            _etapes_14_15(conn)         # v12, v13 et v14 : `clients` reconstruite une seule fois
+            if version < 15:
+                _etapes_14_15(conn)     # v12, v13 et v14 : `clients` reconstruite une seule fois
+        _etapes_15_16(conn)             # toutes les versions : la table `journal` est neuve
         for genre, nom, _, sql in definitions:
             if genre in ("TRIGGER", "VIEW"):
                 conn.execute(sql)
