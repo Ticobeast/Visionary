@@ -1,0 +1,30 @@
+# Lance tous les tests à chaque pull request (et à la demande, onglet Actions).
+# Python 3.9 sous Windows : comme le PC. Python 3.13 sous Linux : comme l'endroit où le programme est écrit.
+# (Python 3.9 n'est plus offert sur les machines Linux récentes de GitHub.)
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45          # sous Windows, la suite prend environ 15 minutes (beaucoup de petites bases écrites sur disque)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, python: "3.9"}
+          - {os: ubuntu-latest, python: "3.13"}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Tests
+        run: python -m unittest discover -s tests
