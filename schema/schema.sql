@@ -127,8 +127,9 @@ CREATE TABLE clients (
     -- adresse. L'ancienne fiche garde tout son historique ; si la nouvelle fiche est supprimée, l'ancienne redevient normale.
     remplace_par INTEGER REFERENCES clients(id) ON DELETE SET NULL,
 
-    -- Vide en temps normal. Sur une fiche en DOUBLON fusionnée : le numéro de la fiche gardée. La fiche en double n'est jamais
-    -- supprimée (ses chantiers terminés, verrouillés, restent attachés à elle et à ses factures) : elle est seulement cachée.
+    -- Vide en temps normal. Sur une fiche en DOUBLON fusionnée : le numéro de la fiche gardée. Un doublon qui a des chantiers
+    -- terminés n'est pas supprimé (ils sont verrouillés et restent attachés à lui et à leurs factures) : il est seulement caché.
+    -- Un doublon sans chantier terminé est supprimé à la fusion (rien ne l'y retient) : il n'a donc jamais cette valeur.
     -- RESTRICT : la fiche gardée ne peut pas être supprimée tant qu'un doublon est fusionné dedans.
     fusionne_dans INTEGER REFERENCES clients(id) ON DELETE RESTRICT,
 

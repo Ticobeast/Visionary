@@ -147,8 +147,8 @@ def page_client(conn, client_id, query):
                        f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
                        '<button class="danger" type="submit">Supprimer le client</button></form></div>')
     fusion = ""
-    if est_admin() and not c["remplace_par"]:       # réservé à l'administrateur ; pas sur une ancienne adresse
-        fusion = (f'<div class="barre" style="margin-top:16px"><a class="bouton secondaire" href="/client/{client_id}/fusionner">'
+    if est_admin() and not c["remplace_par"]:       # réservé à l'administrateur et à l'ordinateur (classe pc-seul) ; pas sur une ancienne adresse
+        fusion = (f'<div class="barre pc-seul" style="margin-top:16px"><a class="bouton secondaire" href="/client/{client_id}/fusionner">'
                   'Fusionner avec un autre client</a></div>')
     return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}{fusion}', query.get("ok"), query.get("err"))
 

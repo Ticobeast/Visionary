@@ -831,8 +831,9 @@ def erreurs_fusion(conn, garde_id, doublon_id):
 
 
 def fusionner_clients(conn, garde_id, doublon_id):
-    """Deux fiches sont le même client : le doublon est fusionné dans la fiche gardée. Il n'est PAS supprimé (ses chantiers terminés,
-    verrouillés par la base, restent sur lui avec leurs factures) : il est marqué `fusionne_dans = garde_id` et n'apparaît plus nulle part.
+    """Deux fiches sont le même client : le doublon est fusionné dans la fiche gardée. S'il a des chantiers terminés (verrouillés par
+    la base, ils restent sur lui avec leurs factures), il n'est PAS supprimé : il est marqué `fusionne_dans = garde_id` et n'apparaît
+    plus nulle part. S'il n'en a aucun, il ne lui reste rien après le déplacement : il est simplement supprimé.
     Ses fiches NON terminées (soumissions, chantiers à planifier, planifiés, en attente, refusés, annulés) passent à la fiche gardée.
     Les champs vides de la fiche gardée sont complétés avec ceux du doublon ; son nom et son adresse ne changent jamais.
     À appeler dans une transaction. Retourne la liste des erreurs (vide si la fusion est faite)."""
@@ -854,7 +855,10 @@ def fusionner_clients(conn, garde_id, doublon_id):
     if changes:
         conn.execute(f"UPDATE clients SET {', '.join(c + ' = ?' for c in changes)} WHERE id = ?", (*changes.values(), garde_id))
     conn.execute("UPDATE chantiers SET client_id = ? WHERE client_id = ? AND statut <> 'termine'", (garde_id, doublon_id))
-    conn.execute("UPDATE clients SET fusionne_dans = ? WHERE id = ?", (garde_id, doublon_id))
+    if conn.execute("SELECT 1 FROM chantiers WHERE client_id = ?", (doublon_id,)).fetchone() is None:
+        conn.execute("DELETE FROM clients WHERE id = ?", (doublon_id,))     # plus rien dessus (aucun chantier terminé) : inutile de le garder caché
+    else:
+        conn.execute("UPDATE clients SET fusionne_dans = ? WHERE id = ?", (garde_id, doublon_id))
     return []
 
 

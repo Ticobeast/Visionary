@@ -382,17 +382,17 @@ l'adresse ; elle n'est plus proposée quand on cherche un client pour une nouvel
 elle est la même que l'actuelle, ou si la fiche est déjà une ancienne adresse. Si on supprime la nouvelle fiche (possible tant qu'elle n'a ni chantier
 terminé ni paiement), l'ancienne redevient une fiche normale. Pour un client sans historique, « Modifier le client » suffit.
 
-**Deux fiches du même client : « Fusionner avec un autre client ».** Réservé à l'**administrateur** : tout en bas de la fiche (près de la zone de
-suppression), un bouton blanc à bordure grise. Il n'est pas affiché sur une ancienne adresse. La page propose d'abord, sans rien taper, les fiches qui ont le
+**Deux fiches du même client : « Fusionner avec un autre client ».** Réservé à l'**administrateur** et à l'**ordinateur** : tout en bas de la fiche (près de la zone de
+suppression), un bouton blanc à bordure grise, caché sur téléphone (les pages `/client/<n>/fusionner` restent ouvertes par adresse). Il n'est pas affiché sur une ancienne adresse. La page propose d'abord, sans rien taper, les fiches qui ont le
 même téléphone ou le même nom de famille ; une recherche (comme dans la liste des clients) permet de trouver l'autre. Après le choix, une page de confirmation
 montre les deux fiches côte à côte (nom, adresse, téléphone, courriel, nombre de soumissions et de chantiers) : la fiche d'où l'on part est **gardée**, l'autre
 **sera cachée**. Le lien « Garder plutôt l'autre fiche » inverse. « Tout l'historique sera visible sur la fiche gardée. Les factures déjà faites ne changent pas. »
-La fiche en double n'est **jamais supprimée** : elle est marquée « fusionnée » (colonne `fusionne_dans`) et disparaît de la liste des clients, du choix d'un client pour
+Si la fiche en double a des **chantiers terminés**, elle n'est **pas supprimée** : elle est marquée « fusionnée » (colonne `fusionne_dans`) et disparaît de la liste des clients, du choix d'un client pour
 une nouvelle soumission et de la détection des doublons. Ses soumissions et chantiers **pas terminés** (en attente, à planifier, planifiés, refusés, annulés) passent à
 la fiche gardée. Ses **chantiers terminés** restent attachés à la fiche cachée (la base les verrouille) : leurs factures gardent le nom et l'adresse d'origine, mais ils
 apparaissent dans l'historique de la fiche gardée, mêlés aux autres par date. Les paiements et les photos suivent leur chantier. Les champs vides de la fiche gardée
 (téléphone, 2e téléphone, courriel, code postal, accès, notes) sont complétés avec ceux du doublon ; si les deux téléphones diffèrent, celui du doublon devient le 2e
-téléphone ; le nom et l'adresse de la fiche gardée ne changent jamais. Une fiche cachée ouverte par un ancien lien (ou une page de chantier terminé) mène à la fiche gardée.
+téléphone ; le nom et l'adresse de la fiche gardée ne changent jamais. Si elle n'en a **aucun**, une fois ses soumissions et chantiers déplacés il ne lui reste rien : elle est simplement **supprimée** (aucune fiche cachée). Une fiche cachée ouverte par un ancien lien (ou une page de chantier terminé) mène à la fiche gardée.
 Refusé si les deux fiches sont la même, si l'une n'existe pas, est déjà fusionnée ou est une ancienne adresse, ou si une autre fiche est liée au doublon (fusionner alors
 dans l'autre sens, ou régler d'abord l'autre fiche). Une fiche fusionnée, ou celle qui garde un doublon, n'est jamais supprimable. Il n'y a pas de retour en arrière dans le programme.
 

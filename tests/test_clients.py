@@ -560,7 +560,7 @@ class TestFusion(BaseClients):
             self.assertIn("n° 4", erreurs[0])
             self.assertEqual(noyau.fusionner_clients(c, 1, 3), [])                                         # mais elle peut garder un deuxième doublon
             self.assertEqual(c.execute("SELECT id, fusionne_dans FROM clients ORDER BY id").fetchall(),
-                             [(1, None), (2, None), (3, 1), (4, 1), (5, None)])
+                             [(1, None), (2, None), (4, 1), (5, None)])           # la fiche 3 n'avait pas de chantier terminé : supprimée
         finally:
             c.close()
 
@@ -631,9 +631,11 @@ class TestFusion(BaseClients):
         try:
             c.execute("INSERT INTO clients (nom) VALUES ('Roy')")
             c.execute("INSERT INTO clients (nom) VALUES ('Roy')")
+            c.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, prix_ht) VALUES (6, 'termine', '2026-01-01', 1, 10)")                                                                                 # le doublon (6) a un chantier terminé : il sera caché
             c.commit()
+            self.assertTrue(noyau.client_supprimable(c, 6) is False)
             self.assertTrue(noyau.client_supprimable(c, 5))                                                 # sans historique : supprimable
-            self.assertEqual(noyau.fusionner_clients(c, 5, 6), [])                                          # deux fiches vides fusionnées
+            self.assertEqual(noyau.fusionner_clients(c, 5, 6), [])                                          # 6 reste cachée (chantier terminé)
             c.commit()
             self.assertFalse(noyau.client_supprimable(c, 5))                                                # a un doublon fusionné dedans
             self.assertFalse(noyau.client_supprimable(c, 6))                                                # est cachée
@@ -661,6 +663,7 @@ class TestFusion(BaseClients):
             c.execute("INSERT INTO clients (nom) VALUES ('Roy')")
             c.execute("INSERT INTO clients (nom) VALUES ('Roy')")
             c.execute("INSERT INTO chantiers (client_id, statut) VALUES (4, 'soumission')")
+            c.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, prix_ht) VALUES (5, 'termine', '2026-01-01', 1, 10)")
             c.commit()
             self.assertEqual(noyau.fusionner_clients(c, 4, 5), [])
             c.commit()
@@ -681,6 +684,36 @@ class TestFusion(BaseClients):
             self.assertEqual(c.execute("SELECT client_id FROM chantiers WHERE id = ?", (nouveau,)).fetchone(), (1,))
         finally:
             c.close()
+
+    def test_doublon_sans_chantier_termine_est_supprime(self):
+        c = self.conn()
+        try:
+            c.execute("INSERT INTO clients (prenom, nom, telephone, adresse, ville) VALUES ('Paul', 'Roy', '+14505550123', '1 Rue A', 'Mirabel')")
+            c.execute("INSERT INTO clients (prenom, nom, telephone, adresse, ville) VALUES ('Paul', 'Roy', '+14505550124', '2 Rue B', 'Mirabel')")
+            c.execute("INSERT INTO chantiers (client_id, statut) VALUES (5, 'soumission')")
+            c.execute("INSERT INTO chantiers (client_id, statut, accepte_le) VALUES (5, 'a_planifier', '2026-09-04')")
+            c.commit()
+        finally:
+            c.close()
+        statut, en_tetes, _ = self.fusionner(4, 5)
+        self.assertEqual(en_tetes["Location"], "/client/4?ok=fusion")
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 5"), [(0,)])                    # plus aucune ligne
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE fusionne_dans IS NOT NULL"), [(0,)])
+        self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id IN (4, 5) ORDER BY id"), [(4,), (4,)])   # ses soumissions sont sur la fiche gardée
+        self.assertEqual(self.get("/client/5")[0][:3], "404")
+        page = self.get("/client/4", {"ok": "fusion"})[1]
+        self.assertIn("Les deux fiches sont fusionnées", page)
+        self.assertEqual(page.count('href="/soumission/') + page.count('href="/chantier/'), 2)
+        self.assertIn("Supprimer le client", page)                                                          # sans historique : reste supprimable
+        c = self.conn()
+        try:
+            self.assertTrue(noyau.client_supprimable(c, 4))
+            self.assertEqual(noyau.supprimer_client(c, 4), [])
+            c.commit()
+        finally:
+            c.close()
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id IN (4, 5)"), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id IN (4, 5)"), [(0,)])
 
     def test_les_secteurs_utilises_par_un_doublon_cache(self):
         self.doublon()
@@ -711,6 +744,7 @@ class TestFusion(BaseClients):
         page = self.get("/client/1")[1]
         self.assertRegex(page, r'<a class="bouton secondaire" href="/client/1/fusionner">Fusionner avec un autre client</a>')
         self.assertLess(page.index("Soumissions et chantiers"), page.index("Fusionner avec un autre client"))      # tout en bas
+        self.assertRegex(page, r'<div class="barre pc-seul"[^>]*><a class="bouton secondaire" href="/client/1/fusionner">')   # ordinateur seulement
         self.deplacer = TestNouvelleAdresse.deplacer.__get__(self)
         self.post("/client/1/nouvelle-adresse", {"adresse": "45 Rue du Lac", "client_secteur": "shawinigan"})
         self.assertNotIn("Fusionner avec un autre client", self.get("/client/1")[1])                         # ancienne adresse : pas de bouton

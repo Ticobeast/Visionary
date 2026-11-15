@@ -322,6 +322,7 @@ class TestDroits(BaseAuth):
     def test_la_fusion_de_fiches_est_reservee_a_l_administrateur(self):
         c = self.conn()
         c.execute("INSERT INTO clients (prenom, nom, telephone, adresse, ville) VALUES ('Marie', 'Gagnon', '+14505550199', '5 Rue Voisine', 'Mirabel')")
+        c.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, prix_ht) VALUES (4, 'termine', '2026-01-01', 1, 10)")   # le doublon sera caché
         c.commit()
         c.close()
         for chemin in ("/client/1/fusionner", "/client/1/fusionner?avec=4"):
