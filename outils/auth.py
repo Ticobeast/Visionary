@@ -282,6 +282,7 @@ PERMIS_SOUMISSION = (
     ("GET", r"^/$"), ("GET", r"^/chantiers$"), ("GET", r"^/nouveau$"), ("POST", r"^/nouveau$"), ("GET", r"^/clients$"),
     # fiche client : voir, modifier, ajouter une soumission ou un chantier (pas de suppression)
     ("GET", r"^/client/(\d+)$"), ("GET", r"^/client/(\d+)/modifier$"), ("POST", r"^/client/(\d+)/modifier$"),
+    ("GET", r"^/client/(\d+)/nouvelle-adresse$"), ("POST", r"^/client/(\d+)/nouvelle-adresse$"),
     ("GET", r"^/client/(\d+)/soumission/nouveau$"), ("POST", r"^/client/(\d+)/soumission/nouveau$"),
     ("GET", r"^/client/(\d+)/chantier/nouveau$"), ("POST", r"^/client/(\d+)/chantier/nouveau$"),
     # soumissions : liste, fiche, modification, accepter, refuser, rouvrir, compléter, PDF (pas de suppression)

@@ -32,6 +32,7 @@ MESSAGES = {
     "deplace": "Ordre de passage mis à jour : les heures sont recalculées.",
     "client_maj": "Fiche client enregistrée.",
     "client_supprime": "Client supprimé.",
+    "nouvelle_adresse": "Nouvelle fiche créée à la nouvelle adresse. L'ancienne fiche garde son historique.",
     "soumission_creee": "Soumission créée.",
     "soumission_reutilisee": "Soumission créée pour un client déjà dans la base (même adresse) : sa fiche a été réutilisée.",
     "soumission_acceptee": "Soumission acceptée : elle est maintenant dans Chantiers, à planifier.",
