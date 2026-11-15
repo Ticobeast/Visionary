@@ -18,9 +18,9 @@ SCHEMA = RACINE / "schema" / "schema.sql"
 MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"     # ajout des comptes
 MIGRATION_9_10 = RACINE / "schema" / "migration_v9_v10.sql"   # tables figées créées par l'étape 9 -> 10 (clients assouplis, raccourcis)
 # Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions), 10 -> 11 (en attente),
-# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client) ; les cinq dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
+# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client), 14 -> 15 (fusion de deux fiches) ; les six dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 14
+VERSION_SCHEMA = 15
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -403,14 +403,14 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (8, 9, 10, 11, 12, 13):                     # migrations automatiques, précédées d'une copie de sécurité
+        if version in (8, 9, 10, 11, 12, 13, 14):                   # migrations automatiques, précédées d'une copie de sécurité
             try:
                 sauvegarder(db_path, f"avant_migration_v{version}")
                 if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
                     conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
                     conn.execute("PRAGMA foreign_keys = ON")
                     version = 9
-                if version in (9, 10, 11, 12, 13):          # v9 -> v10 -> ... -> v14 : en UNE transaction, tout ou rien
+                if version in (9, 10, 11, 12, 13, 14):      # v9 -> v10 -> ... -> v15 : en UNE transaction, tout ou rien
                     _migrer_vers_courant(conn, version)
                     version = VERSION_SCHEMA
             except BaseException:
@@ -532,15 +532,16 @@ def _etapes_12_13(conn):
     _reconstruire_tables(conn, ("chantiers",))
 
 
-def _etapes_13_14(conn):
-    """Format v13 -> v14 : `clients.remplace_par` (fiche à l'ancienne adresse -> fiche à la nouvelle adresse), vide partout au départ.
+def _etapes_14_15(conn):
+    """Format v14 -> v15 : `clients.fusionne_dans` (fiche en double -> fiche gardée), vide partout au départ. Cette étape sert aussi
+    de v13 -> v14 (`clients.remplace_par`) : schema.sql contient les deux colonnes, donc UNE seule reconstruction de `clients` suffit.
     `clients` est reconstruite (et non ALTER TABLE ADD COLUMN, qui ne pose pas toutes les règles) pour que sa définition soit identique
     à celle d'une base neuve ; ses lignes, ses numéros et son compteur de numéros sont conservés."""
     _reconstruire_tables(conn, ("clients",))
 
 
 def _migrer_vers_courant(conn, version):
-    """Formats v9 à v13 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
+    """Formats v9 à v14 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
     début puis recréés à la fin, tels que dans schema.sql : la base migrée est identique à une base neuve (un test le vérifie)."""
     definitions = _definitions_du_schema()
     conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
@@ -554,11 +555,11 @@ def _migrer_vers_courant(conn, version):
         if version in (9, 10):
             _etapes_10_11(conn)
         if version in (9, 10, 11):
-            _etapes_11_12(conn)         # reconstruit déjà `clients` et `chantiers` d'après le schéma courant (facture_le, remplace_par)
+            _etapes_11_12(conn)         # reconstruit déjà `clients` et `chantiers` d'après le schéma courant (facture_le, remplace_par, fusionne_dans)
         else:
             if version == 12:
                 _etapes_12_13(conn)
-            _etapes_13_14(conn)
+            _etapes_14_15(conn)         # v12, v13 et v14 : `clients` reconstruite une seule fois
         for genre, nom, _, sql in definitions:
             if genre in ("TRIGGER", "VIEW"):
                 conn.execute(sql)
