@@ -85,6 +85,9 @@ python3 outils/interface.py --essai                    # base d'ESSAI (fausses d
 python3 outils/interface.py                            # la VRAIE base (créée au premier lancement)
 ```
 
+Les mêmes tests sont lancés automatiquement sur GitHub à chaque pull request (Python 3.9 sous Windows et Linux, Python 3.13 sous Linux) :
+une coche verte à côté de la pull request veut dire que tout passe ; une croix rouge, qu'il ne faut pas fusionner.
+
 **Bouton « Exécuter » de VS Code** : ouvre `lancer_essai.py` (essai) ou `lancer_interface.py` (vraie base) ; ne lance pas
 `interface.py` directement, il ouvrirait toujours la vraie base. Les chemins contenant des espaces doivent être entre guillemets.
 
