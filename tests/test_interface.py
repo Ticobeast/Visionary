@@ -152,7 +152,7 @@ class TestPages(BaseInterface):
 
 
 class TestSuppressionDeClient(BaseInterface):
-    """Un client peut toujours être effacé, avec tout ce qui le concerne (archives comprises)."""
+    """Un client sans chantier terminé ni paiement peut être effacé avec ses fiches ; sinon c'est de l'historique : refusé."""
 
     def creer(self, **perso):
         """Ouvre une soumission et retourne son id (la redirection mène à la fiche du client)."""
@@ -179,34 +179,82 @@ class TestSuppressionDeClient(BaseInterface):
         self.post(f"/soumission/{self.sql('SELECT max(id) FROM chantiers')[0][0]}/supprimer", {})        # supprime la soumission (et le client orphelin)
         self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(0,)])
 
-    def test_un_client_peut_toujours_etre_supprime_avec_tout_son_historique(self):
-        triggers = self.sql("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
-        for client in (1, 2, 3):                                                  # exemples : 1 et 2 terminés ; 3 planifié avec acompte
-            page = self.get(f"/client/{client}")[1]
-            self.assertIn(f'action="/client/{client}/supprimer"', page)
-            self.assertIn("confirm(", page)
-        client = self.sql("SELECT client_id FROM chantiers WHERE id = 1")[0][0]
-        self.assertEqual(self.sql("SELECT count(*) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id WHERE c.client_id = ?", (client,)), [(1,)])
-        statut, en_tetes, _ = self.post(f"/client/{client}/supprimer", {})
-        self.assertEqual(en_tetes["Location"], "/clients?ok=client_supprime")
+    def declencheurs(self):
+        return self.sql("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
+
+    def test_client_avec_chantier_termine_et_paiement_refuse(self):
+        declencheurs = self.declencheurs()
+        client = self.sql("SELECT client_id FROM chantiers WHERE id = 1")[0][0]       # exemple : terminé, avec un paiement
+        page = self.get(f"/client/{client}")[1]
+        self.assertNotIn(f'action="/client/{client}/supprimer"', page)                # pas de bouton
+        self.assertNotIn("Supprimer le client", page)
+        statut, en_tetes, _ = self.post(f"/client/{client}/supprimer", {})            # requête faite à la main
+        self.assertEqual(statut[:3], "303")
+        self.assertIn("historique", self.get(en_tetes["Location"])[1])                # le message est montré
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(1,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE id = 1"), [(1,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(2,)])
+        self.assertEqual(self.declencheurs(), declencheurs)
+
+    def test_client_avec_chantier_termine_sans_paiement_refuse(self):
+        self.assertEqual(self.sql("SELECT count(*) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id WHERE c.client_id = 2"), [(0,)])
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE client_id = 2"), [("termine",)])
+        self.assertNotIn('action="/client/2/supprimer"', self.get("/client/2")[1])
+        self.post("/client/2/supprimer", {})
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 2"), [(1,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 2"), [(1,)])
+
+    def test_client_avec_paiement_sur_chantier_non_termine_refuse(self):
+        declencheurs = self.declencheurs()
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE client_id = 3"), [("planifie",)])    # exemple : acompte
+        self.assertNotIn('action="/client/3/supprimer"', self.get("/client/3")[1])
+        _, en_tetes, _ = self.post("/client/3/supprimer", {})
+        self.assertIn("historique", self.get(en_tetes["Location"])[1])
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 3"), [(1,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 3"), [(1,)])
+        self.assertEqual(self.declencheurs(), declencheurs)
+
+    def test_paiement_sur_une_autre_fiche_du_client_refuse_aussi(self):
+        self.post("/client/3/soumission/nouveau", {"type_emondage": "1", "duree_estimee_h": "2"})       # nouvelle soumission sans paiement
+        self.assertNotIn('action="/client/3/supprimer"', self.get("/client/3")[1])
+        self.post("/client/3/supprimer", {})
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 3"), [(2,)])
+
+    def test_client_avec_chantier_annule_et_soumission_supprimable(self):
+        declencheurs = self.declencheurs()
+        client = self.creer()
+        client = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (client,))[0][0]
+        self.post(f"/client/{client}/soumission/nouveau", {"type_emondage": "1", "duree_estimee_h": "2"})
+        nouveau = self.sql("SELECT max(id) FROM chantiers")[0][0]
+        self.post("/action/annuler", {"chantier_id": str(nouveau), "retour": "/"})
+        self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE client_id = ? ORDER BY id", (client,)), [("soumission",), ("annule",)])
+        self.assertIn(f'action="/client/{client}/supprimer"', self.get(f"/client/{client}")[1])
+        self.post(f"/client/{client}/supprimer", {})
         self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(0,)])
         self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = ?", (client,)), [(0,)])
-        self.assertEqual(self.sql("SELECT count(*) FROM paiements"), [(1,)])      # seul l'acompte de l'autre client reste
-        self.assertEqual(self.sql("SELECT count(*) FROM chantier_travaux WHERE chantier_id = 1"), [(0,)])
-        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(2,)])
-        self.assertEqual(self.sql("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name"), triggers)   # protections rétablies
-        self.assertNotIn("Marie Gagnon", self.get("/chantiers")[1])               # disparu des archives aussi
+        self.assertEqual(self.sql("SELECT count(*) FROM chantier_travaux WHERE chantier_id = ?", (nouveau,)), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])                   # les exemples restent
+        self.assertEqual(self.declencheurs(), declencheurs)
 
-    def test_client_avec_un_chantier_termine_et_un_annule(self):
+    def test_client_avec_chantier_a_planifier_sans_paiement_supprimable(self):
+        chantier = self.creer_accepte()
+        client = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (chantier,))[0][0]
+        self.assertIn(f'action="/client/{client}/supprimer"', self.get(f"/client/{client}")[1])
+        self.post(f"/client/{client}/supprimer", {})
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = ?", (client,)), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE id = ?", (chantier,)), [(0,)])
+
+    def test_client_avec_chantier_termine_et_un_annule_refuse(self):
         self.post("/action/terminer", {"chantier_id": "3", "paye": "non", "retour": "/"})        # client 3 : terminé (avec acompte)
         self.post("/client/3/soumission/nouveau", {"type_emondage": "1", "duree_estimee_h": "2"})
         nouveau = self.sql("SELECT max(id) FROM chantiers")[0][0]
         self.post("/action/annuler", {"chantier_id": str(nouveau), "retour": "/"})
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE client_id = 3 ORDER BY id"), [("termine",), ("annule",)])
+        self.assertNotIn('action="/client/3/supprimer"', self.get("/client/3")[1])
         self.post("/client/3/supprimer", {})
-        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 3"), [(0,)])
-        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 3"), [(0,)])
-        self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 3"), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE id = 3"), [(1,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 3"), [(2,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM paiements WHERE chantier_id = 3"), [(1,)])
 
     def test_un_chantier_termine_seul_reste_non_supprimable(self):
         _, en_tetes, _ = self.post("/chantier/1/supprimer", {})

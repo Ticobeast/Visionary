@@ -491,7 +491,7 @@ class TestPresentationTelephone(BaseArchives):
         self.assertIn('class="recherche filtres-jour ouvert"', self.get("/journee?date=2026-10-12&tri=duree"))
 
     def test_la_fiche_client_a_un_historique_a_badge_et_une_suppression_discrete(self):
-        client = self.sql("SELECT client_id FROM chantiers LIMIT 1")[0][0]
+        client = self.sql("SELECT id FROM clients WHERE nom = 'Fortin'")[0][0]          # soumission en cours seulement : supprimable
         page = self.get(f"/client/{client}")
         self.assertIn('<table class="historique">', page)
         self.assertIn('<td class="c-statut">', page)
