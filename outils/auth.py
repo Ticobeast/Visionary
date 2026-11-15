@@ -309,6 +309,8 @@ RESERVE_ADMIN = (
     # comptes
     ("GET", r"^/utilisateurs$"), ("POST", r"^/utilisateurs/ajouter$"), ("POST", r"^/utilisateurs/(\d+)/mot-de-passe$"),
     ("POST", r"^/utilisateurs/(\d+)/actif$"),
+    # journal des modifications
+    ("GET", r"^/journal$"),
     # journée, tournée, suivi et actions sur les chantiers planifiés
     ("GET", r"^/journee\.pdf$"), ("GET", r"^/journee$"), ("POST", r"^/journee/planifier$"), ("GET", r"^/tournee$"), ("GET", r"^/suivi$"),
     ("POST", r"^/action/terminer$"), ("POST", r"^/action/annuler$"), ("POST", r"^/action/rouvrir$"), ("POST", r"^/action/retirer$"),

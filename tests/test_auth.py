@@ -285,11 +285,11 @@ class TestDroits(BaseAuth):
         self.soum = self.ouvrir("Soumission", "motdepasse-soum")
 
     def test_administrateur_voit_tout(self):
-        for chemin in ("/", "/journee", "/chantiers", "/clients", "/client/1", "/chantier/3", "/nouveau", "/utilisateurs"):
+        for chemin in ("/", "/journee", "/chantiers", "/clients", "/client/1", "/chantier/3", "/nouveau", "/utilisateurs", "/journal"):
             self.assertTrue(self.req("GET", chemin, cookie=self.admin)[0].startswith("200"), chemin)
         self.assertTrue(self.req("GET", "/journee.pdf", cookie=self.admin, query={"date": "2026-10-14"})[0].startswith("200"))
         page = self.req("GET", "/chantiers", cookie=self.admin)[2]
-        for lien in ("Tableau de bord", "Journée", "Chantiers", "Clients", "Utilisateurs", "Se déconnecter"):
+        for lien in ("Tableau de bord", "Journée", "Chantiers", "Clients", "Utilisateurs", "Journal", "Se déconnecter"):
             self.assertIn(lien, page)
 
     def test_soumission_pages_permises(self):
@@ -611,7 +611,8 @@ class TestRefusParDefaut(unittest.TestCase):
                 self.assertEqual(premiere, motif, f"{methode} {chemin} serait servi par une autre route")
                 photo_supprimee = "/photos/" in chemin and chemin.endswith("/supprimer")      # différence voulue
                 fusion = chemin.endswith("/fusionner")                                        # autre différence voulue : réservée à l'administrateur
-                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee and not fusion
+                journal = chemin == "/journal"                                                # autre différence voulue : journal réservé à l'administrateur
+                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee and not fusion and not journal
                 self.assertEqual(auth.permis("soumission", methode, chemin), attendu, f"{methode} {chemin}")
                 self.assertTrue(auth.permis("admin", methode, chemin), f"{methode} {chemin}")
                 verifies += 1
@@ -623,8 +624,8 @@ class TestRefusParDefaut(unittest.TestCase):
             for chemin in _chemins_exemples(motif):
                 if auth.permis("soumission", methode, chemin) != _ancien_permis_soumission(chemin):
                     differences.append(motif)
-        self.assertEqual(differences, [r"^/client/(\d+)/fusionner$"] * 2
-                         + [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2)
+        self.assertEqual(sorted(differences), sorted([r"^/client/(\d+)/fusionner$"] * 2 + [r"^/journal$"]
+                                                     + [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2))
 
     def test_chemin_inconnu_refuse_au_role_soumission(self):
         for chemin in ("/nouvelle-page", "/admin", "/client/3/exporter", "/chantier/3/photos/x.jpg/autre", "/data/sylvainculteur.db", "/chantiers/"):
