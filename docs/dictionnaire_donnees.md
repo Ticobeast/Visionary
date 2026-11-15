@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v11)
+# Dictionnaire de données (schéma v12)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -210,11 +210,19 @@ Au premier passage d'une personne sur une page, ses raccourcis de départ sont e
 Soumission : À planifier, Planifiés ; Soumissions : Mes soumissions, À relancer). Une ligne spéciale (`filtre` = `__vide__`, invisible) retient qu'une
 personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendraient.
 
-## Migrations automatiques (v8, v9 et v10 vers v11)
+## Numéros de fiche : jamais réutilisés (depuis le format v12)
 
-Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v10…`, ou `_v9`, `_v8`), puis
-migre. De v9 ou v10 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
+Le numéro (`id`) d'un client, d'un chantier, d'un paiement, d'un compte et d'un raccourci est en `INTEGER PRIMARY KEY AUTOINCREMENT` : quand une fiche est supprimée, son numéro n'est **jamais** repris par la suivante (SQLite garde le plus grand numéro déjà donné dans `sqlite_sequence`). C'est important parce que le numéro du chantier est celui de la soumission et de la facture remises au client (« N° 0042 ») et celui du dossier de photos par défaut (`photos/chantier-42`) : une nouvelle fiche ne peut pas hériter du numéro ni des photos d'une fiche supprimée. Des trous dans la numérotation sont donc normaux.
+
+## Migrations automatiques (v8, v9, v10 et v11 vers v12)
+
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v11…`, ou `_v10`, `_v9`, `_v8`), puis
+migre. De v9, v10 ou v11 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
 vue `v_chantiers` est recréée à la fin, telle que dans `schema.sql`.
+
+### Étape v11 vers v12 : numéros jamais réutilisés
+
+SQLite ne peut pas ajouter `AUTOINCREMENT` à une table existante : `clients`, `chantiers`, `paiements`, `utilisateurs` et `raccourcis` sont **reconstruites** (nouvelle table, copie des lignes avec leurs numéros, suppression de l'ancienne, renommage), avec les index, puis les déclencheurs et la vue sont recréés. Les définitions sont lues dans `schema.sql` (pas de copie figée), donc la base migrée est identique à une base neuve. Tout se fait dans la même transaction, liens vérifiés avant de valider. Le compteur de chaque table part du plus grand numéro existant. Les tables de référence (`types_travaux`, `secteurs`) et `chantier_travaux`, `sessions` ne sont pas touchées. Un test part d'une vraie base v11 (`tests/schema_v11.sql`) et compare toutes les données.
 
 ### Étape v10 vers v11 : « En attente » devient un statut de chantier
 

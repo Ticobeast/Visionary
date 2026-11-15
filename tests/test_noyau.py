@@ -38,8 +38,30 @@ class TestSchema(unittest.TestCase):
 
     def test_version_et_integrite(self):
         self.assertEqual(self.c.execute("PRAGMA user_version").fetchone()[0], noyau.VERSION_SCHEMA)
-        self.assertEqual(noyau.VERSION_SCHEMA, 11)
+        self.assertEqual(noyau.VERSION_SCHEMA, 12)
         self.assertEqual(self.c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+
+    def test_un_numero_n_est_jamais_reutilise(self):
+        """Format v12 : après suppression de la DERNIÈRE fiche, la suivante reçoit un numéro strictement plus grand."""
+        c = self.c
+        c.execute("INSERT INTO chantiers (client_id, statut) VALUES (1, 'soumission')")
+        dernier = c.execute("SELECT max(id) FROM chantiers").fetchone()[0]
+        c.execute("INSERT INTO chantiers (client_id, statut, date_prevue, prix_ht) VALUES (1, 'a_planifier', '2026-06-01', 100)")
+        chantier = c.execute("SELECT max(id) FROM chantiers").fetchone()[0]
+        c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (?, '2026-06-01', 10, 'interac')", (chantier,))
+        paiement = c.execute("SELECT max(id) FROM paiements").fetchone()[0]
+        c.execute("DELETE FROM paiements WHERE id = ?", (paiement,))
+        c.execute("INSERT INTO paiements (chantier_id, date_paiement, montant, mode) VALUES (?, '2026-06-01', 10, 'interac')", (chantier,))
+        self.assertGreater(c.execute("SELECT max(id) FROM paiements").fetchone()[0], paiement)
+        c.execute("DELETE FROM paiements")
+        c.execute("DELETE FROM chantiers WHERE id = ?", (chantier,))
+        c.execute("DELETE FROM chantiers WHERE id = ?", (dernier,))
+        c.execute("INSERT INTO chantiers (client_id, statut) VALUES (1, 'soumission')")
+        self.assertGreater(c.execute("SELECT max(id) FROM chantiers").fetchone()[0], chantier)
+        c.execute("DELETE FROM chantiers")
+        c.execute("DELETE FROM clients")
+        c.execute("INSERT INTO clients (nom) VALUES ('Autre')")
+        self.assertGreater(c.execute("SELECT max(id) FROM clients").fetchone()[0], 1)
 
     def test_dates_invalides_refusees(self):
         for d in ("2026-02-30", "2026-02-29", "2026-04-31", "2026-13-01", "14/06/2026", "2026-6-1", "2026-06-14 10:00"):
