@@ -134,6 +134,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 90 | Chantier **planifié** : télécharger la facture aujourd'hui, puis le lendemain ; ensuite **terminer** le chantier et la télécharger encore, puis un autre jour | avant la fermeture, la facture porte chaque fois la **date du jour** ; après, elle garde la date de la **dernière ouverture d'avant la fermeture** et ne bouge plus. Chantier terminé sans que la facture ait été ouverte : elle porte le **jour de la fermeture** |
 | 91 | **Compte Soumission** : ouvrir la fiche d'un chantier ou d'une soumission qui a des photos, toucher une vignette ; puis, avec le compte administrateur, faire pareil | le compte Soumission voit la photo agrandie avec seulement **Fermer** (aucun bouton **Supprimer**) et peut toujours en ajouter ; l'administrateur voit **Fermer** et **Supprimer**. Ouvrir à la main l'adresse de suppression avec le compte Soumission répond « Accès réservé » et la photo reste |
 | 92 | Fiche d'un client qui a un **chantier terminé** ou un **paiement** (même un acompte sur un chantier planifié) ; puis celle d'un client qui n'a que des soumissions, sur ordinateur et sur téléphone | pour le premier : **aucun** bouton « Supprimer le client » et aucun texte à la place ; pour le second : le bouton est là et la suppression fonctionne |
+| 93 | Fiche d'un client qui a un **chantier terminé** : toucher **Nouvelle adresse**, écrire une autre adresse et choisir un secteur, **Enregistrer la nouvelle adresse** ; puis ouvrir un ancien chantier ou sa facture PDF, et essayer **+ Nouvelle soumission** depuis la nouvelle fiche ; sur téléphone aussi | on arrive sur la **nouvelle fiche** (mêmes téléphone et courriel, ligne « Ancienne adresse : » avec un lien). L'**ancienne fiche** porte « Ancienne adresse », un lien « Nouvelle adresse : », n'a plus « + Nouvelle soumission », et reste dans la liste des clients avec « ancienne adresse » sous l'adresse. L'ancien chantier et sa facture montrent toujours l'**ancienne adresse**. Une adresse vide ou identique à l'actuelle est refusée avec un message clair et rien n'est perdu dans le formulaire. Le client n'apparaît qu'une fois (nouvelle fiche) quand on le cherche pour une nouvelle soumission. Un client sans historique n'a pas le bouton « Nouvelle adresse » |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -148,7 +149,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 91 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 93 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

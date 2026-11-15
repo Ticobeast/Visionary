@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v13)
+# Dictionnaire de données (schéma v14)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -56,6 +56,7 @@ Un client qui possède deux propriétés = **deux fiches clients** (une par adre
 | `notes_acces` | texte | non | barrière, chien, où stationner, où est l'arbre | `Stationner près de la grange` |
 | `notes` | texte | non | préférences, historique utile | `Préfère être appelé après 17 h` |
 | `cree_le` | texte | auto | date-heure locale de création | `2026-10-05 14:02:11` |
+| `remplace_par` | entier | non | → `clients.id` (`ON DELETE SET NULL`), jamais égal à `id`. **Vide en temps normal.** Sur une fiche à l'**ancienne adresse** (le client a déménagé) : le numéro de la fiche à la **nouvelle adresse**. L'ancienne fiche garde ses chantiers et ses paiements ; si la nouvelle fiche est supprimée, la colonne redevient vide. Ajoutée au format v14 | `4` |
 
 **Écrire une adresse que Google Maps comprend.** Le format ci-dessus suffit : la vue `v_chantiers`
 fabrique la chaîne `123 Rue des Érables, Saint-Jérôme, QC J7Z 1A1, Canada` (colonne `adresse_maps`),
@@ -215,11 +216,15 @@ personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendr
 
 Le numéro (`id`) d'un client, d'un chantier, d'un paiement, d'un compte et d'un raccourci est en `INTEGER PRIMARY KEY AUTOINCREMENT` : quand une fiche est supprimée, son numéro n'est **jamais** repris par la suivante (SQLite garde le plus grand numéro déjà donné dans `sqlite_sequence`). C'est important parce que le numéro du chantier est celui de la soumission et de la facture remises au client (« N° 0042 ») et celui du dossier de photos par défaut (`photos/chantier-42`) : une nouvelle fiche ne peut pas hériter du numéro ni des photos d'une fiche supprimée. Des trous dans la numérotation sont donc normaux.
 
-## Migrations automatiques (v8, v9, v10, v11 et v12 vers v13)
+## Migrations automatiques (v8, v9, v10, v11, v12 et v13 vers v14)
 
-Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v12…`, ou `_v11`, `_v10`, `_v9`, `_v8`), puis
-migre. De v9, v10, v11 ou v12 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v13…`, ou `_v12`, `_v11`, `_v10`, `_v9`, `_v8`), puis
+migre. De v9, v10, v11, v12 ou v13 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
 vue `v_chantiers` est recréée à la fin, telle que dans `schema.sql`.
+
+### Étape v13 vers v14 : nouvelle adresse d'un client
+
+Ajoute `clients.remplace_par` (voir la colonne), vide partout au départ. Comme pour les étapes précédentes, `clients` est **reconstruite** d'après `schema.sql` (et non `ALTER TABLE ... ADD COLUMN`) : ses lignes, ses numéros et son compteur `AUTOINCREMENT` sont conservés, et la base migrée reste identique à une base neuve. Depuis v9 à v11, la reconstruction de l'étape v11 vers v12 fait déjà le travail (une seule reconstruction par table). Un test part d'une vraie base v13 (`tests/schema_v13.sql`) et compare toutes les données.
 
 ### Étape v12 vers v13 : date de la facture figée à la fermeture
 
