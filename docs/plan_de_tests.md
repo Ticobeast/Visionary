@@ -130,6 +130,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 86 | Supprimer `data/copie_externe.txt`, relancer | le démarrage dit qu'aucune copie externe n'est configurée et comment faire |
 | 87 | Programme fermé : double-clic sur `restaurer_sauvegarde.bat`, choisir une sauvegarde, répondre autre chose que « oui » | rien n'est changé |
 | 88 | Même chose, mais taper « oui » | message de fin ; une copie `avant_restauration` apparaît ; au lancement, les données sont celles de la sauvegarde |
+| 89 | Noter le numéro de la **dernière** soumission (ex. N° 0042), la **supprimer** (fiche non acceptée, sans paiement), puis créer une nouvelle soumission | la nouvelle soumission a un numéro **plus grand** (0043, pas 0042) ; son PDF porte ce nouveau numéro ; elle ne reprend pas les photos de la fiche supprimée |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 

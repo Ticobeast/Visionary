@@ -28,7 +28,10 @@
 PRAGMA foreign_keys = ON;
 
 -- Numéro de version du schéma (sert aux migrations futures).
-PRAGMA user_version = 11;
+-- Format v12 : les numéros de fiche (clients, chantiers, paiements, utilisateurs, raccourcis) sont en AUTOINCREMENT :
+-- le numéro d'une fiche supprimée n'est JAMAIS repris par une nouvelle fiche (le numéro de chantier est celui de la
+-- soumission et de la facture remises au client, et du dossier de photos par défaut).
+PRAGMA user_version = 12;
 
 
 -- -----------------------------------------------------------------------------
@@ -88,7 +91,7 @@ INSERT INTO secteurs (code, libelle, ville, ordre) VALUES
 -- Les renseignements indispensables sont exigés par l'application au moment d'ACCEPTER la soumission.
 -- -----------------------------------------------------------------------------
 CREATE TABLE clients (
-    id          INTEGER PRIMARY KEY,
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     prenom      TEXT,
     nom         TEXT,
     entreprise  TEXT,
@@ -150,7 +153,7 @@ CREATE TABLE clients (
 -- Un travail de plusieurs jours = un chantier par journée (durée <= 24 h).
 -- -----------------------------------------------------------------------------
 CREATE TABLE chantiers (
-    id              INTEGER PRIMARY KEY,
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id       INTEGER NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
 
     description     TEXT,     -- description générale (imprimée sur la feuille de route) ;
@@ -268,7 +271,7 @@ CREATE INDEX idx_chantiers_statut     ON chantiers(statut);
 -- saisi : il ne peut donc pas se contredire avec les montants.
 -- -----------------------------------------------------------------------------
 CREATE TABLE paiements (
-    id            INTEGER PRIMARY KEY,
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
     chantier_id   INTEGER NOT NULL REFERENCES chantiers(id) ON DELETE RESTRICT,
     date_paiement TEXT NOT NULL,              -- AAAA-MM-JJ
     montant       REAL NOT NULL,              -- $ CAD, taxes incluses
@@ -294,7 +297,7 @@ CREATE INDEX idx_paiements_chantier ON paiements(chantier_id);
 -- la connexion est exigée partout. Gérer les comptes : python gerer_utilisateurs.py
 -- -----------------------------------------------------------------------------
 CREATE TABLE utilisateurs (
-    id           INTEGER PRIMARY KEY,
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
     nom          TEXT NOT NULL UNIQUE COLLATE NOCASE
                  CONSTRAINT ck_utilisateurs_nom CHECK (trim(nom) <> ''),
     role         TEXT NOT NULL DEFAULT 'soumission'
@@ -321,7 +324,7 @@ CREATE INDEX idx_sessions_utilisateur ON sessions(utilisateur_id);
 -- utilisateur_id vide : interface ouverte sans comptes.
 -- -----------------------------------------------------------------------------
 CREATE TABLE raccourcis (
-    id             INTEGER PRIMARY KEY,
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
     utilisateur_id INTEGER REFERENCES utilisateurs(id) ON DELETE CASCADE,
     page           TEXT NOT NULL CONSTRAINT ck_raccourcis_page CHECK (page IN ('chantiers', 'soumissions')),
     libelle        TEXT NOT NULL CONSTRAINT ck_raccourcis_libelle CHECK (trim(libelle) <> ''),
