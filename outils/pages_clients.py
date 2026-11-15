@@ -9,7 +9,7 @@ import sqlite3
 from urllib.parse import urlencode
 
 from composants import retour_valide
-from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
+from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprimable, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    lister_secteurs, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, client_avance,
@@ -109,22 +109,22 @@ def page_client(conn, client_id, query):
              + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
     actions = (f'<div class="barre actions-client" style="margin-bottom:16px"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>'
                f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a></div>')
-    n, termines, paiements = resume_suppression_client(conn, client_id)
-    nb_soumissions = sum(1 for f in fiches if f[5] == "soumission")
-    nb_chantiers = n - nb_soumissions
-    efface = []
-    if nb_chantiers:
-        efface.append(f"{nb_chantiers} chantier{'s' if nb_chantiers > 1 else ''}" + (f" (dont {termines} terminé{'s' if termines > 1 else ''}, archives comprises)" if termines else ""))
-    if nb_soumissions:
-        efface.append(f"{nb_soumissions} soumission{'s' if nb_soumissions > 1 else ''}")
-    if paiements:
-        efface.append(f"{paiements} paiement{'s' if paiements > 1 else ''}")
-    detail = " et ".join(efface)
-    confirmation = ("Supprimer définitivement ce client" + (f" avec {detail}" if detail else "") + " ? Tout disparaît, y compris des archives. Cette action est irréversible.")
-    suppression = ('<div class="carte suppression"><h2>Supprimer ce client</h2><p class="doux">Efface le client et tout ce qui le concerne'
-                   + (f" : {esc(detail)}" if detail else "") + ". Définitif, y compris dans les archives.</p>"
-                   f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
-                   '<button class="danger" type="submit">Supprimer le client</button></form></div>')
+    suppression = ""
+    if client_supprimable(conn, client_id):                # sinon : pas de bouton (le serveur refuse de toute façon)
+        n = resume_suppression_client(conn, client_id)[0]
+        nb_soumissions = sum(1 for f in fiches if f[5] == "soumission")
+        nb_chantiers = n - nb_soumissions
+        efface = []
+        if nb_chantiers:
+            efface.append(f"{nb_chantiers} chantier{'s' if nb_chantiers > 1 else ''}")
+        if nb_soumissions:
+            efface.append(f"{nb_soumissions} soumission{'s' if nb_soumissions > 1 else ''}")
+        detail = " et ".join(efface)
+        confirmation = ("Supprimer définitivement ce client" + (f" avec {detail}" if detail else "") + " ? Cette action est irréversible.")
+        suppression = ('<div class="carte suppression"><h2>Supprimer ce client</h2><p class="doux">Efface le client et ses fiches'
+                       + (f" : {esc(detail)}" if detail else "") + ". Définitif.</p>"
+                       f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
+                       '<button class="danger" type="submit">Supprimer le client</button></form></div>')
     return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}', query.get("ok"), query.get("err"))
 
 

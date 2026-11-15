@@ -1378,36 +1378,33 @@ def supprimer_chantier(conn, chantier_id):
 
 
 def resume_suppression_client(conn, client_id):
-    """Ce qui disparaîtrait avec le client : (chantiers, dont terminés, paiements)."""
+    """Ce qui disparaîtrait avec le client : (fiches, dont chantiers terminés, paiements)."""
     n = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ?", (client_id,)).fetchone()[0]
     termines = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ? AND statut = 'termine'", (client_id,)).fetchone()[0]
     paiements = conn.execute("SELECT count(*) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id WHERE c.client_id = ?", (client_id,)).fetchone()[0]
     return n, termines, paiements
 
 
-# Protections levées le temps d'une suppression de client (puis remises, ou annulées avec la transaction si quelque chose échoue).
-_DECLENCHEURS_SUPPRESSION = ("trg_chantiers_termine_non_supprimable", "trg_travaux_termine_verrouilles_suppr")
+MSG_CLIENT_HISTORIQUE = "Ce client a des chantiers terminés ou des paiements : il fait partie de ton historique et ne peut pas être supprimé."
+
+
+def client_supprimable(conn, client_id):
+    """Vrai si le client n'a aucun chantier terminé et aucun paiement (sur n'importe laquelle de ses fiches)."""
+    _, termines, paiements = resume_suppression_client(conn, client_id)
+    return termines == 0 and paiements == 0
 
 
 def supprimer_client(conn, client_id):
-    """Supprime DÉFINITIVEMENT un client et tout ce qui le concerne : chantiers (même terminés ou archivés), types de
-    travaux et paiements. À appeler dans une transaction (tout ou rien).
-
-    Le verrou « Terminé » protège un chantier contre les modifications et les suppressions isolées ; seule la suppression
-    volontaire d'un client, confirmée par l'utilisateur, l'emporte. Ses déclencheurs de suppression sont retirés puis
-    recréés à l'identique dans la même transaction.
+    """Supprime un client et ses fiches (soumissions, chantiers annulés ou pas encore terminés, avec leurs types de
+    travaux). Refusé s'il a un chantier terminé ou un paiement : c'est de l'historique d'argent. À appeler dans une
+    transaction (tout ou rien). Les déclencheurs de protection de la base ne sont jamais touchés.
     """
     if conn.execute("SELECT 1 FROM clients WHERE id = ?", (client_id,)).fetchone() is None:
         return [f"client #{client_id} introuvable"]
-    protections = [(nom, sql) for nom in _DECLENCHEURS_SUPPRESSION
-                   for (sql,) in conn.execute("SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?", (nom,))]
-    for nom, _ in protections:
-        conn.execute(f"DROP TRIGGER {nom}")
+    if not client_supprimable(conn, client_id):
+        return [MSG_CLIENT_HISTORIQUE]
     ids = "SELECT id FROM chantiers WHERE client_id = ?"
-    conn.execute(f"DELETE FROM paiements WHERE chantier_id IN ({ids})", (client_id,))
     conn.execute(f"DELETE FROM chantier_travaux WHERE chantier_id IN ({ids})", (client_id,))
     conn.execute("DELETE FROM chantiers WHERE client_id = ?", (client_id,))
     conn.execute("DELETE FROM clients WHERE id = ?", (client_id,))
-    for _, sql in protections:
-        conn.execute(sql)
     return []

@@ -333,7 +333,11 @@ class TestDroits(BaseAuth):
         admin = self.req("GET", "/chantier/3", cookie=self.admin)[2]
         for present in ("Paiements", "Supprimer ce chantier", "Terminer"):
             self.assertIn(present, admin, present)
-        self.assertIn("Supprimer ce client", self.req("GET", "/client/1", cookie=self.admin)[2])
+        self.assertNotIn("Supprimer ce client", self.req("GET", "/client/1", cookie=self.admin)[2])      # client 1 : historique, protégé
+        self.req("POST", "/nouveau", {"client_nom": "Essai", "adresse": "1 Rue A", "client_secteur": "centre_ville", "type_emondage": "1", "duree_estimee_h": "2"}, cookie=self.admin)
+        libre = self.sql("SELECT max(id) FROM clients")[0][0]                                            # seulement une soumission : supprimable
+        self.assertIn("Supprimer ce client", self.req("GET", f"/client/{libre}", cookie=self.admin)[2])
+        self.assertNotIn("Supprimer ce client", self.req("GET", f"/client/{libre}", cookie=self.soum)[2])
 
     def test_soumission_ne_peut_pas_supprimer_une_photo_mais_peut_en_ajouter_et_voir(self):
         jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 200 + b"\xff\xd9"

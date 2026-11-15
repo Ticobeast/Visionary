@@ -75,7 +75,7 @@ secteur **au moment d'accepter** la soumission, et pour modifier un client qui a
 | Colonne | Type | Oblig. | Règle | Exemple |
 |---|---|---|---|---|
 | `id` | entier | auto | | |
-| `client_id` | entier | oui | → `clients.id` ; la base refuse de supprimer un client qui a encore des chantiers (l'interface le supprime avec tout son historique, dans une seule transaction) | `1` |
+| `client_id` | entier | oui | → `clients.id` ; la base refuse de supprimer un client qui a encore des chantiers (l'interface ne supprime que les clients sans chantier terminé ni paiement, avec leurs fiches, dans une seule transaction) | `1` |
 | `description` | texte | non | **la** description du chantier (une seule), imprimée sur la feuille de route ; le détail par type est dans `chantier_travaux` | `Résidus ramassés. Prévenir le gardien la veille.` |
 | `statut` | texte | oui, défaut `soumission` | voir ci-dessous ; **ne se choisit jamais à la main** | `planifie` |
 | `date_soumission` | date | non | date de la **demande ou de la soumission** : sert à calculer le délai d'attente (à défaut, la date de création de la fiche) | `2026-05-28` |
@@ -127,7 +127,7 @@ Au moins un type est exigé par l'interface. Dans `v_chantiers` : `attente_depui
 `chantier` pour tout le reste. Les pages Chantiers, Journée et le tableau de bord ne lisent que le genre `chantier` ; la page Soumissions, que le genre
 `soumission` (les refusées dans leur section du bas).
 
-**Terminé = définitivement verrouillé** : des déclencheurs de la base (`trg_chantiers_termine_verrouille`, `trg_chantiers_termine_non_supprimable`, `trg_travaux_termine_*`) refusent toute modification du chantier terminé (statut, client, description, dates, durées, prix, taxes, modalité, fichiers), de ses types de travaux et sa suppression. Restent permis : les **paiements** et la **duplication**. Le verrou est donc garanti même pour un autre outil (DB Browser…). Limite connue : l'ajout d'un type de travaux à un chantier déjà terminé n'est pas bloqué par la base (nécessaire à la création d'un chantier directement terminé, par import) ; l'interface ne l'offre pas.
+**Terminé = définitivement verrouillé** : des déclencheurs de la base (`trg_chantiers_termine_verrouille`, `trg_chantiers_termine_non_supprimable`, `trg_travaux_termine_*`) refusent toute modification du chantier terminé (statut, client, description, dates, durées, prix, taxes, modalité, fichiers), de ses types de travaux et sa suppression (même la suppression d'un client est refusée par le programme s'il a un chantier terminé ou un paiement). Restent permis : les **paiements** et la **duplication**. Le verrou est donc garanti même pour un autre outil (DB Browser…). Limite connue : l'ajout d'un type de travaux à un chantier déjà terminé n'est pas bloqué par la base (nécessaire à la création d'un chantier directement terminé, par import) ; l'interface ne l'offre pas.
 
 Parcours normal : *Soumission, (En attente,) À planifier, Planifié, Terminé* ; *Refusée* (soumission) ou *Annulé* (chantier) à tout moment (sauf après Terminé).
 **Le statut est automatique** : Créer = `soumission` ; **Accepter** = `a_planifier` (si les conditions sont remplies : `noyau.CONDITIONS_ACCEPTATION`, et `accepte_le` = aujourd'hui) ;
