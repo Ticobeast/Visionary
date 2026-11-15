@@ -12,6 +12,8 @@ sys.path.insert(0, str(RACINE / "outils"))
 sys.path.insert(0, str(RACINE / "tests"))
 import fixtures  # noqa: E402
 import interface  # noqa: E402
+import noyau  # noqa: E402
+from test_documents import texte_pdf  # noqa: E402
 
 
 
@@ -222,6 +224,196 @@ class TestModifierClient(BaseClients):
         self.assertTrue(statut.startswith("200"))
         self.assertIn("client_telephone", page)
         self.assertEqual(self.sql("SELECT telephone FROM clients WHERE id = 1"), [("+14505550142",)])
+
+
+class TestNouvelleAdresse(BaseClients):
+    """Un client qui déménage : nouvelle fiche, l'ancienne garde son historique (format v14, clients.remplace_par)."""
+    FORM = {"adresse": "45 Rue du Lac", "client_secteur": "shawinigan", "code_postal": "g9n 2b2", "notes_acces": "Porte arrière"}
+
+    def deplacer(self, client_id=1, **perso):
+        return self.post(f"/client/{client_id}/nouvelle-adresse", {**self.FORM, **perso})
+
+    def sans_historique(self):
+        """Un client qui n'a qu'une soumission : supprimable (les trois clients d'exemple ont tous un historique)."""
+        self.post("/nouveau", {"client_nom": "Roy", "client_prenom": "Sylvie", "client_telephone": "450-555-0111", "adresse": "22 Rue des Pins",
+                               "client_secteur": "centre_ville", "type_emondage": "1", "duree_estimee_h": "2"})
+        return self.sql("SELECT max(id) FROM clients")[0][0]
+
+    def test_creation_de_la_nouvelle_fiche_et_copie_des_coordonnees(self):
+        statut, en_tetes, _ = self.deplacer()
+        self.assertTrue(statut.startswith("303"))
+        self.assertEqual(en_tetes["Location"], "/client/4?ok=nouvelle_adresse")                    # on arrive sur la NOUVELLE fiche
+        self.assertEqual(self.sql("SELECT prenom, nom, telephone, courriel, sms_ok, notes FROM clients WHERE id = 4"),
+                         self.sql("SELECT prenom, nom, telephone, courriel, sms_ok, notes FROM clients WHERE id = 1"))
+        self.assertEqual(self.sql("SELECT adresse, ville, secteur, code_postal, notes_acces, latitude, longitude, geocode_statut, remplace_par FROM clients WHERE id = 4"),
+                         [("45 Rue du Lac", "Shawinigan", "shawinigan", "G9N 2B2", "Porte arrière", None, None, "a_faire", None)])
+        self.assertEqual(self.sql("SELECT remplace_par, adresse FROM clients WHERE id = 1"), [(4, "123 Rue des Érables")])   # l'ancienne fiche ne change pas d'adresse
+
+    def test_l_historique_et_les_paiements_restent_sur_l_ancienne_fiche(self):
+        avant = self.sql("SELECT id, client_id, statut, prix_ht FROM chantiers ORDER BY id")
+        paiements = self.sql("SELECT p.id, c.client_id FROM paiements p JOIN chantiers c ON c.id = p.chantier_id ORDER BY p.id")
+        self.deplacer()
+        self.assertEqual(self.sql("SELECT id, client_id, statut, prix_ht FROM chantiers ORDER BY id"), avant)
+        self.assertEqual(self.sql("SELECT p.id, c.client_id FROM paiements p JOIN chantiers c ON c.id = p.chantier_id ORDER BY p.id"), paiements)
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 4"), [(0,)])
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers WHERE client_id = 1"), [(1,)])
+
+    def test_un_ancien_chantier_garde_l_ancienne_adresse_dans_la_page_et_la_facture(self):
+        self.deplacer()
+        page = self.get("/chantier/1")[1]
+        self.assertIn("123 Rue des Érables", page)
+        self.assertNotIn("45 Rue du Lac", page)
+        statut, _, corps = interface.repondre(self.db, "GET", "/facture/1/pdf", {})
+        self.assertEqual(statut, "200 OK")
+        texte = texte_pdf(corps)
+        self.assertIn("123 Rue des Érables", texte)
+        self.assertNotIn("45 Rue du Lac", texte)
+
+    def test_refus(self):
+        c, _ = noyau.ouvrir_base(self.db)
+        try:
+            self.assertEqual(noyau.nouvelle_adresse_client(c, 99, self.FORM)[0], None)
+            self.assertIn("introuvable", noyau.nouvelle_adresse_client(c, 99, self.FORM)[1][0])
+            self.assertIn("Écris la nouvelle adresse", noyau.nouvelle_adresse_client(c, 1, {**self.FORM, "adresse": "   "})[1][0])
+            self.assertIn("secteur", noyau.nouvelle_adresse_client(c, 1, {**self.FORM, "client_secteur": ""})[1][0])
+            self.assertIn("client_secteur", noyau.nouvelle_adresse_client(c, 1, {**self.FORM, "client_secteur": "nulle_part"})[1][0])
+            self.assertIn("code_postal", noyau.nouvelle_adresse_client(c, 1, {**self.FORM, "code_postal": "zzz"})[1][0])
+            # la même adresse (casse et espaces ignorés) : la fiche 3 est à Blainville
+            c.execute("UPDATE clients SET adresse = '850 Boulevard du Lac', ville = 'Shawinigan', secteur = 'shawinigan' WHERE id = 3")
+            nid, erreurs = noyau.nouvelle_adresse_client(c, 3, {**self.FORM, "adresse": "  850  boulevard DU lac "})
+            self.assertIsNone(nid)
+            self.assertIn("même adresse", erreurs[0])
+            self.assertEqual(c.execute("SELECT count(*) FROM clients").fetchone()[0], 3)               # rien n'a été créé
+            self.assertEqual(c.execute("SELECT count(*) FROM clients WHERE remplace_par IS NOT NULL").fetchone()[0], 0)
+            # une fiche déjà remplacée ne peut pas l'être une deuxième fois
+            nouveau, erreurs = noyau.nouvelle_adresse_client(c, 1, self.FORM)
+            self.assertEqual(erreurs, [])
+            nid, erreurs = noyau.nouvelle_adresse_client(c, 1, {**self.FORM, "adresse": "1 Rue Ailleurs"})
+            self.assertIsNone(nid)
+            self.assertIn("déjà une ancienne adresse", erreurs[0])
+            self.assertEqual(c.execute("SELECT count(*) FROM clients").fetchone()[0], 4)
+        finally:
+            c.close()
+
+    def test_erreur_dans_le_formulaire_ne_perd_rien(self):
+        statut, _, page = self.deplacer(client_secteur="")
+        self.assertTrue(statut.startswith("200"))
+        self.assertIn("À corriger", page)
+        for valeur in ("45 Rue du Lac", "g9n 2b2", "Porte arrière"):
+            self.assertIn(valeur, page)
+        self.assertEqual(self.sql("SELECT count(*) FROM clients"), [(3,)])
+        statut, _, page = self.deplacer(client_id=99)
+        self.assertTrue(statut.startswith("404"))
+
+    def test_le_formulaire_est_court(self):
+        statut, page = self.get("/client/1/nouvelle-adresse")
+        self.assertTrue(statut.startswith("200"))
+        self.assertIn("Les anciens chantiers et factures gardent l'ancienne adresse.", page)
+        corps = page[page.index("<form"):]
+        self.assertEqual(sorted(set(re.findall(r'name="([^"]+)"', corps))), ["adresse", "client_secteur", "code_postal", "notes_acces"])
+        self.assertIn("Enregistrer la nouvelle adresse", page)
+        self.assertRegex(page, r'<a class="bouton secondaire annuler" href="/client/1">Annuler</a>')
+        self.assertNotIn("Paramètres avancés", page)
+        self.assertTrue(self.get("/client/99/nouvelle-adresse")[0].startswith("404"))
+
+    def test_le_bouton_depend_de_l_historique(self):
+        page = self.get("/client/1")[1]                                                 # historique (chantier terminé) : le bouton est là
+        self.assertRegex(page, r'<a class="bouton secondaire" href="/client/1/nouvelle-adresse">Nouvelle adresse</a>')
+        libre = self.sans_historique()
+        page = self.get(f"/client/{libre}")[1]                                          # sans historique : « Modifier le client » suffit
+        self.assertNotIn("nouvelle-adresse", page)
+        self.assertIn("Modifier le client", page)
+        self.deplacer()
+        self.assertNotIn("/client/1/nouvelle-adresse", self.get("/client/1")[1])       # déjà une ancienne adresse
+        self.assertNotIn("nouvelle-adresse", self.get("/client/4")[1])                  # la nouvelle fiche n'a pas encore d'historique
+
+    def test_fiches_ancienne_et_nouvelle(self):
+        self.deplacer()
+        ancienne = self.get("/client/1")[1]
+        self.assertIn("Ancienne adresse</span>", ancienne)                                # pastille près du nom
+        self.assertIn('<b>Nouvelle adresse :</b> <a href="/client/4">45 Rue du Lac</a>', ancienne)
+        self.assertNotIn("+ Nouvelle soumission", ancienne)
+        self.assertNotIn("/client/1/nouvelle-adresse", ancienne)
+        self.assertIn("Modifier le client", ancienne)
+        self.assertIn("123 Rue des Érables", ancienne)
+        nouvelle = self.get("/client/4")[1]
+        self.assertIn('<b>Ancienne adresse :</b> <a href="/client/1">123 Rue des Érables</a>', nouvelle)
+        self.assertIn("+ Nouvelle soumission", nouvelle)
+        self.assertNotIn("Nouvelle adresse :", nouvelle)
+
+    def test_nouvelle_soumission_redirigee_vers_la_nouvelle_fiche(self):
+        self.deplacer()
+        statut, page = self.get("/client/1/soumission/nouveau")
+        self.assertTrue(statut.startswith("303") or statut.startswith("302"), statut)
+        statut, en_tetes, _ = self.post("/client/1/soumission/nouveau", {"type_emondage": "1"})
+        self.assertEqual(en_tetes["Location"], "/client/4/soumission/nouveau")
+        self.assertEqual(self.sql("SELECT count(*) FROM chantiers"), [(3,)])               # rien n'a été créé sur l'ancienne fiche
+        self.assertTrue(self.get("/client/4/soumission/nouveau")[0].startswith("200"))
+        # la chaîne est suivie : la nouvelle fiche déménage à son tour
+        self.deplacer(client_id=4, adresse="7 Rue Finale")
+        _, en_tetes, _ = self.post("/client/1/soumission/nouveau", {})
+        self.assertEqual(en_tetes["Location"], "/client/5/soumission/nouveau")
+        # une boucle (impossible avec les règles, mais pas impossible à la main) ne fait pas tourner le serveur
+        c = sqlite3.connect(self.db)
+        c.execute("UPDATE clients SET remplace_par = 1 WHERE id = 5")
+        c.commit()
+        c.close()
+        c = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(noyau.client_remplacant(c, 1), 5)
+        finally:
+            c.close()
+
+    def test_la_liste_garde_les_anciennes_fiches_avec_une_mention(self):
+        self.deplacer()
+        page = self.get("/clients")[1]
+        self.assertEqual(page.count("Marie Gagnon"), 2)                                   # l'ancienne et la nouvelle
+        self.assertEqual(page.count("ancienne adresse"), 1)
+        ligne = page[page.index('href="/client/1"'):]
+        self.assertIn("ancienne adresse</div>", ligne[:ligne.index("</tr>")])
+        nouvelle = page[page.index('href="/client/4"'):]
+        self.assertNotIn("ancienne adresse", nouvelle[:nouvelle.index("</tr>")])
+
+    def test_le_choix_d_un_client_et_les_doublons_ignorent_l_ancienne_fiche(self):
+        self.deplacer()
+        page = self.get("/nouveau", {"q": "Gagnon"})[1]
+        self.assertIn('href="/client/4"', page)
+        self.assertNotIn('href="/client/1"', page)
+        c, _ = noyau.ouvrir_base(self.db)
+        try:
+            idx = noyau.Index(c)
+            self.assertNotIn(1, idx.infos)
+            self.assertIn(4, idx.infos)
+            self.assertIsNone(idx.ailleurs({"client_telephone": "+14505550999", "client_telephone_2": None}))
+            self.assertEqual(idx.ailleurs({"client_telephone": "+14505550142", "client_telephone_2": None}), 4)      # le téléphone mène à la fiche actuelle
+            v = {"adresse": "123 Rue des Érables", "ville": "Saint-Jérôme", "client_prenom": "Marie", "client_nom": "Gagnon",
+                 "client_entreprise": None, "client_telephone": "+14505550142", "client_telephone_2": None}
+            self.assertEqual(idx.trouver(v), (None, None))                                  # la vieille adresse n'est plus réutilisée
+        finally:
+            c.close()
+
+    def test_supprimer_la_nouvelle_fiche_rend_l_ancienne_normale(self):
+        self.deplacer()
+        self.assertEqual(self.sql("SELECT remplace_par FROM clients WHERE id = 1"), [(4,)])
+        c, _ = noyau.ouvrir_base(self.db)
+        try:
+            with noyau.transaction(c):
+                self.assertEqual(noyau.supprimer_client(c, 4), [])
+        finally:
+            c.close()
+        self.assertEqual(self.sql("SELECT remplace_par FROM clients WHERE id = 1"), [(None,)])
+        page = self.get("/client/1")[1]
+        self.assertIn("+ Nouvelle soumission", page)
+        self.assertNotIn("Ancienne adresse", page)
+        self.assertNotIn("ancienne adresse", self.get("/clients")[1])
+
+    def test_une_fiche_ne_peut_pas_se_remplacer_elle_meme(self):
+        c = sqlite3.connect(self.db)
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                c.execute("UPDATE clients SET remplace_par = id WHERE id = 1")
+        finally:
+            c.close()
 
 
 if __name__ == "__main__":
