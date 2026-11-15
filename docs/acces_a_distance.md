@@ -26,7 +26,9 @@ Sur le téléphone, avec Tailscale allumé : `http://ticotower.tailbb6d3b.ts.net
    - **Administrateur** : tout (tableau de bord, journée, PDF, finances, suppressions, comptes, **archives et statistiques**).
    - **Soumission** : soumissions, chantiers et clients : ouvrir, remplir, **accepter**, **mettre en attente** et **refuser** des soumissions, consulter les chantiers
      et les clients, **voir et télécharger le PDF d'une soumission** pour l'envoyer au client. Ni finances (donc **pas la facture** en PDF, qui montre les paiements),
-     ni Terminer, ni suppression, ni journée, ni archives.
+     ni Terminer, ni suppression (**pas même celle d'une photo**), ni journée, ni archives.
+   - **Principe : refus par défaut.** Le compte « Soumission » n'a accès qu'à une liste précise de pages et d'actions (la liste `PERMIS_SOUMISSION`
+     de `outils/auth.py`). Une page ajoutée plus tard lui reste donc fermée tant qu'on ne l'a pas autorisée exprès.
 3. Double-cliquer **`lancer_reseau.bat`** (au lieu de `lancer_interface.bat`) et laisser la fenêtre ouverte.
 4. Si Windows demande d'autoriser le pare-feu : accepter. Si les téléphones n'arrivent pas à se connecter, ouvrir l'**Invite de commandes en
    administrateur** et taper (une ligne ; elle n'autorise que le réseau Tailscale) :
@@ -64,7 +66,7 @@ Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes 
 - **Archives** : la recherche, un bouton **Filtres** qui déplie les critères, les idées de recherche et les chiffres en pastilles qu'on fait défiler, puis une carte par résultat.
 - **Tableau de bord, la journée** : une loupe en haut à droite de la carte du jour ouvre le détail (sur ordinateur : il suffit de la survoler ; un point rouge la marque quand la journée est chargée) (début, fin prévue, total avec taxes, dîner).
 - **Documents** : à côté de **Soumission** et **Facture**, une petite flèche enregistre le PDF (dans l'application ajoutée à l'écran d'accueil, le PDF ne fait que s'afficher ; si l'enregistrement n'y marche pas, ouvre l'adresse directement dans Safari). L'export Excel et le lien « En attente » de Chantiers (à ajouter en raccourci) ne sont pas affichés sur téléphone.
-- **Photos** : sur la fiche d'une soumission ou d'un chantier, la carte **Photos** a deux boutons : **Prendre une photo** (ouvre l'appareil photo) et **Ajouter des photos** (la galerie, plusieurs à la fois). Le téléphone réduit chaque photo avant de l'envoyer (quelques centaines de Ko). Toucher une vignette l'agrandit, avec **Fermer** et **Supprimer**.
+- **Photos** : sur la fiche d'une soumission ou d'un chantier, la carte **Photos** a deux boutons : **Prendre une photo** (ouvre l'appareil photo) et **Ajouter des photos** (la galerie, plusieurs à la fois). Le téléphone réduit chaque photo avant de l'envoyer (quelques centaines de Ko). Toucher une vignette l'agrandit, avec **Fermer** et, pour l'administrateur seulement, **Supprimer**.
 - **Annuler / Fermer** : ramènent toujours à la page d'où tu viens (la liste filtrée, la fiche), même après une erreur de saisie.
 - **Fiche client** : l'historique avec le statut à droite de chaque ligne, et un petit bouton **Supprimer le client** (la mise en garde s'affiche dans la fenêtre de confirmation).
 - **Fiches et formulaires** : les types de travaux et les options sont des **tuiles** à cocher ; le bouton principal prend toute la largeur ; « Terminer » monte

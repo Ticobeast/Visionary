@@ -12,7 +12,7 @@ invente lui-même le nom du fichier et ne sort jamais du dossier de données.
     GET  /chantier/12/photos/NOM            la photo ; ?v=1 : sa vignette (ou la photo si elle n'a pas de vignette)
     POST /chantier/12/photos                ajoute une photo (corps = JPEG ou PNG) ; répond {"nom": "..."}
     POST /chantier/12/photos/NOM/vignette   range la vignette de cette photo (JPEG léger)
-    POST /chantier/12/photos/NOM/supprimer  efface la photo et sa vignette
+    POST /chantier/12/photos/NOM/supprimer  efface la photo et sa vignette (administrateur seulement)
 (« soumission » et « chantier » sont interchangeables : c'est la même fiche.)
 """
 import datetime
@@ -21,7 +21,7 @@ import re
 import secrets
 from pathlib import Path
 
-from vue import _BASE, esc, gabarit, redirection, url_fiche
+from vue import _BASE, esc, est_admin, gabarit, redirection, url_fiche
 
 TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 LIMITE_OCTETS = 20_000_000          # une photo plus lourde est refusée (le navigateur la réduit avant l'envoi)
@@ -85,13 +85,13 @@ etat.textContent="Terminé.";try{sessionStorage.setItem("pos:"+location.pathname
 catch(e){etat.textContent="Échec de l'envoi : "+e.message;}}
 c.querySelectorAll("input[type=file]").forEach(function(inp){inp.addEventListener("change",function(){if(inp.files.length){traiter(Array.prototype.slice.call(inp.files));}inp.value="";});});
 c.querySelectorAll("a.photo").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();v.querySelector("img").src=a.href;
-v.querySelector("form").action=base+"/"+a.getAttribute("data-nom")+"/supprimer";v.hidden=false;});});
+var sf=v.querySelector("form");if(sf){sf.action=base+"/"+a.getAttribute("data-nom")+"/supprimer";}v.hidden=false;});});
 v.querySelector("[data-fermer]").addEventListener("click",function(){v.hidden=true;v.querySelector("img").removeAttribute("src");});
 })();</script>"""
 
 
 def bloc(conn, chantier_id):
-    """La carte « Photos » : vignettes, boutons pour en ajouter, visionneuse (toucher une photo l'agrandit ; on peut la supprimer)."""
+    """La carte « Photos » : vignettes, boutons pour en ajouter, visionneuse (toucher une photo l'agrandit ; l'administrateur peut la supprimer)."""
     dossier, genre = dossier_de(conn, chantier_id)
     if dossier is None:
         return ""
@@ -107,7 +107,9 @@ def bloc(conn, chantier_id):
             '<p class="doux photo-etat" aria-live="polite"></p>'
             '<div class="visionneuse" hidden><img alt="Photo agrandie"><div class="barre">'
             '<button type="button" class="secondaire" data-fermer>Fermer</button>'
-            '<form method="post" action="" onsubmit="return confirm(\'Supprimer cette photo ?\')"><button type="submit" class="danger">Supprimer</button></form></div></div>'
+            + ('<form method="post" action="" onsubmit="return confirm(\'Supprimer cette photo ?\')"><button type="submit" class="danger">Supprimer</button></form>'
+               if est_admin() else "")      # supprimer une photo : administrateur seulement
+            + '</div></div>'
             + SCRIPT + "</div>")
 
 
