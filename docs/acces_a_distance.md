@@ -93,6 +93,10 @@ La deuxième à enregistrer reçoit « Cette fiche vient d'être modifiée par q
   désactiver son compte.
 - N'active **jamais** « Tailscale Funnel » : ce serait rendre l'application publique.
 - Ne pas copier le dossier du projet dans OneDrive / Dropbox (voir README).
+- Le serveur refuse les requêtes venues d'un autre site (« cross-site » et « DNS rebinding »), les liens de retour qui contiennent
+  des caractères de contrôle, et les requêtes dont la taille annoncée est invalide (400) ou trop grande pour un formulaire (413).
+- Chaque réponse porte des en-têtes de sécurité (`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`,
+  `Referrer-Policy`) : les pages ne peuvent pas être affichées dans le cadre d'un autre site et ne chargent rien d'extérieur.
 
 ## Logo
 Pour afficher le logo du site dans l'application, copier `logo.svg` (ou `logo.png`) du dossier `images` du site dans **`outils/static/`**

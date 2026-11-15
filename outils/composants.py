@@ -45,8 +45,10 @@ def nom_client(l):
 
 
 def retour_valide(retour, defaut="/"):
-    """N'accepte qu'un chemin local (jamais une adresse externe)."""
+    """N'accepte qu'un chemin local (jamais une adresse externe, jamais de caractère de contrôle)."""
     if not retour or not retour.startswith("/") or retour.startswith("//") or "\\" in retour:
+        return defaut
+    if any(ord(c) < 32 or ord(c) == 127 for c in retour):      # retour de chariot, saut de ligne, tabulation, nul...
         return defaut
     return retour
 

@@ -7,6 +7,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
@@ -219,6 +220,13 @@ class TestPorte(BaseAuth):
             self.assertEqual(en_tetes["Location"], "/", mauvais)
         statut, en_tetes, _ = self.req("GET", "/chantiers", query={"q": "lac"})
         self.assertEqual(en_tetes["Location"], "/connexion?suite=%2Fchantiers%3Fq%3Dlac")
+
+    def test_suite_avec_saut_de_ligne_n_injecte_pas_d_en_tete(self):
+        self.comptes()
+        for suite in ("/x\r\nSet-Cookie: pirate=1", urllib.parse.unquote("/x%0d%0aSet-Cookie:%20pirate=1")):
+            _, en_tetes, _ = self.req("POST", "/connexion", {"nom": "Admin", "mot_de_passe": "motdepasse-admin", "suite": suite})
+            self.assertEqual(en_tetes["Location"], "/")
+            self.assertNotIn("pirate", en_tetes["Set-Cookie"])
 
     def test_connexion_cookie_et_deconnexion(self):
         self.comptes()
