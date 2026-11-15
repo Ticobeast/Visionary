@@ -306,10 +306,8 @@ def _navigation(section):
     droite = etiquette_base()
     if u:
         droite += (f'<span class="qui">{esc(u["nom"])}</span>'
-                   + ('<a class="admin-seul" href="/utilisateurs">Utilisateurs</a><a class="admin-seul" href="/journal">Journal</a>' if u["role"] == "admin" else "")
+                   + ('<a class="admin-seul" href="/utilisateurs">Utilisateurs</a>' if u["role"] == "admin" else "")
                    + '<form method="post" action="/deconnexion"><button class="lien" type="submit">Se déconnecter</button></form>')
-    elif admin:                                     # sans comptes : le journal reste consultable (la navigation du téléphone n'a jamais ce lien)
-        droite += '<a class="admin-seul" href="/journal">Journal</a>'
     return (f'<header class="navbar"><div class="nav-contenu"><a class="marque" href="{"/" if admin else "/soumissions"}">{logo_html()}</a>'
             f'<nav class="nav-bureau">{nav}</nav><div class="nav-droite">{droite}</div></div></header>{surlignage}')
 

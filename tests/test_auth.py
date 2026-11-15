@@ -289,7 +289,7 @@ class TestDroits(BaseAuth):
             self.assertTrue(self.req("GET", chemin, cookie=self.admin)[0].startswith("200"), chemin)
         self.assertTrue(self.req("GET", "/journee.pdf", cookie=self.admin, query={"date": "2026-10-14"})[0].startswith("200"))
         page = self.req("GET", "/chantiers", cookie=self.admin)[2]
-        for lien in ("Tableau de bord", "Journée", "Chantiers", "Clients", "Utilisateurs", "Journal", "Se déconnecter"):
+        for lien in ("Tableau de bord", "Journée", "Chantiers", "Clients", "Utilisateurs", "Se déconnecter"):
             self.assertIn(lien, page)
 
     def test_soumission_pages_permises(self):

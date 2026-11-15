@@ -260,7 +260,8 @@ def page_journal(conn, query):
     if navigation:
         navigation = f'<div class="barre" style="margin-top:12px">{navigation}</div>'
 
-    contenu = (f'<h1>Journal des modifications</h1><p class="doux">Qui a fait quoi et quand. Le journal garde tout et ne se modifie pas.</p>'
+    contenu = (f'<h1>Journal des modifications</h1><p class="doux">Qui a fait quoi et quand. Le journal garde tout et ne se modifie pas. '
+               '<span class="pc-seul"><a class="doux" href="/utilisateurs">Utilisateurs</a></span></p>'
                f'{recherche}<div class="liste-defile"><table><thead><tr><th>Date et heure</th><th>Compte</th><th>Action</th><th>Cible</th></tr></thead>'
                f'<tbody>{corps}</tbody></table></div>{navigation}')
     return gabarit("Journal", contenu, large=True)

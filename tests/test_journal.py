@@ -184,7 +184,8 @@ class TestConnexion(BaseJournal):
         page = self.req("GET", "/journal", ip="127.0.0.1")[2]
         self.assertIn("Nouvelle adresse du client", page)
         self.assertIn("<td>—</td>", page)
-        self.assertIn('href="/journal"', page)                                               # le lien existe aussi sans comptes
+        entete = self.req("GET", "/chantiers", ip="127.0.0.1")[2]
+        self.assertNotIn("/journal", entete[entete.index("<header"):entete.index("</header>")])       # la barre du haut n'a pas de lien Journal
 
 
 class TestPage(BaseJournal):
@@ -211,16 +212,26 @@ class TestPage(BaseJournal):
         page = self.req("GET", "/chantiers", cookie=self.soum)[2]
         self.assertNotIn("/journal", page)
 
-    def test_lien_dans_la_navigation_de_l_ordinateur_seulement(self):
-        page = self.req("GET", "/chantiers", cookie=self.admin)[2]
-        nav = page[page.index('<div class="nav-droite">'):page.index("</header>")]
-        self.assertIn('href="/utilisateurs"', nav)
-        self.assertIn('<a class="admin-seul" href="/journal">Journal</a>', nav)
+    def test_aucun_lien_journal_dans_la_barre_du_haut_ni_dans_le_menu_du_telephone(self):
+        for cookie in (self.admin, self.soum):
+            page = self.req("GET", "/chantiers", cookie=cookie)[2]
+            self.assertNotIn("/journal", page[page.index("<header"):page.index("</header>")])      # la barre du haut ne bouge pas
         telephone = self.req("GET", "/chantiers", cookie=self.admin, agent=TELEPHONE)[2]
         mobile = telephone[telephone.index('<nav class="barre-mobile">'):telephone.index("</div></div>", telephone.index('class="menu-feuille"'))]
         self.assertIn("/utilisateurs", mobile)                                               # le menu du téléphone est bien celui-là
         self.assertNotIn("/journal", mobile)
         self.assertNotIn("Journal", mobile)
+
+    def test_bouton_journal_sur_la_page_utilisateurs_pour_l_ordinateur_seulement(self):
+        page = self.req("GET", "/utilisateurs", cookie=self.admin)[2]
+        self.assertIn('<div class="barre pc-seul"><a class="bouton secondaire" href="/journal">Journal des modifications</a></div>', page)
+        self.assertLess(page.index("<h1>Utilisateurs</h1>"), page.index('href="/journal"'))
+        self.assertEqual(page.count('href="/journal"'), 1)
+        self.assertEqual(self.req("GET", "/utilisateurs", cookie=self.soum)[0][:3], "403")        # le compte soumission n'a ni la page ni le bouton
+
+    def test_retour_vers_utilisateurs_sur_la_page_du_journal(self):
+        page = self.req("GET", "/journal", cookie=self.admin)[2]
+        self.assertIn('<span class="pc-seul"><a class="doux" href="/utilisateurs">Utilisateurs</a></span>', page)
 
     def test_la_page_s_ouvre_sur_telephone(self):
         statut, _, corps = self.req("GET", "/journal", cookie=self.admin, agent=TELEPHONE)
