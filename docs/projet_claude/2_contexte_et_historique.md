@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v15 (fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v14 vers v15). 657 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 686 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).

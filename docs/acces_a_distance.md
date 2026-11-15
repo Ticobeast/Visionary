@@ -54,7 +54,7 @@ clair, des boutons faciles à toucher (44 px), des **flèches plutôt que des mo
 Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes blanches à fine bordure, boutons secondaires **blancs** à bordure grise, bouton principal vert, champs blancs. La mise en forme est dans `outils/telephone.py`.
 
 **Barre du bas** (administrateur) : **Tableau de bord**, **Clients** et le bouton **Menu** (trois barres) qui ouvre une feuille avec **Chantiers**,
-**Soumissions**, **Journée**, **Archives**, **Utilisateurs** et **Se déconnecter**. Le compte « Soumission » a **Soumissions**, **Clients** et le Menu (Chantiers).
+**Soumissions**, **Journée**, **Archives**, **Utilisateurs** et **Se déconnecter**. (Le **Journal** des modifications est réservé à l'administrateur et n'est que dans la barre du haut de l'ordinateur.) Le compte « Soumission » a **Soumissions**, **Clients** et le Menu (Chantiers).
 - **Tableau de bord** : un calendrier comme celui d'Apple (un point sous les jours chargés ; le fond vert pâle des fins de semaine ; le jour courant en
   gras (et en cercle vert seulement quand il est choisi), un autre jour choisi en cercle vert foncé), et dessous la journée choisie avec **Terminer** et un lien discret **Facture** en haut à droite de chaque chantier.
 - **Journée** : une flèche de chaque côté de la date pour changer de jour (ou toucher la date), un seul bouton **Aujourd'hui** (en haut à droite du titre, absent quand on est déjà aujourd'hui), les quatre filtres des chantiers à placer regroupés sous un seul bouton **Filtres**, et la gestion de la journée (ordre, retirer, ajouter).
