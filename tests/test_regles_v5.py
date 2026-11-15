@@ -286,7 +286,8 @@ class TestOuvertureAncienneBase(unittest.TestCase):
             c.close()
             with self.assertRaises(SystemExit) as e:
                 noyau.ouvrir_base(db)
-            self.assertIn("supprime simplement ce fichier", str(e.exception))
+            self.assertIn("Ne supprime pas ce fichier", str(e.exception))
+            self.assertIn("trop ancien", str(e.exception))
 
 
 if __name__ == "__main__":
