@@ -319,6 +319,24 @@ class TestDroits(BaseAuth):
             self.assertIn(present, admin, present)
         self.assertIn("Supprimer ce client", self.req("GET", "/client/1", cookie=self.admin)[2])
 
+    def test_soumission_ne_peut_pas_supprimer_une_photo_mais_peut_en_ajouter_et_voir(self):
+        jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 200 + b"\xff\xd9"
+        statut, _, corps = interface.repondre(self.db, "POST", "/chantier/3/photos", {}, {"_octets": jpeg},
+                                              {"cookie": self.soum, "ip": "100.64.1.2", "agent": BUREAU, "https": False})
+        self.assertTrue(statut.startswith("200"), corps)                                    # ajouter : permis
+        nom = re.search(rb'"nom": "([^"]+)"', corps).group(1).decode()
+        self.assertTrue(self.req("GET", f"/chantier/3/photos/{nom}", cookie=self.soum)[0].startswith("200"))   # voir : permis
+        for fiche in ("chantier", "soumission"):
+            statut, _, page = self.req("POST", f"/{fiche}/3/photos/{nom}/supprimer", cookie=self.soum)
+            self.assertTrue(statut.startswith("403"), fiche)                                # supprimer : refusé
+            self.assertIn("réservée à l'administrateur", page)
+        self.assertTrue(self.req("GET", f"/chantier/3/photos/{nom}", cookie=self.soum)[0].startswith("200"))   # la photo existe toujours
+        # l'interface ne propose plus le bouton au compte « soumission » (l'administrateur le garde)
+        self.assertNotIn("Supprimer cette photo", self.req("GET", "/chantier/3", cookie=self.soum)[2])
+        self.assertIn("Supprimer cette photo", self.req("GET", "/chantier/3", cookie=self.admin)[2])
+        self.assertTrue(self.req("POST", f"/chantier/3/photos/{nom}/supprimer", cookie=self.admin)[0].startswith("303"))
+        self.assertTrue(self.req("GET", f"/chantier/3/photos/{nom}", cookie=self.admin)[0].startswith("404"))
+
     def test_soumission_cree_et_modifie_une_soumission(self):
         form = {"client_nom": "Tremblay", "client_prenom": "Jean", "client_telephone": "450-555-0123", "adresse": "9 Rue des Lilas",
                 "client_secteur": "centre_ville", "province": "QC", "type_emondage": "1", "statut": "soumission", "duree_estimee_h": "2", "prix_ht": "300"}
@@ -488,3 +506,78 @@ class TestMigration(BaseAuth):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Refus par défaut du rôle « soumission »
+# ---------------------------------------------------------------------------
+# Référence FIGÉE : l'ancienne règle (« tout est permis sauf ceci »), recopiée telle quelle avant le passage au refus par défaut.
+_ANCIENS_REFUS_SOUMISSION = [re.compile(p) for p in (
+    r"^/utilisateurs", r"^/secteurs", r"^/client/\d+/supprimer$", r"^/chantier/\d+/supprimer$", r"^/chantier/\d+/paiement$",
+    r"^/soumission/\d+/supprimer$", r"^/paiement/", r"^/journee", r"^/action/", r"^/tournee", r"^/suivi", r"^/archives", r"^/facture/")]
+
+
+def _ancien_permis_soumission(chemin):
+    return not any(p.search(chemin) for p in _ANCIENS_REFUS_SOUMISSION)
+
+
+def _chemins_exemples(motif):
+    """Chemins réels qui correspondent à un motif de route (un par variante « soumission » / « chantier »)."""
+    chemin = motif.lstrip("^").rstrip("$").replace("\\.", ".")
+    chemin = chemin.replace("(\\d+)", "3").replace("([^/]+)", "photo.jpg").replace("(svg|png)", "svg")
+    variantes = ("soumission", "chantier") if "(?:soumission|chantier)" in chemin else (None,)
+    return [chemin if v is None else chemin.replace("(?:soumission|chantier)", v) for v in variantes]
+
+
+class TestRefusParDefaut(unittest.TestCase):
+    def test_chaque_route_est_classee(self):
+        permises, reservees = set(auth.PERMIS_SOUMISSION), set(auth.RESERVE_ADMIN)
+        self.assertFalse(permises & reservees, "une route ne peut pas être à la fois permise et réservée")
+        for methode, motif, _ in interface.ROUTES:
+            self.assertTrue((methode, motif) in permises or (methode, motif) in reservees,
+                            f"Route non classée : {methode} {motif}. Décide si le rôle « soumission » peut l'utiliser : si oui, "
+                            "ajoute (méthode, motif) à PERMIS_SOUMISSION dans outils/auth.py ; sinon, ajoute-la à RESERVE_ADMIN "
+                            "(même fichier). Sans cela elle reste refusée au rôle « soumission ».")
+        routes = {(m, motif) for m, motif, _ in interface.ROUTES}
+        for m, motif in permises | reservees:
+            self.assertIn((m, motif), routes, f"{m} {motif} est classée mais n'existe plus dans interface.ROUTES : retire-la de auth.py")
+
+    def test_meme_resultat_que_l_ancienne_regle_sauf_suppression_de_photo(self):
+        verifies = 0
+        for methode, motif, _ in interface.ROUTES:
+            for chemin in _chemins_exemples(motif):
+                self.assertTrue(re.match(motif, chemin), (motif, chemin))
+                premiere = next(mt for m, mt, _ in interface.ROUTES if m == methode and re.match(mt, chemin))
+                self.assertEqual(premiere, motif, f"{methode} {chemin} serait servi par une autre route")
+                photo_supprimee = "/photos/" in chemin and chemin.endswith("/supprimer")      # seule différence voulue
+                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee
+                self.assertEqual(auth.permis("soumission", methode, chemin), attendu, f"{methode} {chemin}")
+                self.assertTrue(auth.permis("admin", methode, chemin), f"{methode} {chemin}")
+                verifies += 1
+        self.assertGreaterEqual(verifies, len(interface.ROUTES))
+
+    def test_la_seule_difference_avec_l_ancienne_regle_est_la_suppression_de_photo(self):
+        differences = []
+        for methode, motif, _ in interface.ROUTES:
+            for chemin in _chemins_exemples(motif):
+                if auth.permis("soumission", methode, chemin) != _ancien_permis_soumission(chemin):
+                    differences.append(motif)
+        self.assertEqual(differences, [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2)
+
+    def test_chemin_inconnu_refuse_au_role_soumission(self):
+        for chemin in ("/nouvelle-page", "/admin", "/client/3/exporter", "/chantier/3/photos/x.jpg/autre", "/data/sylvainculteur.db", "/chantiers/"):
+            for methode in ("GET", "POST"):
+                self.assertFalse(auth.permis("soumission", methode, chemin), f"{methode} {chemin}")
+            self.assertTrue(auth.permis("admin", "GET", chemin))
+
+    def test_methode_non_prevue_refusee(self):
+        self.assertFalse(auth.permis("soumission", "POST", "/chantiers"))
+        self.assertFalse(auth.permis("soumission", "GET", "/chantier/3/photos"))
+        self.assertFalse(auth.permis("soumission", "DELETE", "/chantier/3"))
+
+    def test_role_inconnu_refuse_partout(self):
+        for role in ("", None, "visiteur", "Admin", "ADMIN", "root"):
+            for methode, motif, _ in interface.ROUTES:
+                for chemin in _chemins_exemples(motif):
+                    self.assertFalse(auth.permis(role, methode, chemin), f"{role!r} {methode} {chemin}")
+            self.assertFalse(auth.permis(role, "GET", "/chantiers"))

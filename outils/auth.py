@@ -7,7 +7,8 @@ cet ordinateur : ainsi un tunnel ou un réseau privé ne contourne jamais la por
   - mots de passe : jamais stockés en clair, seulement une empreinte PBKDF2-SHA256 salée (hashlib, rien à installer) ;
   - session : un jeton aléatoire dans un cookie (HttpOnly, SameSite=Lax) ; la base ne garde que son empreinte ;
   - essais ratés : blocage temporaire (par nom et par adresse) pour décourager les devinettes ;
-  - droits : « admin » (tout) et « soumission » (clients et chantiers, sans finances ni suppressions).
+  - droits : « admin » (tout) et « soumission » (clients et chantiers, sans finances ni suppressions) ; refus par défaut :
+    ce rôle n'a accès qu'à la liste PERMIS_SOUMISSION, tout le reste lui est fermé.
 
 Gérer les comptes : `python gerer_utilisateurs.py` (menu) ou la page « Utilisateurs » (administrateur).
 """
@@ -258,16 +259,64 @@ def connexion(conn, nom, mot_de_passe, ip):
 # ---------------------------------------------------------------------------
 # Droits
 # ---------------------------------------------------------------------------
-_REFUS_SOUMISSION = [re.compile(p) for p in (
-    r"^/utilisateurs", r"^/secteurs", r"^/client/\d+/supprimer$", r"^/chantier/\d+/supprimer$", r"^/chantier/\d+/paiement$",
-    r"^/soumission/\d+/supprimer$", r"^/paiement/", r"^/journee", r"^/action/", r"^/tournee", r"^/suivi", r"^/archives", r"^/facture/")]
+# Refus par défaut : le rôle « soumission » n'a accès QU'À ce qui est écrit ici. Une page ajoutée plus tard lui est donc fermée
+# tant qu'on ne l'a pas listée volontairement. Chaque ligne est (méthode, motif) : le motif est celui de la route dans interface.ROUTES.
+# L'administrateur a tout. Un rôle inconnu n'a rien.
+PERMIS_SOUMISSION = (
+    # connexion, déconnexion, logo et icône
+    ("GET", r"^/connexion$"), ("POST", r"^/connexion$"), ("POST", r"^/deconnexion$"),
+    ("GET", r"^/logo\.(svg|png)$"), ("GET", r"^/favicon\.ico$"),
+    # pages d'accueil : calendrier, chantiers, nouvelle soumission, liste des clients
+    ("GET", r"^/$"), ("GET", r"^/chantiers$"), ("GET", r"^/nouveau$"), ("POST", r"^/nouveau$"), ("GET", r"^/clients$"),
+    # fiche client : voir, modifier, ajouter une soumission ou un chantier (pas de suppression)
+    ("GET", r"^/client/(\d+)$"), ("GET", r"^/client/(\d+)/modifier$"), ("POST", r"^/client/(\d+)/modifier$"),
+    ("GET", r"^/client/(\d+)/soumission/nouveau$"), ("POST", r"^/client/(\d+)/soumission/nouveau$"),
+    ("GET", r"^/client/(\d+)/chantier/nouveau$"), ("POST", r"^/client/(\d+)/chantier/nouveau$"),
+    # soumissions : liste, fiche, modification, accepter, refuser, rouvrir, compléter, PDF (pas de suppression)
+    ("GET", r"^/soumissions$"), ("GET", r"^/soumission/(\d+)$"), ("POST", r"^/soumission/(\d+)$"),
+    ("POST", r"^/soumission/(\d+)/accepter$"), ("POST", r"^/soumission/(\d+)/refuser$"), ("POST", r"^/soumission/(\d+)/rouvrir$"),
+    ("GET", r"^/soumission/(\d+)/completer$"), ("POST", r"^/soumission/(\d+)/completer$"), ("GET", r"^/soumission/(\d+)/pdf$"),
+    # mise en attente et reprise
+    ("GET", r"^/(?:soumission|chantier)/(\d+)/attente$"), ("POST", r"^/(?:soumission|chantier)/(\d+)/attente$"),
+    ("POST", r"^/chantier/(\d+)/reprendre$"),
+    # chantier : fiche, modification, remettre en soumission, dupliquer (ni paiement ni suppression)
+    ("GET", r"^/chantier/(\d+)$"), ("POST", r"^/chantier/(\d+)$"), ("POST", r"^/chantier/(\d+)/remettre-soumission$"),
+    ("GET", r"^/chantier/(\d+)/dupliquer$"), ("POST", r"^/chantier/(\d+)/dupliquer$"),
+    # raccourcis de la barre des listes
+    ("GET", r"^/raccourcis$"), ("POST", r"^/raccourcis/ajouter$"), ("POST", r"^/raccourcis/reinitialiser$"),
+    ("POST", r"^/raccourcis/(\d+)/retirer$"), ("POST", r"^/raccourcis/(\d+)/deplacer$"),
+    # photos : voir et ajouter, mais pas supprimer (réservé à l'administrateur)
+    ("GET", r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)$"), ("POST", r"^/(?:soumission|chantier)/(\d+)/photos$"),
+    ("POST", r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/vignette$"),
+)
+
+# Routes réservées à l'administrateur. Cette liste ne sert pas à décider (tout ce qui n'est pas permis est déjà refusé) : elle oblige à
+# CLASSER chaque route. Le test tests/test_auth.py échoue si une route n'est ni ici ni dans PERMIS_SOUMISSION.
+RESERVE_ADMIN = (
+    # comptes
+    ("GET", r"^/utilisateurs$"), ("POST", r"^/utilisateurs/ajouter$"), ("POST", r"^/utilisateurs/(\d+)/mot-de-passe$"),
+    ("POST", r"^/utilisateurs/(\d+)/actif$"),
+    # journée, tournée, suivi et actions sur les chantiers planifiés
+    ("GET", r"^/journee\.pdf$"), ("GET", r"^/journee$"), ("POST", r"^/journee/planifier$"), ("GET", r"^/tournee$"), ("GET", r"^/suivi$"),
+    ("POST", r"^/action/terminer$"), ("POST", r"^/action/annuler$"), ("POST", r"^/action/rouvrir$"), ("POST", r"^/action/retirer$"),
+    ("POST", r"^/action/deplacer$"),
+    # suppressions et finances
+    ("POST", r"^/client/(\d+)/supprimer$"), ("POST", r"^/soumission/(\d+)/supprimer$"), ("POST", r"^/chantier/(\d+)/supprimer$"),
+    ("POST", r"^/chantier/(\d+)/paiement$"), ("POST", r"^/paiement/(\d+)/supprimer$"), ("GET", r"^/facture/(\d+)/pdf$"),
+    # archives
+    ("GET", r"^/archives\.csv$"), ("GET", r"^/archives$"),
+    # photos : suppression
+    ("POST", r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"),
+)
+
+_PERMIS_SOUMISSION = [(m, re.compile(p)) for m, p in PERMIS_SOUMISSION]
 
 
 def permis(role, methode, chemin):
     if role == "admin":
         return True
     if role == "soumission":
-        return not any(p.search(chemin) for p in _REFUS_SOUMISSION)
+        return any(m == methode and p.match(chemin) for m, p in _PERMIS_SOUMISSION)
     return False
 
 

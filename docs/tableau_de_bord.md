@@ -277,7 +277,7 @@ un logo exporté d'Illustrator, Inkscape, Figma ou Canva ; sinon le nom de l'ent
 
 ### Photos d'une soumission ou d'un chantier
 
-Sur la fiche (soumission ou chantier, même terminé), la carte **Photos** sert à joindre des photos : **Prendre une photo** (sur téléphone : ouvre l'appareil photo), **Ajouter des photos** (la galerie du téléphone, ou n'importe quel dossier de l'ordinateur ; plusieurs à la fois). Toucher ou cliquer une vignette l'agrandit ; **Supprimer** l'efface (avec confirmation). Le compte « Soumission » peut en ajouter aussi.
+Sur la fiche (soumission ou chantier, même terminé), la carte **Photos** sert à joindre des photos : **Prendre une photo** (sur téléphone : ouvre l'appareil photo), **Ajouter des photos** (la galerie du téléphone, ou n'importe quel dossier de l'ordinateur ; plusieurs à la fois). Toucher ou cliquer une vignette l'agrandit ; **Supprimer** l'efface (avec confirmation) : seul l'administrateur le voit. Le compte « Soumission » peut en ajouter et les voir, mais pas les supprimer.
 
 Où elles vont : dans le **dossier de photos** de la fiche (« Paramètres avancés ») ; s'il est vide, dans `data/photos/chantier-N` (N = numéro de la fiche). Ce sont de simples fichiers JPEG ou PNG : tu peux aussi les glisser toi-même dans ce dossier, et elles apparaissent dans la fiche. Rien n'est écrit dans la base. Elles sont reprises dans le **PDF de la journée** (voir plus haut).
 

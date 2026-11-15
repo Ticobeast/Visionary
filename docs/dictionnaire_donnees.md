@@ -188,7 +188,7 @@ Crée une **nouvelle soumission** pour le même client : travaux (avec précisio
 | Colonne | Type | Rôle |
 |---|---|---|
 | `utilisateurs.nom` | texte unique (sans égard à la casse) | nom de connexion |
-| `utilisateurs.role` | `admin` ou `soumission` | `admin` : tout ; `soumission` : soumissions, chantiers et clients (ni finances, ni journée, ni suppressions) |
+| `utilisateurs.role` | `admin` ou `soumission` | `admin` : tout ; `soumission` : soumissions, chantiers et clients (ni finances, ni journée, ni suppressions, dont celle des photos) ; refus par défaut : tout ce qui n'est pas listé dans `PERMIS_SOUMISSION` (`outils/auth.py`) lui est fermé |
 | `utilisateurs.mot_de_passe` | texte | `pbkdf2_sha256$itérations$sel$empreinte` : jamais le mot de passe lui-même |
 | `utilisateurs.actif` | 0 ou 1 | 0 : connexion impossible, sessions coupées |
 | `sessions.jeton_hash` | texte | empreinte SHA-256 du jeton du cookie (le jeton n'est jamais stocké) |

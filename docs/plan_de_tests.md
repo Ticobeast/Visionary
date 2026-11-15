@@ -132,6 +132,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 88 | Même chose, mais taper « oui » | message de fin ; une copie `avant_restauration` apparaît ; au lancement, les données sont celles de la sauvegarde |
 | 89 | Noter le numéro de la **dernière** soumission (ex. N° 0042), la **supprimer** (fiche non acceptée, sans paiement), puis créer une nouvelle soumission | la nouvelle soumission a un numéro **plus grand** (0043, pas 0042) ; son PDF porte ce nouveau numéro ; elle ne reprend pas les photos de la fiche supprimée |
 | 90 | Chantier **planifié** : télécharger la facture aujourd'hui, puis le lendemain ; ensuite **terminer** le chantier et la télécharger encore, puis un autre jour | avant la fermeture, la facture porte chaque fois la **date du jour** ; après, elle garde la date de la **dernière ouverture d'avant la fermeture** et ne bouge plus. Chantier terminé sans que la facture ait été ouverte : elle porte le **jour de la fermeture** |
+| 91 | **Compte Soumission** : ouvrir la fiche d'un chantier ou d'une soumission qui a des photos, toucher une vignette ; puis, avec le compte administrateur, faire pareil | le compte Soumission voit la photo agrandie avec seulement **Fermer** (aucun bouton **Supprimer**) et peut toujours en ajouter ; l'administrateur voit **Fermer** et **Supprimer**. Ouvrir à la main l'adresse de suppression avec le compte Soumission répond « Accès réservé » et la photo reste |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -146,7 +147,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 90 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 91 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)
