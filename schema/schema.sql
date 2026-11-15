@@ -33,7 +33,8 @@ PRAGMA foreign_keys = ON;
 -- soumission et de la facture remises au client, et du dossier de photos par défaut).
 -- Format v13 : chantiers.facture_le, la date de la facture, figée quand le chantier est terminé (elle ne bouge plus ensuite).
 -- Format v14 : clients.remplace_par (une fiche à l'ancienne adresse d'un client qui a déménagé pointe vers la fiche à la nouvelle adresse).
-PRAGMA user_version = 14;
+-- Format v15 : clients.fusionne_dans (une fiche en double, fusionnée dans la fiche gardée : cachée, jamais supprimée).
+PRAGMA user_version = 15;
 
 
 -- -----------------------------------------------------------------------------
@@ -126,6 +127,12 @@ CREATE TABLE clients (
     -- adresse. L'ancienne fiche garde tout son historique ; si la nouvelle fiche est supprimée, l'ancienne redevient normale.
     remplace_par INTEGER REFERENCES clients(id) ON DELETE SET NULL,
 
+    -- Vide en temps normal. Sur une fiche en DOUBLON fusionnée : le numéro de la fiche gardée. Un doublon qui a des chantiers
+    -- terminés n'est pas supprimé (ils sont verrouillés et restent attachés à lui et à leurs factures) : il est seulement caché.
+    -- Un doublon sans chantier terminé est supprimé à la fusion (rien ne l'y retient) : il n'a donc jamais cette valeur.
+    -- RESTRICT : la fiche gardée ne peut pas être supprimée tant qu'un doublon est fusionné dedans.
+    fusionne_dans INTEGER REFERENCES clients(id) ON DELETE RESTRICT,
+
     CONSTRAINT ck_clients_telephone
         CHECK (telephone IS NULL
                OR telephone GLOB '+1[2-9][0-9][0-9][2-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
@@ -151,7 +158,9 @@ CREATE TABLE clients (
     CONSTRAINT ck_clients_coordonnees
         CHECK ((latitude IS NULL) = (longitude IS NULL)
                AND (geocode_statut IN ('a_faire','echec')) = (latitude IS NULL)),
-    CONSTRAINT ck_clients_remplace_par CHECK (remplace_par IS NULL OR remplace_par <> id)
+    CONSTRAINT ck_clients_remplace_par CHECK (remplace_par IS NULL OR remplace_par <> id),
+    CONSTRAINT ck_clients_fusionne_dans CHECK (fusionne_dans IS NULL OR fusionne_dans <> id),
+    CONSTRAINT ck_clients_fusion_ou_adresse CHECK (fusionne_dans IS NULL OR remplace_par IS NULL)
 );
 
 

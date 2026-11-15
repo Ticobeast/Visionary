@@ -1,4 +1,4 @@
-# Dictionnaire de données (schéma v14)
+# Dictionnaire de données (schéma v15)
 
 Source de vérité : [`schema/schema.sql`](../schema/schema.sql). Ce document l'explique ; en cas de
 désaccord, c'est le fichier SQL qui a raison (la base applique ses règles elle-même).
@@ -57,6 +57,7 @@ Un client qui possède deux propriétés = **deux fiches clients** (une par adre
 | `notes` | texte | non | préférences, historique utile | `Préfère être appelé après 17 h` |
 | `cree_le` | texte | auto | date-heure locale de création | `2026-10-05 14:02:11` |
 | `remplace_par` | entier | non | → `clients.id` (`ON DELETE SET NULL`), jamais égal à `id`. **Vide en temps normal.** Sur une fiche à l'**ancienne adresse** (le client a déménagé) : le numéro de la fiche à la **nouvelle adresse**. L'ancienne fiche garde ses chantiers et ses paiements ; si la nouvelle fiche est supprimée, la colonne redevient vide. Ajoutée au format v14 | `4` |
+| `fusionne_dans` | entier | non | → `clients.id` (`ON DELETE RESTRICT`), jamais égal à `id`, et jamais rempli en même temps que `remplace_par`. **Vide en temps normal.** Sur une fiche en **doublon fusionnée** : le numéro de la fiche **gardée**. Un doublon qui a des chantiers terminés n'est pas supprimé (ils sont verrouillés par la base et restent attachés à lui, avec leurs factures) : il est caché de la liste, des choix et de la détection de doublons, et ne se modifie plus. Ses chantiers terminés sont affichés dans l'historique de la fiche gardée. Un doublon **sans** chantier terminé est supprimé au moment de la fusion : il n'a donc jamais cette valeur. `RESTRICT` : la fiche gardée ne peut pas être supprimée tant qu'un doublon est fusionné dedans. Ajoutée au format v15 | `1` |
 
 **Écrire une adresse que Google Maps comprend.** Le format ci-dessus suffit : la vue `v_chantiers`
 fabrique la chaîne `123 Rue des Érables, Saint-Jérôme, QC J7Z 1A1, Canada` (colonne `adresse_maps`),
@@ -216,15 +217,19 @@ personne a **retiré tous** ses raccourcis : sans elle, ceux du départ reviendr
 
 Le numéro (`id`) d'un client, d'un chantier, d'un paiement, d'un compte et d'un raccourci est en `INTEGER PRIMARY KEY AUTOINCREMENT` : quand une fiche est supprimée, son numéro n'est **jamais** repris par la suivante (SQLite garde le plus grand numéro déjà donné dans `sqlite_sequence`). C'est important parce que le numéro du chantier est celui de la soumission et de la facture remises au client (« N° 0042 ») et celui du dossier de photos par défaut (`photos/chantier-42`) : une nouvelle fiche ne peut pas hériter du numéro ni des photos d'une fiche supprimée. Des trous dans la numérotation sont donc normaux.
 
-## Migrations automatiques (v8, v9, v10, v11, v12 et v13 vers v14)
+## Migrations automatiques (v8, v9, v10, v11, v12, v13 et v14 vers v15)
 
-Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v13…`, ou `_v12`, `_v11`, `_v10`, `_v9`, `_v8`), puis
-migre. De v9, v10, v11, v12 ou v13 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
+Au premier démarrage avec la nouvelle version, le programme **copie d'abord la base** (`data/sauvegardes/…avant_migration_v14…`, ou `_v13`, `_v12`, `_v11`, `_v10`, `_v9`, `_v8`), puis
+migre. De v9, v10, v11, v12, v13 ou v14 au format courant, **tout se fait dans une seule transaction** (tout ou rien, avec vérification des liens `PRAGMA foreign_key_check`) ; la
 vue `v_chantiers` est recréée à la fin, telle que dans `schema.sql`.
+
+### Étape v14 vers v15 : fusion de deux fiches
+
+Ajoute `clients.fusionne_dans` (voir la colonne) et ses règles (jamais égal à `id`, jamais rempli en même temps que `remplace_par`), vide partout au départ. `clients` est **reconstruite** d'après `schema.sql` ; ses lignes, ses numéros et son compteur `AUTOINCREMENT` sont conservés. Une seule reconstruction de `clients` sert aux départs v12, v13 et v14 (`_etapes_14_15`, qui fait aussi l'étape v13 vers v14) ; depuis v9 à v11, celle de l'étape v11 vers v12 suffit. Aucun déclencheur n'est modifié ni retiré. Un test part d'une vraie base v14 (`tests/schema_v14.sql`) et compare toutes les données.
 
 ### Étape v13 vers v14 : nouvelle adresse d'un client
 
-Ajoute `clients.remplace_par` (voir la colonne), vide partout au départ. Comme pour les étapes précédentes, `clients` est **reconstruite** d'après `schema.sql` (et non `ALTER TABLE ... ADD COLUMN`) : ses lignes, ses numéros et son compteur `AUTOINCREMENT` sont conservés, et la base migrée reste identique à une base neuve. Depuis v9 à v11, la reconstruction de l'étape v11 vers v12 fait déjà le travail (une seule reconstruction par table). Un test part d'une vraie base v13 (`tests/schema_v13.sql`) et compare toutes les données.
+Ajoute `clients.remplace_par` (voir la colonne), vide partout au départ. Comme pour les étapes précédentes, `clients` est **reconstruite** d'après `schema.sql` (et non `ALTER TABLE ... ADD COLUMN`) : ses lignes, ses numéros et son compteur `AUTOINCREMENT` sont conservés, et la base migrée reste identique à une base neuve. Depuis v9 à v11, la reconstruction de l'étape v11 vers v12 fait déjà le travail (une seule reconstruction par table). Un test part d'une vraie base v13 (`tests/schema_v13.sql`) et compare toutes les données. Depuis le format v15, cette étape est faite par la même reconstruction que la suivante.
 
 ### Étape v12 vers v13 : date de la facture figée à la fermeture
 

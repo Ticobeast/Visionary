@@ -319,6 +319,32 @@ class TestDroits(BaseAuth):
         self.req("POST", "/client/3/nouvelle-adresse", form)
         self.assertEqual(self.sql("SELECT remplace_par FROM clients WHERE id = 3"), [(None,)])
 
+    def test_la_fusion_de_fiches_est_reservee_a_l_administrateur(self):
+        c = self.conn()
+        c.execute("INSERT INTO clients (prenom, nom, telephone, adresse, ville) VALUES ('Marie', 'Gagnon', '+14505550199', '5 Rue Voisine', 'Mirabel')")
+        c.execute("INSERT INTO chantiers (client_id, statut, date_prevue, duree_estimee_h, prix_ht) VALUES (4, 'termine', '2026-01-01', 1, 10)")   # le doublon sera caché
+        c.commit()
+        c.close()
+        for chemin in ("/client/1/fusionner", "/client/1/fusionner?avec=4"):
+            chemin, _, texte = chemin.partition("?")
+            query = {"avec": "4"} if texte else None
+            self.assertTrue(self.req("GET", chemin, cookie=self.admin, query=query)[0].startswith("200"), chemin)
+            self.assertTrue(self.req("GET", chemin, cookie=self.soum, query=query)[0].startswith("403"), chemin)
+            self.assertFalse(self.req("GET", chemin, query=query)[0].startswith("200"), chemin)               # sans connexion
+        statut, _, _ = self.req("POST", "/client/1/fusionner", {"avec": "4"}, cookie=self.soum)
+        self.assertTrue(statut.startswith("403"))
+        self.assertEqual(self.sql("SELECT count(*) FROM clients WHERE fusionne_dans IS NOT NULL"), [(0,)])
+        self.assertNotIn("Fusionner avec un autre client", self.req("GET", "/client/1", cookie=self.soum)[2])   # bouton caché
+        self.assertIn("Fusionner avec un autre client", self.req("GET", "/client/1", cookie=self.admin)[2])
+        statut, en_tetes, _ = self.req("POST", "/client/1/fusionner", {"avec": "4"}, cookie=self.admin)
+        self.assertTrue(statut.startswith("303"))
+        self.assertEqual(en_tetes["Location"], "/client/1?ok=fusion")
+        self.assertEqual(self.sql("SELECT fusionne_dans FROM clients WHERE id = 4"), [(1,)])
+        for cookie in (self.admin, self.soum):                                                                 # la fiche cachée redirige pour les deux rôles
+            statut, en_tetes, _ = self.req("GET", "/client/4", cookie=cookie)
+            self.assertTrue(statut.startswith("303"))
+            self.assertEqual(en_tetes["Location"], "/client/1")
+
     def test_soumission_pages_refusees(self):
         for chemin in ("/journee", "/journee.pdf", "/utilisateurs", "/tournee", "/suivi"):
             statut, _, corps = self.req("GET", chemin, cookie=self.soum)
@@ -583,8 +609,9 @@ class TestRefusParDefaut(unittest.TestCase):
                 self.assertTrue(re.match(motif, chemin), (motif, chemin))
                 premiere = next(mt for m, mt, _ in interface.ROUTES if m == methode and re.match(mt, chemin))
                 self.assertEqual(premiere, motif, f"{methode} {chemin} serait servi par une autre route")
-                photo_supprimee = "/photos/" in chemin and chemin.endswith("/supprimer")      # seule différence voulue
-                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee
+                photo_supprimee = "/photos/" in chemin and chemin.endswith("/supprimer")      # différence voulue
+                fusion = chemin.endswith("/fusionner")                                        # autre différence voulue : réservée à l'administrateur
+                attendu = _ancien_permis_soumission(chemin) and not photo_supprimee and not fusion
                 self.assertEqual(auth.permis("soumission", methode, chemin), attendu, f"{methode} {chemin}")
                 self.assertTrue(auth.permis("admin", methode, chemin), f"{methode} {chemin}")
                 verifies += 1
@@ -596,7 +623,8 @@ class TestRefusParDefaut(unittest.TestCase):
             for chemin in _chemins_exemples(motif):
                 if auth.permis("soumission", methode, chemin) != _ancien_permis_soumission(chemin):
                     differences.append(motif)
-        self.assertEqual(differences, [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2)
+        self.assertEqual(differences, [r"^/client/(\d+)/fusionner$"] * 2
+                         + [r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/supprimer$"] * 2)
 
     def test_chemin_inconnu_refuse_au_role_soumission(self):
         for chemin in ("/nouvelle-page", "/admin", "/client/3/exporter", "/chantier/3/photos/x.jpg/autre", "/data/sylvainculteur.db", "/chantiers/"):

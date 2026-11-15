@@ -314,7 +314,8 @@ RESERVE_ADMIN = (
     ("POST", r"^/action/terminer$"), ("POST", r"^/action/annuler$"), ("POST", r"^/action/rouvrir$"), ("POST", r"^/action/retirer$"),
     ("POST", r"^/action/deplacer$"),
     # suppressions et finances
-    ("POST", r"^/client/(\d+)/supprimer$"), ("POST", r"^/soumission/(\d+)/supprimer$"), ("POST", r"^/chantier/(\d+)/supprimer$"),
+    ("POST", r"^/client/(\d+)/supprimer$"), ("GET", r"^/client/(\d+)/fusionner$"), ("POST", r"^/client/(\d+)/fusionner$"),
+    ("POST", r"^/soumission/(\d+)/supprimer$"), ("POST", r"^/chantier/(\d+)/supprimer$"),
     ("POST", r"^/chantier/(\d+)/paiement$"), ("POST", r"^/paiement/(\d+)/supprimer$"), ("GET", r"^/facture/(\d+)/pdf$"),
     # archives
     ("GET", r"^/archives\.csv$"), ("GET", r"^/archives$"),

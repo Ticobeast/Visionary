@@ -143,7 +143,7 @@ def page_nouveau(conn, query):
     trouves = ""
     if q:
         mots = cle(q).split()
-        lignes = [r for r in conn.execute("SELECT id, prenom, nom, entreprise, adresse, ville, telephone FROM clients WHERE remplace_par IS NULL ORDER BY nom")
+        lignes = [r for r in conn.execute("SELECT id, prenom, nom, entreprise, adresse, ville, telephone FROM clients WHERE remplace_par IS NULL AND fusionne_dans IS NULL ORDER BY nom")
                   if all(m in cle(" ".join(str(x) for x in r[1:] if x)) for m in mots)][:10]
         def libelle(r):
             nom = " ".join(x for x in r[1:4] if x) or "(client à identifier)"

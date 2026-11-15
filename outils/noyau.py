@@ -18,9 +18,9 @@ SCHEMA = RACINE / "schema" / "schema.sql"
 MIGRATION_8_9 = RACINE / "schema" / "migration_v8_v9.sql"     # ajout des comptes
 MIGRATION_9_10 = RACINE / "schema" / "migration_v9_v10.sql"   # tables figées créées par l'étape 9 -> 10 (clients assouplis, raccourcis)
 # Migrations conservées parce que des données réelles peuvent exister : 8 -> 9 (comptes), 9 -> 10 (soumissions), 10 -> 11 (en attente),
-# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client) ; les cinq dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
+# 11 -> 12 (numéros jamais réutilisés), 12 -> 13 (date de la facture), 13 -> 14 (nouvelle adresse d'un client), 14 -> 15 (fusion de deux fiches) ; les six dernières s'enchaînent en une seule transaction (voir _migrer_vers_courant).
 DB_DEFAUT = RACINE / "data" / "sylvainculteur.db"
-VERSION_SCHEMA = 14
+VERSION_SCHEMA = 15
 SERVICES_NUAGE = ("onedrive", "dropbox", "google drive", "googledrive", "icloud", "box sync")
 
 
@@ -403,14 +403,14 @@ def ouvrir_base(db_path, en_memoire_si_absente=False):
         conn.execute("PRAGMA foreign_keys = ON")
     else:
         version = conn.execute("PRAGMA user_version").fetchone()[0]
-        if version in (8, 9, 10, 11, 12, 13):                     # migrations automatiques, précédées d'une copie de sécurité
+        if version in (8, 9, 10, 11, 12, 13, 14):                   # migrations automatiques, précédées d'une copie de sécurité
             try:
                 sauvegarder(db_path, f"avant_migration_v{version}")
                 if version == 8:                            # v8 -> v9 : seulement deux nouvelles tables, rien n'est modifié
                     conn.executescript(MIGRATION_8_9.read_text(encoding="utf-8"))
                     conn.execute("PRAGMA foreign_keys = ON")
                     version = 9
-                if version in (9, 10, 11, 12, 13):          # v9 -> v10 -> ... -> v14 : en UNE transaction, tout ou rien
+                if version in (9, 10, 11, 12, 13, 14):      # v9 -> v10 -> ... -> v15 : en UNE transaction, tout ou rien
                     _migrer_vers_courant(conn, version)
                     version = VERSION_SCHEMA
             except BaseException:
@@ -532,15 +532,16 @@ def _etapes_12_13(conn):
     _reconstruire_tables(conn, ("chantiers",))
 
 
-def _etapes_13_14(conn):
-    """Format v13 -> v14 : `clients.remplace_par` (fiche à l'ancienne adresse -> fiche à la nouvelle adresse), vide partout au départ.
+def _etapes_14_15(conn):
+    """Format v14 -> v15 : `clients.fusionne_dans` (fiche en double -> fiche gardée), vide partout au départ. Cette étape sert aussi
+    de v13 -> v14 (`clients.remplace_par`) : schema.sql contient les deux colonnes, donc UNE seule reconstruction de `clients` suffit.
     `clients` est reconstruite (et non ALTER TABLE ADD COLUMN, qui ne pose pas toutes les règles) pour que sa définition soit identique
     à celle d'une base neuve ; ses lignes, ses numéros et son compteur de numéros sont conservés."""
     _reconstruire_tables(conn, ("clients",))
 
 
 def _migrer_vers_courant(conn, version):
-    """Formats v9 à v13 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
+    """Formats v9 à v14 -> format courant, en UNE seule transaction (tout ou rien). Les déclencheurs et la vue sont supprimés au
     début puis recréés à la fin, tels que dans schema.sql : la base migrée est identique à une base neuve (un test le vérifie)."""
     definitions = _definitions_du_schema()
     conn.execute("PRAGMA foreign_keys = OFF")                           # sans effet à l'intérieur d'une transaction : à faire avant
@@ -554,11 +555,11 @@ def _migrer_vers_courant(conn, version):
         if version in (9, 10):
             _etapes_10_11(conn)
         if version in (9, 10, 11):
-            _etapes_11_12(conn)         # reconstruit déjà `clients` et `chantiers` d'après le schéma courant (facture_le, remplace_par)
+            _etapes_11_12(conn)         # reconstruit déjà `clients` et `chantiers` d'après le schéma courant (facture_le, remplace_par, fusionne_dans)
         else:
             if version == 12:
                 _etapes_12_13(conn)
-            _etapes_13_14(conn)
+            _etapes_14_15(conn)         # v12, v13 et v14 : `clients` reconstruite une seule fois
         for genre, nom, _, sql in definitions:
             if genre in ("TRIGGER", "VIEW"):
                 conn.execute(sql)
@@ -617,7 +618,7 @@ class Index:
         self.par_telephone = {}  # téléphone -> id
         for ligne in conn.execute(
                 "SELECT id, prenom, nom, entreprise, telephone, telephone_2, adresse, ville FROM clients"
-                " WHERE remplace_par IS NULL"):         # une fiche à l'ancienne adresse n'est jamais proposée ni réutilisée
+                " WHERE remplace_par IS NULL AND fusionne_dans IS NULL"):     # une ancienne adresse ou un doublon fusionné n'est jamais proposé ni réutilisé
             self.ajouter(*ligne)
 
     def ajouter(self, id_, prenom, nom, entreprise, tel, tel2, adresse, ville):
@@ -781,16 +782,84 @@ def mettre_a_jour_client(conn, client_id, v):
 
 
 def client_remplacant(conn, client_id):
-    """Fiche à utiliser pour une NOUVELLE soumission : si le client a déménagé, la fiche à la nouvelle adresse (on suit la chaîne,
-    avec une protection contre une boucle). Retourne client_id lui-même s'il n'a pas été remplacé."""
+    """Fiche à utiliser pour une NOUVELLE soumission : si le client a déménagé, la fiche à la nouvelle adresse ; si la fiche est un
+    doublon fusionné, la fiche gardée (on suit la chaîne, avec une protection contre une boucle). Retourne client_id lui-même
+    si la fiche n'a été ni remplacée ni fusionnée."""
     vus = {client_id}
     courant = client_id
     while True:
-        r = conn.execute("SELECT remplace_par FROM clients WHERE id = ?", (courant,)).fetchone()
+        r = conn.execute("SELECT COALESCE(fusionne_dans, remplace_par) FROM clients WHERE id = ?", (courant,)).fetchone()
         if r is None or r[0] is None or r[0] in vus:
             return courant
         courant = r[0]
         vus.add(courant)
+
+
+def fiche_gardee(conn, client_id):
+    """Fiche à ouvrir à la place d'un doublon fusionné : la fiche gardée. Retourne client_id lui-même si la fiche n'est pas fusionnée.
+    (Contrairement à client_remplacant, ne suit pas une nouvelle adresse : l'ancienne adresse d'un client reste consultable.)"""
+    r = conn.execute("SELECT fusionne_dans FROM clients WHERE id = ?", (client_id,)).fetchone()
+    return r[0] if r and r[0] is not None else client_id
+
+
+def doublons_fusionnes(conn, client_id):
+    """Numéros des fiches en double fusionnées dans cette fiche (cachées, avec leurs chantiers terminés)."""
+    return [r[0] for r in conn.execute("SELECT id FROM clients WHERE fusionne_dans = ? ORDER BY id", (client_id,))]
+
+
+MSG_FUSION_LIEN = ("Une autre fiche (n° {autre}) est liée à la fiche à cacher (n° {doublon}) : fusionne plutôt dans l'autre sens, "
+                   "ou règle d'abord l'autre fiche.")
+CHAMPS_FUSION = ("telephone", "telephone_2", "courriel", "code_postal", "notes_acces", "notes")
+
+
+def erreurs_fusion(conn, garde_id, doublon_id):
+    """Pourquoi la fusion est refusée (liste vide : elle est possible). Ne modifie rien."""
+    if garde_id == doublon_id:
+        return ["Choisis deux fiches différentes : une fiche ne peut pas être fusionnée avec elle-même."]
+    for i in (garde_id, doublon_id):
+        r = conn.execute("SELECT remplace_par, fusionne_dans FROM clients WHERE id = ?", (i,)).fetchone()
+        if r is None:
+            return [f"La fiche n° {i} n'existe pas."]
+        if r[1] is not None:
+            return [f"La fiche n° {i} est déjà fusionnée avec une autre : on ne peut plus la fusionner."]
+        if r[0] is not None:
+            return [f"La fiche n° {i} est une ancienne adresse du client : ouvre plutôt sa fiche à la nouvelle adresse."]
+    lie = conn.execute("SELECT id FROM clients WHERE remplace_par = ? OR fusionne_dans = ? ORDER BY id", (doublon_id, doublon_id)).fetchone()
+    if lie is not None:
+        return [MSG_FUSION_LIEN.format(autre=lie[0], doublon=doublon_id)]
+    return []
+
+
+def fusionner_clients(conn, garde_id, doublon_id):
+    """Deux fiches sont le même client : le doublon est fusionné dans la fiche gardée. S'il a des chantiers terminés (verrouillés par
+    la base, ils restent sur lui avec leurs factures), il n'est PAS supprimé : il est marqué `fusionne_dans = garde_id` et n'apparaît
+    plus nulle part. S'il n'en a aucun, il ne lui reste rien après le déplacement : il est simplement supprimé.
+    Ses fiches NON terminées (soumissions, chantiers à planifier, planifiés, en attente, refusés, annulés) passent à la fiche gardée.
+    Les champs vides de la fiche gardée sont complétés avec ceux du doublon ; son nom et son adresse ne changent jamais.
+    À appeler dans une transaction. Retourne la liste des erreurs (vide si la fusion est faite)."""
+    erreurs = erreurs_fusion(conn, garde_id, doublon_id)
+    if erreurs:
+        return erreurs
+    lire = f"SELECT {', '.join(CHAMPS_FUSION)} FROM clients WHERE id = ?"
+    g = dict(zip(CHAMPS_FUSION, conn.execute(lire, (garde_id,)).fetchone()))
+    d = dict(zip(CHAMPS_FUSION, conn.execute(lire, (doublon_id,)).fetchone()))
+    nouveau = dict(g)
+    for champ in CHAMPS_FUSION:
+        if not nouveau[champ] and d[champ]:
+            nouveau[champ] = d[champ]
+    if not g["telephone_2"] and g["telephone"] and d["telephone"] and d["telephone"] != g["telephone"]:
+        nouveau["telephone_2"] = d["telephone"]                        # deux numéros différents : le second est gardé, pas perdu
+    if nouveau["telephone_2"] and nouveau["telephone_2"] == nouveau["telephone"]:
+        nouveau["telephone_2"] = None
+    changes = {c: v for c, v in nouveau.items() if v != g[c]}
+    if changes:
+        conn.execute(f"UPDATE clients SET {', '.join(c + ' = ?' for c in changes)} WHERE id = ?", (*changes.values(), garde_id))
+    conn.execute("UPDATE chantiers SET client_id = ? WHERE client_id = ? AND statut <> 'termine'", (garde_id, doublon_id))
+    if conn.execute("SELECT 1 FROM chantiers WHERE client_id = ?", (doublon_id,)).fetchone() is None:
+        conn.execute("DELETE FROM clients WHERE id = ?", (doublon_id,))     # plus rien dessus (aucun chantier terminé) : inutile de le garder caché
+    else:
+        conn.execute("UPDATE clients SET fusionne_dans = ? WHERE id = ?", (garde_id, doublon_id))
+    return []
 
 
 def nouvelle_adresse_client(conn, client_id, valeurs):
@@ -803,6 +872,8 @@ def nouvelle_adresse_client(conn, client_id, valeurs):
     if ancien is None:
         return None, [f"Client #{client_id} introuvable."]
     prenom, nom, entreprise, tel, tel2, courriel, sms_ok, notes, adresse_ancienne, ville_ancienne, province, remplace_par = ancien
+    if conn.execute("SELECT fusionne_dans FROM clients WHERE id = ?", (client_id,)).fetchone()[0] is not None:
+        return None, ["Cette fiche a été fusionnée avec une autre : ouvre la fiche gardée pour changer l'adresse."]
     if remplace_par is not None:
         return None, ["Cette fiche est déjà une ancienne adresse : ouvre la fiche à la nouvelle adresse pour en faire une autre."]
     brut = {c: "" for c in COLONNES}
@@ -1155,6 +1226,7 @@ def dupliquer_chantier(conn, chantier_id, prix_ht=None, avec_taxes=None, duree=N
     if src is None:
         return None, [f"chantier #{chantier_id} introuvable"]
     client_id, desc, duree_src, prix_src, tps_src, tvq_src, modalite, nacelle, bois, format_bois = src
+    client_id = fiche_gardee(conn, client_id)       # un chantier terminé resté sur un doublon fusionné : la copie va à la fiche gardée
     L = Ligne({"prix_ht": prix_ht if prix_ht is not None else "", "duree_estimee_h": duree if duree is not None else ""})
     prix, h = L.montant("prix_ht"), L.duree("duree_estimee_h")
     if L.erreurs:
@@ -1413,9 +1485,11 @@ def renommer_secteur(conn, code, libelle):
 
 
 def supprimer_secteur(conn, code):
-    n = conn.execute("SELECT count(*) FROM clients WHERE secteur = ?", (code,)).fetchone()[0]
+    n = conn.execute("SELECT count(*) FROM clients WHERE secteur = ? AND fusionne_dans IS NULL", (code,)).fetchone()[0]
     if n:
         return [f"{n} client{'s' if n > 1 else ''} utilise{'nt' if n > 1 else ''} ce secteur : change d'abord leur secteur"]
+    if conn.execute("SELECT 1 FROM clients WHERE secteur = ? AND fusionne_dans IS NOT NULL", (code,)).fetchone():
+        return ["des fiches fusionnées (cachées, on ne les modifie plus) utilisent ce secteur : il ne peut pas être supprimé"]
     conn.execute("DELETE FROM secteurs WHERE code = ?", (code,))
     return []
 
@@ -1430,24 +1504,33 @@ def supprimer_chantier(conn, chantier_id):
     if conn.execute("SELECT 1 FROM paiements WHERE chantier_id = ?", (chantier_id,)).fetchone():
         return ["Impossible de supprimer : ce chantier a des paiements. Supprime-les d'abord."]
     conn.execute("DELETE FROM chantiers WHERE id = ?", (chantier_id,))
-    if not conn.execute("SELECT 1 FROM chantiers WHERE client_id = ?", (r[0],)).fetchone():
+    if (not conn.execute("SELECT 1 FROM chantiers WHERE client_id = ?", (r[0],)).fetchone()
+            and not doublons_fusionnes(conn, r[0])):            # une fiche gardée par une fusion n'est jamais supprimée
         conn.execute("DELETE FROM clients WHERE id = ?", (r[0],))
     return []
 
 
 def resume_suppression_client(conn, client_id):
-    """Ce qui disparaîtrait avec le client : (fiches, dont chantiers terminés, paiements)."""
-    n = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ?", (client_id,)).fetchone()[0]
-    termines = conn.execute("SELECT count(*) FROM chantiers WHERE client_id = ? AND statut = 'termine'", (client_id,)).fetchone()[0]
-    paiements = conn.execute("SELECT count(*) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id WHERE c.client_id = ?", (client_id,)).fetchone()[0]
+    """Ce qui disparaîtrait avec le client : (fiches, dont chantiers terminés, paiements). Les fiches des doublons fusionnés dans ce
+    client (leurs chantiers terminés sont restés sur eux) comptent aussi."""
+    fiches = "client_id IN (SELECT id FROM clients WHERE id = ? OR fusionne_dans = ?)"
+    n = conn.execute(f"SELECT count(*) FROM chantiers WHERE {fiches}", (client_id, client_id)).fetchone()[0]
+    termines = conn.execute(f"SELECT count(*) FROM chantiers WHERE statut = 'termine' AND {fiches}", (client_id, client_id)).fetchone()[0]
+    paiements = conn.execute(f"SELECT count(*) FROM paiements p JOIN chantiers c ON c.id = p.chantier_id WHERE c.{fiches}", (client_id, client_id)).fetchone()[0]
     return n, termines, paiements
 
 
 MSG_CLIENT_HISTORIQUE = "Ce client a des chantiers terminés ou des paiements : il fait partie de ton historique et ne peut pas être supprimé."
+MSG_CLIENT_FUSIONNE = "Cette fiche a été fusionnée dans une autre : elle fait partie de ton historique et ne peut pas être supprimée."
+MSG_CLIENT_GARDE = "Une fiche en double a été fusionnée dans celle-ci : elle fait partie de ton historique et ne peut pas être supprimée."
 
 
 def client_supprimable(conn, client_id):
-    """Vrai si le client n'a aucun chantier terminé et aucun paiement (sur n'importe laquelle de ses fiches)."""
+    """Vrai si le client n'a aucun chantier terminé et aucun paiement (sur n'importe laquelle de ses fiches), n'est pas un doublon
+    fusionné (fiche cachée) et n'a pas de doublon fusionné dedans."""
+    r = conn.execute("SELECT fusionne_dans FROM clients WHERE id = ?", (client_id,)).fetchone()
+    if (r is not None and r[0] is not None) or doublons_fusionnes(conn, client_id):
+        return False
     _, termines, paiements = resume_suppression_client(conn, client_id)
     return termines == 0 and paiements == 0
 
@@ -1459,6 +1542,10 @@ def supprimer_client(conn, client_id):
     """
     if conn.execute("SELECT 1 FROM clients WHERE id = ?", (client_id,)).fetchone() is None:
         return [f"client #{client_id} introuvable"]
+    if fiche_gardee(conn, client_id) != client_id:
+        return [MSG_CLIENT_FUSIONNE]
+    if doublons_fusionnes(conn, client_id):
+        return [MSG_CLIENT_GARDE]
     if not client_supprimable(conn, client_id):
         return [MSG_CLIENT_HISTORIQUE]
     ids = "SELECT id FROM chantiers WHERE client_id = ?"

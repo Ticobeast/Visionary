@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 
 from composants import retour_valide
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprimable, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
-                   client_remplacant, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
+                   client_remplacant, doublons_fusionnes, erreurs_fusion, fiche_gardee, fusionner_clients, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, champ_secteur, client_avance,
                  client_essentiel, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
@@ -30,12 +30,12 @@ def _nom_client(c):
 
 def _client(conn, client_id):
     r = conn.execute("SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.telephone_2, cl.courriel, cl.sms_ok, cl.adresse, cl.ville,"
-                     " cl.province, cl.code_postal, cl.notes_acces, cl.notes, cl.geocode_statut, s.libelle, cl.remplace_par FROM clients cl"
+                     " cl.province, cl.code_postal, cl.notes_acces, cl.notes, cl.geocode_statut, s.libelle, cl.remplace_par, cl.fusionne_dans FROM clients cl"
                      " LEFT JOIN secteurs s ON s.code = cl.secteur WHERE cl.id = ?", (client_id,)).fetchone()
     if r is None:
         return None
     cols = ["id", "prenom", "nom", "entreprise", "telephone", "telephone_2", "courriel", "sms_ok", "adresse", "ville",
-            "province", "code_postal", "notes_acces", "notes", "geocode_statut", "secteur", "remplace_par"]
+            "province", "code_postal", "notes_acces", "notes", "geocode_statut", "secteur", "remplace_par", "fusionne_dans"]
     c = dict(zip(cols, r))
     c["adresse_texte"], c["adresse_maps"] = adresses(c["adresse"], c["ville"], c["province"], c["code_postal"])
     return c
@@ -53,19 +53,27 @@ def _introuvable():
 # ---------------------------------------------------------------------------
 # Liste et fiche
 # ---------------------------------------------------------------------------
+def _clients_trouves(conn, q="", secteur=""):
+    """Les fiches clients visibles (jamais un doublon fusionné, caché) qui correspondent à la recherche : tous les mots de `q` doivent
+    se retrouver dans le nom, le téléphone, l'adresse ou le secteur. Chaque ligne : id, prénom, nom, entreprise, téléphone, adresse, ville,
+    province, code postal, libellé du secteur, « ancienne adresse » (vrai/faux)."""
+    lignes = conn.execute(
+        "SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.adresse, cl.ville, cl.province, cl.code_postal, s.libelle,"
+        " cl.remplace_par IS NOT NULL FROM clients cl LEFT JOIN secteurs s ON s.code = cl.secteur WHERE cl.fusionne_dans IS NULL"
+        + (" AND cl.secteur = ?" if secteur else "") + " ORDER BY cl.nom, cl.entreprise, cl.prenom",
+        (secteur,) if secteur else ()).fetchall()
+    if q:
+        mots = cle(q).split()
+        lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in (r[1:9] + (r[9],)) if x)) for m in mots)]
+    return lignes
+
+
 def page_clients(conn, query):
     """Liste épurée : Nom, Téléphone, Adresse (ni nombre de chantiers, ni montants : ils sont dans la fiche du client).
     On peut la filtrer par secteur (liste fermée : jamais de doublon d'écriture)."""
     q = query.get("q", "").strip()
     secteur = query.get("secteur", "")
-    lignes = conn.execute(
-        "SELECT cl.id, cl.prenom, cl.nom, cl.entreprise, cl.telephone, cl.adresse, cl.ville, cl.province, cl.code_postal, s.libelle,"
-        " cl.remplace_par IS NOT NULL FROM clients cl LEFT JOIN secteurs s ON s.code = cl.secteur"
-        + (" WHERE cl.secteur = ?" if secteur else "") + " ORDER BY cl.nom, cl.entreprise, cl.prenom",
-        (secteur,) if secteur else ()).fetchall()
-    if q:
-        mots = cle(q).split()
-        lignes = [r for r in lignes if all(m in cle(" ".join(str(x) for x in (r[1:9] + (r[9],)) if x)) for m in mots)]
+    lignes = _clients_trouves(conn, q, secteur)
     corps = ""
     for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, libelle_secteur, ancienne in lignes[:300]:
         maps = adresses(adresse, ville, prov, cp)[1]
@@ -86,9 +94,12 @@ def page_client(conn, client_id, query):
     c = _client(conn, client_id)
     if c is None:
         return _introuvable()
+    if c["fusionne_dans"]:                         # doublon fusionné : caché, on ouvre la fiche gardée
+        return redirection(f"/client/{c['fusionne_dans']}" + (f"?{urlencode(query)}" if query else ""))
     fiches = conn.execute(
         "SELECT chantier_id, attente_depuis, type_libelle, statut, archive, genre"
-        " FROM v_chantiers WHERE client_id = ? ORDER BY 2 DESC, chantier_id DESC", (client_id,)).fetchall()
+        " FROM v_chantiers WHERE client_id = ? OR client_id IN (SELECT id FROM clients WHERE fusionne_dans = ?)"       # + chantiers terminés restés sur un doublon fusionné
+        " ORDER BY 2 DESC, chantier_id DESC", (client_id, client_id)).fetchall()
     lignes = "".join(
         f'<tr><td class="c-date"><a href="{url_fiche(i, g)}">{esc(d) or "sans date"}</a></td><td class="c-travaux">{esc(t) or "<span class=doux>à préciser</span>"}</td>'
         f'<td class="c-statut">{badge_statut(st, g)}{" <span class=doux>archivé</span>" if arch and g == "chantier" else ""}</td></tr>'
@@ -135,7 +146,11 @@ def page_client(conn, client_id, query):
                        + (f" : {esc(detail)}" if detail else "") + ". Définitif.</p>"
                        f'<form method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
                        '<button class="danger" type="submit">Supprimer le client</button></form></div>')
-    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}', query.get("ok"), query.get("err"))
+    fusion = ""
+    if est_admin() and not c["remplace_par"]:       # réservé à l'administrateur et à l'ordinateur (classe pc-seul) ; pas sur une ancienne adresse
+        fusion = (f'<div class="barre pc-seul" style="margin-top:16px"><a class="bouton secondaire" href="/client/{client_id}/fusionner">'
+                  'Fusionner avec un autre client</a></div>')
+    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}{fusion}', query.get("ok"), query.get("err"))
 
 
 # ---------------------------------------------------------------------------
@@ -294,9 +309,129 @@ def nouvelle_adresse_creer(conn, client_id, form):
     return redirection(f"/client/{nouveau}?ok=nouvelle_adresse")
 
 
+# ---------------------------------------------------------------------------
+# Fusion : deux fiches sont le même client. La fiche d'où l'on part est GARDÉE ; l'autre est cachée (jamais supprimée).
+# ---------------------------------------------------------------------------
+def _vers_gardee(conn, client_id, suite="", query=None):
+    """Une fiche cachée (doublon fusionné) ne s'ouvre ni ne se modifie : on va à la même page de la fiche gardée.
+    Retourne une redirection, ou None si la fiche n'est pas fusionnée."""
+    gardee = fiche_gardee(conn, client_id)
+    if gardee == client_id:
+        return None
+    return redirection(f"/client/{gardee}{suite}" + (f"?{urlencode(query)}" if query else ""))
+
+
+def _ligne(libelle, contenu_html):
+    return f'<p style="margin:6px 0 0"><b>{libelle} :</b> {contenu_html}</p>'
+
+
+def _nombres(conn, client_id):
+    """(soumissions, chantiers) de la fiche, avec ceux des doublons déjà fusionnés dedans."""
+    genres = dict(conn.execute("SELECT genre, count(*) FROM v_chantiers WHERE client_id = ? OR client_id IN"
+                               " (SELECT id FROM clients WHERE fusionne_dans = ?) GROUP BY genre", (client_id, client_id)))
+    return genres.get("soumission", 0), genres.get("chantier", 0)
+
+
+def _carte_fusion(conn, c, etiquette):
+    s, ch = _nombres(conn, c["id"])
+    return (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(_nom_client(c))}</h2><span class="badge">{etiquette}</span></div>'
+            + _ligne("Adresse", esc(c["adresse_texte"]) if c["adresse"] else "—")
+            + _ligne("Téléphone", " · ".join(lien_tel(t) for t in (c["telephone"], c["telephone_2"]) if t) or "—")
+            + _ligne("Courriel", esc(c["courriel"]) if c["courriel"] else "—")
+            + _ligne("Soumissions", str(s)) + _ligne("Chantiers", str(ch)) + "</div>")
+
+
+def _erreurs_html(erreurs):
+    return ('<div class="erreurs"><strong>À corriger :</strong><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>") if erreurs else ""
+
+
+def _ressemblantes(conn, c):
+    """Fiches qui ont le même téléphone ou le même nom de famille que `c` (jamais elle-même, un doublon fusionné ou une ancienne adresse)."""
+    tels = {t for t in (c["telephone"], c["telephone_2"]) if t}
+    nom = cle(c["nom"])
+    resultat = []
+    for r in conn.execute("SELECT id, nom, telephone, telephone_2 FROM clients WHERE id <> ? AND fusionne_dans IS NULL AND remplace_par IS NULL ORDER BY nom, id",
+                          (c["id"],)):
+        if (tels & {r[2], r[3]}) or (nom and cle(r[1]) == nom):
+            resultat.append(r[0])
+    return resultat
+
+
+def page_fusionner(conn, client_id, query=None, erreurs=()):
+    query = query or {}
+    c = _client(conn, client_id)
+    if c is None:
+        return _introuvable()
+    cachee = _vers_gardee(conn, client_id, "/fusionner")
+    if cachee:
+        return cachee
+    if c["remplace_par"]:
+        return redirection(f"/client/{client_id}?" + urlencode({"err": "Cette fiche est une ancienne adresse : ouvre sa fiche à la nouvelle adresse pour la fusionner."}))
+    avec = query.get("avec", "")
+    if avec.isdigit():
+        autre = _client(conn, int(avec))
+        problemes = erreurs_fusion(conn, client_id, int(avec)) if autre is not None else [f"La fiche n° {avec} n'existe pas."]
+        if not problemes:
+            inverse = ""
+            if not erreurs_fusion(conn, int(avec), client_id):
+                inverse = f'<p><a href="/client/{avec}/fusionner?avec={client_id}">Garder plutôt l\'autre fiche</a></p>'
+            return gabarit("Fusionner deux fiches",
+                           f'<h1>Fusionner deux fiches</h1><p>Tout l\'historique sera visible sur la fiche gardée. Les factures déjà faites ne changent pas.</p>'
+                           f'{_erreurs_html(erreurs)}<div class="grille">{_carte_fusion(conn, c, "Fiche gardée")}{_carte_fusion(conn, autre, "Sera cachée")}</div>'
+                           f'<form method="post" action="/client/{client_id}/fusionner"><input type="hidden" name="avec" value="{esc(avec)}">'
+                           f'<div class="barre"><button type="submit">Fusionner</button>'
+                           f'<a class="bouton secondaire annuler" href="/client/{client_id}">Annuler</a></div></form>{inverse}')
+        erreurs = list(erreurs) + problemes
+    q = query.get("q", "").strip()
+    if q:
+        trouvees = [r for r in _clients_trouves(conn, q) if r[0] != client_id and not r[10]][:20]
+        titre = "Résultats"
+    else:
+        ids = set(_ressemblantes(conn, c))
+        trouvees = [r for r in _clients_trouves(conn) if r[0] in ids][:20]
+        titre = "Fiches qui se ressemblent (même téléphone ou même nom de famille)"
+    cartes = ""
+    for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, _libelle, _ancienne in trouvees:
+        tel = f"{tel[2:5]}-{tel[5:8]}-{tel[8:]}" if tel and len(tel) == 12 else tel
+        cartes += (f'<div class="carte"><div class="barre"><b>{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</b>'
+                   f'<a class="bouton secondaire" href="/client/{client_id}/fusionner?avec={cid}">Choisir cette fiche</a></div>'
+                   f'<p class="doux" style="margin:6px 0 0">{esc(" · ".join(x for x in (tel, adresse, ville) if x)) or "—"}</p></div>')
+    if not cartes:
+        cartes = '<div class="carte doux">Aucune fiche trouvée.</div>' if q else '<div class="carte doux">Aucune fiche ne ressemble à celle-ci : cherche par nom, téléphone ou adresse.</div>'
+    recherche = (f'<form class="recherche" method="get" action="/client/{client_id}/fusionner"><input type="search" name="q" value="{esc(q)}" '
+                 f'placeholder="Chercher l\'autre fiche : nom, téléphone, adresse…"><button type="submit">Chercher</button></form>')
+    return gabarit("Fusionner deux fiches",
+                   f'<h1>Fusionner avec un autre client</h1><p class="doux">Cette fiche (<b>{esc(_nom_client(c))}</b>) sera gardée. '
+                   f'Choisis l\'autre fiche : elle sera cachée et son historique ira ici.</p>'
+                   f'{_erreurs_html(erreurs)}{recherche}<h2>{titre}</h2>{cartes}'
+                   f'<div class="barre"><a class="bouton secondaire annuler" href="/client/{client_id}">Annuler</a></div>')
+
+
+def client_fusionner(conn, client_id, form):
+    if _client(conn, client_id) is None:
+        return _introuvable()
+    cachee = _vers_gardee(conn, client_id, "/fusionner")
+    if cachee:
+        return cachee
+    avec = (form.get("avec") or "").strip()
+    if not avec.isdigit():
+        return page_fusionner(conn, client_id, {}, ["Choisis d'abord l'autre fiche."])
+    try:
+        with transaction(conn):
+            erreurs = fusionner_clients(conn, client_id, int(avec))
+    except sqlite3.IntegrityError as e:
+        erreurs = [f"Refusé par la base : {e}"]
+    if erreurs:
+        return page_fusionner(conn, client_id, {}, erreurs)
+    return redirection(f"/client/{client_id}?ok=fusion")
+
+
 def client_supprimer(conn, client_id):
     if _client(conn, client_id) is None:
         return _introuvable()
+    cachee = _vers_gardee(conn, client_id)
+    if cachee:
+        return cachee
     try:
         with transaction(conn):
             erreurs = supprimer_client_noyau(conn, client_id)
@@ -310,11 +445,13 @@ def client_supprimer(conn, client_id):
 ROUTES_CLIENTS = [
     ("GET", r"^/clients$", lambda c, q, f, *g: page_clients(c, q)),
     ("GET", r"^/client/(\d+)$", lambda c, q, f, i: page_client(c, int(i), q)),
-    ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: page_client_modifier(c, int(i), q)),
-    ("POST", r"^/client/(\d+)/modifier$", lambda c, q, f, i: client_modifier(c, int(i), f)),
+    ("GET", r"^/client/(\d+)/modifier$", lambda c, q, f, i: _vers_gardee(c, int(i), "/modifier", q) or page_client_modifier(c, int(i), q)),
+    ("POST", r"^/client/(\d+)/modifier$", lambda c, q, f, i: _vers_gardee(c, int(i), "/modifier") or client_modifier(c, int(i), f)),
     ("POST", r"^/client/(\d+)/supprimer$", lambda c, q, f, i: client_supprimer(c, int(i))),
-    ("GET", r"^/client/(\d+)/nouvelle-adresse$", lambda c, q, f, i: page_nouvelle_adresse(c, int(i))),
-    ("POST", r"^/client/(\d+)/nouvelle-adresse$", lambda c, q, f, i: nouvelle_adresse_creer(c, int(i), f)),
+    ("GET", r"^/client/(\d+)/nouvelle-adresse$", lambda c, q, f, i: _vers_gardee(c, int(i), "/nouvelle-adresse") or page_nouvelle_adresse(c, int(i))),
+    ("POST", r"^/client/(\d+)/nouvelle-adresse$", lambda c, q, f, i: _vers_gardee(c, int(i), "/nouvelle-adresse") or nouvelle_adresse_creer(c, int(i), f)),
+    ("GET", r"^/client/(\d+)/fusionner$", lambda c, q, f, i: page_fusionner(c, int(i), q)),
+    ("POST", r"^/client/(\d+)/fusionner$", lambda c, q, f, i: client_fusionner(c, int(i), f)),
     ("GET", r"^/client/(\d+)/soumission/nouveau$", lambda c, q, f, i: page_soumission_nouvelle(c, int(i))),
     ("POST", r"^/client/(\d+)/soumission/nouveau$", lambda c, q, f, i: soumission_creer(c, int(i), f)),
     ("GET", r"^/client/(\d+)/chantier/nouveau$", lambda c, q, f, i: redirection(f"/client/{i}/soumission/nouveau")),      # ancien lien
