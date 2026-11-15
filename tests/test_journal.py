@@ -224,7 +224,7 @@ class TestPage(BaseJournal):
 
     def test_bouton_journal_sur_la_page_utilisateurs_pour_l_ordinateur_seulement(self):
         page = self.req("GET", "/utilisateurs", cookie=self.admin)[2]
-        self.assertIn('<div class="barre pc-seul"><a class="bouton secondaire" href="/journal">Journal des modifications</a></div>', page)
+        self.assertIn('<div class="barre pc-seul" style="margin-bottom:16px"><a class="bouton secondaire" href="/journal">Journal des modifications</a></div>', page)
         self.assertLess(page.index("<h1>Utilisateurs</h1>"), page.index('href="/journal"'))
         self.assertEqual(page.count('href="/journal"'), 1)
         self.assertEqual(self.req("GET", "/utilisateurs", cookie=self.soum)[0][:3], "403")        # le compte soumission n'a ni la page ni le bouton
