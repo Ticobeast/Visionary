@@ -778,8 +778,9 @@ class TestMigrations(unittest.TestCase):
             self.assertEqual(c.execute("SELECT count(*) FROM clients").fetchone()[0], 3 if version >= 11 else 2)
             self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('chantiers') WHERE name = 'reprise_le'").fetchone()[0], 1 if version >= 11 else 0)
             self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('chantiers') WHERE name = 'facture_le'").fetchone()[0], 1 if version >= 13 else 0)
-            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('clients') WHERE name = 'remplace_par'").fetchone()[0], 1 if version == 14 else 0)
-            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('clients') WHERE name = 'fusionne_dans'").fetchone()[0], 0)
+            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('clients') WHERE name = 'remplace_par'").fetchone()[0], 1 if version >= 14 else 0)
+            self.assertEqual(c.execute("SELECT count(*) FROM pragma_table_info('clients') WHERE name = 'fusionne_dans'").fetchone()[0], 1 if version == 15 else 0)
+            self.assertEqual(c.execute("SELECT count(*) FROM sqlite_master WHERE name = 'journal'").fetchone()[0], 0)                                  # rien créé
             self.assertEqual(c.execute("SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_sequence'").fetchone()[0], 1 if version >= 12 else 0)       # rien reconstruit
             self.assertEqual(c.execute("SELECT count(*) FROM sqlite_master WHERE type = 'trigger'").fetchone()[0], 7)
             self.assertIsNotNone(c.execute("SELECT 1 FROM sqlite_master WHERE name = 'v_chantiers'").fetchone())
