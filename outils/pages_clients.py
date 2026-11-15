@@ -336,7 +336,7 @@ def _carte_fusion(conn, c, etiquette):
     s, ch = _nombres(conn, c["id"])
     return (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(_nom_client(c))}</h2><span class="badge">{etiquette}</span></div>'
             + _ligne("Adresse", esc(c["adresse_texte"]) if c["adresse"] else "—")
-            + _ligne("Téléphone", " · ".join(esc(t) for t in (c["telephone"], c["telephone_2"]) if t) or "—")
+            + _ligne("Téléphone", " · ".join(lien_tel(t) for t in (c["telephone"], c["telephone_2"]) if t) or "—")
             + _ligne("Courriel", esc(c["courriel"]) if c["courriel"] else "—")
             + _ligne("Soumissions", str(s)) + _ligne("Chantiers", str(ch)) + "</div>")
 
@@ -392,6 +392,7 @@ def page_fusionner(conn, client_id, query=None, erreurs=()):
         titre = "Fiches qui se ressemblent (même téléphone ou même nom de famille)"
     cartes = ""
     for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, _libelle, _ancienne in trouvees:
+        tel = f"{tel[2:5]}-{tel[5:8]}-{tel[8:]}" if tel and len(tel) == 12 else tel
         cartes += (f'<div class="carte"><div class="barre"><b>{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</b>'
                    f'<a class="bouton secondaire" href="/client/{client_id}/fusionner?avec={cid}">Choisir cette fiche</a></div>'
                    f'<p class="doux" style="margin:6px 0 0">{esc(" · ".join(x for x in (tel, adresse, ville) if x)) or "—"}</p></div>')
