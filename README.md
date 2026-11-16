@@ -48,6 +48,7 @@ outils/pages_soumissions.py             onglet Soumissions : liste, boutons Acce
 outils/pages_attente.py                 « Mettre en attente » (date de reprise ou à nouvel ordre) et « Sortir de l'attente »
 outils/archives.py                      onglet Archives : recherche, relance par client, statistiques, export CSV (administrateur)
 outils/journal.py                       journal des modifications (qui a fait quoi et quand) : libellés, écriture, page /journal (administrateur, ordinateur)
+outils/messages.py                      textos et courriels préremplis au client : suivi de soumission, rappel de la visite, rappel de paiement
 outils/raccourcis.py                    pastilles de raccourcis en haut de Chantiers et Soumissions (chaque compte garde les siennes)
 outils/listes.py                        sélections des listes Chantiers et Soumissions (filtres, recherche, délais)
 outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)

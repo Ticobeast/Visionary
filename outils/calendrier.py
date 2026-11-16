@@ -14,6 +14,7 @@ from composants import (JOURNEE_H, JOURS, MOIS, bouton_terminer, cellule_adresse
                         lignes_vue)
 from noyau import DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, calculer_horaire, heure_texte, ids_de_la_journee
 from vue import argent, argent_entier, esc, gabarit, heures
+import messages
 
 
 def _jour_valide(texte):
@@ -29,6 +30,18 @@ def _mois_valide(texte):
         return datetime.date(annee, mois, 1)
     except ValueError:
         return None
+
+
+def _texto_rappel(conn, l):
+    """Téléphone : petite bulle à côté de Terminer, qui ouvre Messages avec le rappel de la visite déjà écrit
+    (la veille, on fait le tour de la journée du lendemain). Rien si le client refuse les textos ou n'a pas de téléphone."""
+    if l["statut"] != "planifie":
+        return ""
+    m = messages.message(conn, l["chantier_id"])
+    if m is None or m["sorte"] != "rappel" or not m["texto_ok"]:
+        return ""
+    return (f'<a class="bouton secondaire texto-jour" href="{esc(messages.url_texto(m["telephone"], m["texte"]))}" '
+            f'aria-label="Texto de rappel au client" title="Texto de rappel au client"></a>')
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +112,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
         if not gestion:
             # tableau de bord : le chantier, puis en bas son bouton Terminer (rien d'autre)
             corps += (f'<tr class="sans-bas">{base}<td class="c-montant">{cellule_montant(l)}</td></tr>'
-                      f'<tr class="ligne-actions"><td colspan="{colonnes}">{bouton_terminer(l, retour)}</td></tr>')
+                      f'<tr class="ligne-actions"><td colspan="{colonnes}">{bouton_terminer(l, retour, _texto_rappel(conn, l))}</td></tr>')
             continue
         actions = bouton_terminer(l, retour)
         if l["statut"] == "planifie":

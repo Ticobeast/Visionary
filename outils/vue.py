@@ -216,7 +216,8 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .connexion .logotype{display:block;font-size:1.6rem;margin-bottom:16px}.connexion img{height:54px;margin-bottom:12px}.connexion h1{font-size:1.7rem;margin:0 0 16px}
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
-.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.note-heures,.resume-jour,.total-jour{display:none}
+.barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.texto-jour,.note-heures,.resume-jour,.total-jour{display:none}
+.message-client .sorte-message{margin:0 0 6px}.message-client .apercu-message{margin:0 0 12px;padding:10px 14px;background:var(--fond);border:1px solid var(--trait-leger);border-radius:12px;color:var(--doux);white-space:pre-line}
 .carte-jour{position:relative}.carte-jour h2{padding-right:48px}
 .info-btn{--loupe:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E");position:absolute;top:12px;right:14px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;box-shadow:none;cursor:pointer}
 .info-btn,.info-btn:hover,.info-btn:focus{background:#fff var(--loupe) center/18px no-repeat}.info-btn:hover{background-color:var(--vert-doux);border-color:var(--vert-bord)}
