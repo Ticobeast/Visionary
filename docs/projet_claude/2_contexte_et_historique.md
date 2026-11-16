@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 686 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 705 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -28,6 +28,10 @@ Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), br
   Reprises dans le PDF de la journée. Rien dans la base.
 - **Raccourcis** : pastilles personnalisables en haut de Chantiers et Soumissions ; bulle « Modifier » au bout de la rangée.
 - **Archives** : historique, recherche, statistiques, regroupement par client (qui relancer), export Excel (PC seulement).
+- **Messages au client** (étape 3 de la revue) : carte « Message au client » sur la fiche ; boutons Texto et Courriel qui
+  ouvrent l'application du téléphone avec le texte déjà écrit (suivi de soumission, rappel de la visite avec le jour et
+  avant-midi / après-midi, rappel de paiement pour l'administrateur). Bulle de texto à côté de Terminer dans le tableau de
+  bord (téléphone). Respecte « Rappels par texto acceptés ». Rien ne part tout seul.
 - **Comptes** : administrateur et « soumission » (pas de finances, pas de Journée). Mots de passe hachés, blocage après
   5 essais. Sans compte, l'accès à distance reste fermé.
 - **Annuler / Fermer** ramènent toujours à la page d'où l'on vient.
@@ -63,5 +67,10 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
 - PDF dans l'app de l'écran d'accueil : la petite flèche « Télécharger » n'a pas été testée sur iPhone ; au besoin, ouvrir
   dans Safari. Le vrai bouton « Partager » d'iOS demanderait un accès HTTPS (possible avec Tailscale ; chantier à part).
 - À vérifier sur un vrai iPhone : « Prendre une photo », largeur des champs de date.
-- Pas encore là : rôle chef d'équipe (Journée et Terminer sur téléphone), équipes séparées, itinéraires.
+- Pas encore là : rôle chef d'équipe, équipes séparées, itinéraires.
+- **Chefs d'équipe (précisé en novembre 2026)** : 2 pour l'instant, peut-être plus un jour. Ils VOIENT LES PRIX et
+  PEUVENT ENREGISTRER LES PAIEMENTS (donc aussi le rappel de paiement par texto). À préciser au moment de créer le rôle :
+  ce qui leur reste interdit (probablement : comptes, journal, suppressions, Archives et export).
+- Feuille de route de la revue : étapes 1 et 2 faites ; étape 3 commencée (12. textos et courriels faits ;
+  restent 13. itinéraire Google Maps, 14. feuille de style en cache, 15. HTTPS par Tailscale Serve).
 - Numéros de TPS et TVQ à inscrire dans outils/entreprise.py quand ils existeront.

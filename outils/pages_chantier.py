@@ -19,6 +19,7 @@ from urllib.parse import quote, urlencode
 
 from composants import liens_pdf, lien_telecharger
 from photos import bloc as bloc_photos
+import messages
 from documents import facture_possible
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_AVEC_BOIS, VERROU, _txt, alias_types_travaux, appliquer_secteur, cle,
                    dupliquer_chantier, empreinte, encaisser, libelles_manques, lire_ligne, lister_secteurs, manques_pour_accepter,
@@ -362,6 +363,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         bandeau = ('<div class="verrou-termine">Chantier <b>annulé</b> : il est dans les archives. Il disparaît des journées ; '
                    'tu peux le rouvrir si l\'annulation était une erreur.</div>')
     corps = carte_client_lecture(conn, client_id, f"{base}/{chantier_id}")
+    corps += messages.carte(conn, chantier_id, finances=est_admin())      # texto / courriel prérempli (rappel, suivi, paiement)
     paiements = "" if (soumission or not est_admin()) else _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement)   # finances : administrateur seulement
     autres = _autres_chantiers(conn, client_id, chantier_id)
     ce = "cette soumission" if soumission else "ce chantier"

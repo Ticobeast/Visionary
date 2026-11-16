@@ -117,12 +117,13 @@ def lien_telecharger(chantier_id, document="soumission"):
             f'aria-label="Télécharger {"la facture" if document == "facture" else "la soumission"}" title="Télécharger le PDF"></a>')
 
 
-def bouton_terminer(l, retour):
+def bouton_terminer(l, retour, extra=""):
     """« Terminer » sur un chantier planifié : ouvre une fenêtre de confirmation (avec « payé ou pas »).
-    À côté, le raccourci « Facture » (PDF) : sur place, on remet la facture avant ou après avoir confirmé."""
+    À côté, le raccourci « Facture » (PDF) : sur place, on remet la facture avant ou après avoir confirmé.
+    `extra` : bouton ajouté au groupe d'un chantier planifié (ex. le texto de rappel, sur téléphone)."""
     if l["statut"] == "planifie":
         return (f'<span class="groupe-actions"><a class="bouton" href="{esc(avec_params(retour, terminer=l["chantier_id"], ok=None, err=None))}">Terminer</a>'
-                + lien_facture(l["chantier_id"], classe="facture-pc") + "</span>")
+                + lien_facture(l["chantier_id"], classe="facture-pc") + extra + "</span>")
     if l["statut"] == "termine":
         return '<span class="groupe-actions"><span class="doux">Terminé</span>' + lien_facture(l["chantier_id"], classe="facture-pc") + "</span>"
     return ""
