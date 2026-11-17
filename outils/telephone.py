@@ -315,6 +315,8 @@ table.gerer td:nth-child(2) b{font-size:1rem}table.gerer td:nth-child(2) .doux{f
 body.menu-ouvert .menu-feuille{animation:monte .22s cubic-bezier(.2,.8,.2,1)}body.menu-ouvert .menu-fond{animation:fondu .2s ease-out}
 table.soumissions tbody tr:active,table.chantiers tbody tr:active,table.clients tbody tr:active,table.historique tbody tr:active{background:var(--vert-doux);outline:2px solid var(--vert);outline-offset:-2px}
 tr.touche{background:var(--vert-doux)}
+*{-webkit-tap-highlight-color:transparent}a:not(.bouton):active{opacity:.6}
+table.chantiers tbody tr,table.soumissions tbody tr,table.clients tbody tr,table.historique tbody tr,table.archive tbody tr{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .glisser-pret>[data-id]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .glisser-pret>[data-id].leve{box-shadow:0 18px 40px rgba(14,52,29,.3);border-radius:18px;background:#fff;scale:1.02}
 .carte.arrive{animation:monte .28s cubic-bezier(.2,.8,.2,1)}
