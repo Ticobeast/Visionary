@@ -261,6 +261,8 @@ table.soumissions tbody tr,table.chantiers tbody tr,table.clients tbody tr{trans
 .glisser-pret .poignee{display:inline-block;width:22px;height:22px;vertical-align:middle;opacity:.55;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230e341d'%3E%3Ccircle cx='9' cy='6' r='1.7'/%3E%3Ccircle cx='15' cy='6' r='1.7'/%3E%3Ccircle cx='9' cy='12' r='1.7'/%3E%3Ccircle cx='15' cy='12' r='1.7'/%3E%3Ccircle cx='9' cy='18' r='1.7'/%3E%3Ccircle cx='15' cy='18' r='1.7'/%3E%3C/svg%3E") center/20px no-repeat}
 body.glisse,body.glisse *{overflow-anchor:none}.glisser-pret>[data-id]{cursor:grab;position:relative}.glisser-pret>[data-id].leve{z-index:30;cursor:grabbing;outline:2px solid var(--vert);outline-offset:-1px;box-shadow:0 16px 36px rgba(14,52,29,.28)}
 @media (min-width:701px){.glisser-pret>tr.leve>td{background:#fff}}body.glisse{cursor:grabbing;user-select:none;-webkit-user-select:none}
+table.historique tbody tr{position:relative}table.historique td.c-date a::after{content:"";position:absolute;inset:0}
+tr.touche{outline:2px solid var(--vert);outline-offset:-2px}@media (hover:hover){table.historique tbody tr:hover{background:var(--vert-doux)}}
 @view-transition{navigation:auto}::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}@view-transition{navigation:none}}
 .no-fiche{font-weight:700;color:var(--doux);font-size:.9rem}
@@ -458,7 +460,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
             '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
-            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}{SCRIPT_GLISSER}</body></html>')
+            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}{SCRIPT_GLISSER}{SCRIPT_TOUCHE}</body></html>')
 
 
 # Changer de jour, de mois ou de filtre sur la même page : on reste à la même hauteur au lieu de remonter en haut.
@@ -535,6 +537,15 @@ c.addEventListener('click',function(e){if(vient){e.preventDefault();e.stopPropag
 # Un seul menu « ··· » ouvert à la fois ; un toucher ailleurs le ferme.
 SCRIPT_MENU = ('<script>document.addEventListener("click",function(e){document.querySelectorAll("details.menu-rapide[open]").forEach('
                'function(d){if(!d.contains(e.target))d.removeAttribute("open");});});</script>')
+
+# Une tuile de liste qu'on touche (n'importe où) garde un contour vert jusqu'à ce que la page suivante s'affiche : on voit que
+# le toucher a été pris. `touchstart` vide : sans lui, l'iPhone n'applique pas l'état « :active » aux tuiles.
+SCRIPT_TOUCHE = ('<script>document.addEventListener("touchstart",function(){},{passive:true});'
+                 'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a");if(!a||a.target)return;'
+                 'var t=a.closest("table.chantiers tbody tr,table.soumissions tbody tr,table.clients tbody tr,table.historique tbody tr");'
+                 'if(t&&!e.defaultPrevented)t.classList.add("touche");});'
+                 'window.addEventListener("pageshow",function(){Array.prototype.forEach.call(document.querySelectorAll("tr.touche"),'
+                 'function(t){t.classList.remove("touche");});});</script>')
 
 SCRIPT_RETOUR = (
     '<script>(function(){try{var s=JSON.parse(sessionStorage.getItem("pile")||"[]"),q=document.querySelectorAll("a.annuler"),'

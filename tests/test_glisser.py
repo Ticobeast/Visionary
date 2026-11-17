@@ -93,5 +93,22 @@ class TestOrdreDesRaccourcis(BaseTableau):
         self.assertEqual(self.ids_raccourcis(), avant)
 
 
+class TestRetourAuToucher(BaseTableau):
+    def test_tuile_surlignee_et_journee_animee(self):
+        """Une tuile touchée garde un contour vert ; sur téléphone, la journée choisie dans le calendrier monte en douceur."""
+        import telephone
+        self.assertIn('t.classList.add("touche")', vue.SCRIPT_TOUCHE)
+        self.assertIn("tr.touche{outline:2px solid var(--vert);outline-offset:-2px}", vue.CSS)
+        self.assertIn(".carte.arrive{animation:monte .28s", telephone.CSS_TELEPHONE)
+        _, page = self.get("/", {"date": DEMAIN})
+        self.assertIn('<div class="carte carte-jour arrive">', page)          # on vient de choisir un jour
+        vide = (AUJOURDHUI + datetime.timedelta(days=9)).isoformat()
+        _, page = self.get("/", {"date": vide})
+        self.assertIn('<div class="carte arrive"><h2>', page)                 # une journée vide arrive de la même façon
+        _, page = self.get("/")
+        self.assertNotIn(" arrive", page.split("</head>")[1].split("<script")[0])      # simple ouverture du tableau de bord : pas d'animation
+        self.assertIn(vue.SCRIPT_TOUCHE, page)
+
+
 if __name__ == "__main__":
     unittest.main()

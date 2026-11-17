@@ -47,7 +47,7 @@ def _texto_rappel(conn, l):
 # ---------------------------------------------------------------------------
 # Déroulement d'une journée
 # ---------------------------------------------------------------------------
-def panneau_jour(conn, jour, retour, gestion=False):
+def panneau_jour(conn, jour, retour, gestion=False, arrive=False):
     """Journée complète : résumé (durée et montant totaux), chantiers dans l'ordre de passage avec heures calculées.
 
     Ni statut ni paiement ici : le statut est automatique (jamais choisi à la main) et le paiement se règle dans la
@@ -55,6 +55,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
     gestion=False (tableau de bord) : lecture seule ; seul le bouton Terminer, en bas de chaque chantier.
     gestion=True (page Journée) : boutons Terminer et Retirer ; l'ordre se change en maintenant une tuile puis en la déplaçant
     (glisser-déposer ; les flèches ▲ ▼ restent si JavaScript est coupé).
+    arrive=True (tableau de bord, on vient de choisir un jour) : sur téléphone, la carte monte en douceur.
     """
     d = datetime.date.fromisoformat(jour)
     ids = ids_de_la_journee(conn, jour)
@@ -70,7 +71,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
     lien_gerer = (f'<a class="bouton secondaire" href="/journee?date={jour}">'
                   f'{"+ Ajouter des chantiers" if gestion else "Gérer cette journée"}</a>')
     if not chantiers:
-        return (f'<div class="carte"><h2>{esc(titre)}</h2><p class="doux">Aucun chantier planifié ce jour-là.</p>'
+        return (f'<div class="carte{" arrive" if arrive else ""}"><h2>{esc(titre)}</h2><p class="doux">Aucun chantier planifié ce jour-là.</p>'
                 f'{"" if gestion else f"<div class=barre>{lien_gerer}</div>"}</div>')
 
     fin = horaire[-1]["fin"]
@@ -146,7 +147,7 @@ def panneau_jour(conn, jour, retour, gestion=False):
     lien_route = (f'<a class="bouton secondaire" href="{esc(route)}" target="_blank" rel="noopener" '
                   f'title="Ouvre Google Maps avec les arrêts qu\'il reste à faire, dans l\'ordre de passage.{plus}">Itinéraire</a>') if route else ""
     pied = "" if gestion else f'<div class="barre pied-jour" style="margin-top:12px">{lien_gerer}{lien_route}{lien_pdf}</div>'
-    return f'<div class="carte carte-jour"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
+    return f'<div class="carte carte-jour{" arrive" if arrive else ""}"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 
 
 # ---------------------------------------------------------------------------
@@ -211,5 +212,5 @@ def page_calendrier(conn, query):
     mois_code = f"{premier.year}-{premier.month:02d}"
     retour = "/?" + urlencode({"date": jour, "mois": mois_code})
     contenu = (f'<h1>Tableau de bord</h1>{_grille(conn, premier, jour, aujourdhui)}'
-               f'{panneau_jour(conn, jour, retour)}')
+               f'{panneau_jour(conn, jour, retour, arrive=bool(query.get("date")))}')
     return gabarit("Tableau de bord", contenu, query.get("ok"), query.get("err"), large=True)
