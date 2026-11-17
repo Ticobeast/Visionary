@@ -20,7 +20,11 @@ et pareille partout. Si une règle ne convient plus, on la change ici d'abord, p
    des boutons blancs.
 4. **Ce qui change la fiche est replié sous « Modifier »**, en bas : le formulaire, et les gestes rares ou dangereux
    (nouvelle adresse, fusionner, annuler, supprimer).
-5. **Aucun texte d'aide.** Si un bouton a besoin d'une explication, c'est le bouton qu'il faut changer.
+5. **Sur iPhone, l'action principale est bien visible, les autres sont derrière « ··· »**, juste à côté
+   (ex. Accepter, puis « ··· » : En attente, Refuser, Dupliquer ; + Nouvelle soumission, puis « ··· » : Modifier le client,
+   Nouvelle adresse). S'il n'y a pas d'action principale, rien n'est caché : un « ··· » tout seul ne dit pas quoi faire.
+   Sur PC, les boutons restent côte à côte.
+6. **Aucun texte d'aide.** Si un bouton a besoin d'une explication, c'est le bouton qu'il faut changer.
 
 ## Une fiche (chantier, soumission ou client)
 
@@ -32,7 +36,8 @@ Toujours dans cet ordre :
    - les boutons ronds **Appeler, Texto, Courriel, Itinéraire** : la seule façon d'agir. Un bouton qui n'a pas de sens
      n'apparaît pas (pas de courriel, textos refusés, pas d'adresse) ;
    - sur un chantier ou une soumission, un petit lien « Fiche client ».
-3. L'action principale, puis les sections (Documents, Photos, Paiements ; l'historique sur un client).
+3. L'action principale (et « ··· » sur iPhone), puis les sections (Documents, Photos, Paiements ; l'historique sur un client).
+   Sur la fiche d'un client, sur PC, « + Nouvelle soumission » est dans la carte de contact, à gauche d'Appeler.
 4. « Modifier », replié.
 
 ## Une liste

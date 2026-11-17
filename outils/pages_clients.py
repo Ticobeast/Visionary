@@ -13,7 +13,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprima
                    client_remplacant, doublons_fusionnes, erreurs_fusion, fiche_gardee, fusionner_clients, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options, carte_contact
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, champ_secteur, client_avance,
-                 client_essentiel, date_lisible, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
+                 client_essentiel, date_lisible, esc, gabarit, rangee_actions, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
 
 def _types(conn):
@@ -116,11 +116,13 @@ def page_client(conn, client_id, query):
              + ("" if c["secteur"] or not c["adresse"] else "<p><b>Secteur :</b> à choisir</p>")
              + (f'<p><b>Notes :</b> {esc(c["notes"])}</p>' if c["notes"] else ""))
     # même carte de contact qu'en haut d'un chantier : adresse, téléphone, courriel, accès, puis Appeler, Texto, Courriel, Itinéraire
-    fiche = (('<p><span class="badge">Ancienne adresse</span></p>' if c["remplace_par"] else "")
-             + carte_contact(conn, client_id, extra=extra))
     supprimable = client_supprimable(conn, client_id)
-    actions = ("" if c["remplace_par"] else
-               f'<div class="actions-bloc"><div class="actions-page"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a></div></div>')
+    nouvelle_soumission = ("" if c["remplace_par"] else
+                           f'<a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>')
+    # PC : « + Nouvelle soumission » dans la carte, à gauche du bouton Appeler
+    fiche = (('<p><span class="badge">Ancienne adresse</span></p>' if c["remplace_par"] else "")
+             + carte_contact(conn, client_id, extra=extra,
+                             avant_ronds=f'<span class="pc-seul nouvelle-pc">{nouvelle_soumission}</span>' if nouvelle_soumission else ""))
     suppression = ""
     if supprimable:                # sinon : pas de bouton (le serveur refuse de toute façon)
         n = resume_suppression_client(conn, client_id)[0]
@@ -142,12 +144,19 @@ def page_client(conn, client_id, query):
         fusion = (f'<div class="barre pc-seul" style="margin-top:16px"><a class="bouton secondaire" href="/client/{client_id}/fusionner">'
                   'Fusionner avec un autre client</a></div>')
     titre = _nom_client(c) if (c["prenom"] or c["nom"] or c["entreprise"]) else "Client à identifier"
-    # tout ce qui CHANGE le client est replié sous « Modifier », en bas, comme sur un chantier
-    modifs = (f'<div class="barre"><a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a>'
-              + ("" if supprimable or c["remplace_par"] else f'<a class="bouton secondaire" href="/client/{client_id}/nouvelle-adresse">Nouvelle adresse</a>')
-              + "</div>" + fusion + (suppression if est_admin() else ""))
-    modifier = f'<details class="avance modifier-fiche" id="modifier"><summary>Modifier</summary>{modifs}</details>'
-    return gabarit(titre, f'<h1>{esc(titre)}</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{modifier}',
+    modifier_client = f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a>'
+    nouvelle_adresse = ("" if supprimable or c["remplace_par"] else
+                        f'<a class="bouton secondaire" href="/client/{client_id}/nouvelle-adresse">Nouvelle adresse</a>')
+    # PC : tout ce qui CHANGE le client est replié sous « Modifier », en bas, comme sur un chantier
+    modifs = f'<div class="barre">{modifier_client}{nouvelle_adresse}</div>' + fusion + (suppression if est_admin() else "")
+    modifier = f'<details class="avance modifier-fiche pc-seul" id="modifier"><summary>Modifier</summary>{modifs}</details>'
+    # téléphone : « + Nouvelle soumission » bien visible, le reste derrière « ··· »
+    supprimer_tel = ""
+    if supprimable and est_admin():
+        supprimer_tel = (f'<form class="mini" method="post" action="/client/{client_id}/supprimer" onsubmit="return confirm({esc(repr(confirmation))})">'
+                         '<button class="danger" type="submit">Supprimer le client</button></form>')
+    actions_tel = f'<div class="actions-bloc tel-bloc">{rangee_actions(nouvelle_soumission, [modifier_client, nouvelle_adresse, supprimer_tel])}</div>'
+    return gabarit(titre, f'<h1>{esc(titre)}</h1>{fiche}{actions_tel}<h2>Soumissions et chantiers</h2>{historique}{modifier}',
                    query.get("ok"), query.get("err"), retour="/clients")
 
 

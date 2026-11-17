@@ -131,5 +131,39 @@ class TestMenuRapide(BaseTableau):
         self.assertIn('details.menu-rapide[open]', page)                   # un toucher ailleurs ferme le menu
 
 
+class TestActionsDesFiches(BaseTableau):
+    def actions(self, chemin):
+        _, page = self.get(chemin)
+        bloc = page[page.index('<div class="actions-bloc">'):]
+        return bloc[:bloc.index('<div class="carte documents')]
+
+    def test_soumission_accepter_devant_le_reste_derriere(self):
+        bloc = self.actions(f"/soumission/{self.ids['Devis']}")
+        self.assertIn('<div class="actions-page avec-menu">', bloc)
+        self.assertLess(bloc.index(">Accepter</button>"), bloc.index('<span class="actions-sec">'))
+        menu = bloc[bloc.index('<details class="menu-rapide menu-fiche">'):]
+        for texte in (">En attente<", ">Refuser<", ">Dupliquer<"):
+            self.assertIn(texte, menu)
+        self.assertNotIn(">Accepter<", menu)
+
+    def test_chantier_planifie_terminer_devant(self):
+        bloc = self.actions(f"/chantier/{self.ids['Demain']}")
+        self.assertTrue(bloc.index(">Terminer</a>") < bloc.index("menu-fiche") or "menu-fiche" not in bloc)
+        self.assertIn(">Dupliquer<", bloc)
+
+    def test_un_seul_choix_pas_de_menu(self):
+        """Chantier terminé : seulement « Dupliquer », visible."""
+        bloc = self.actions(f"/chantier/{self.ids['Fait']}")
+        self.assertNotIn("menu-fiche", bloc)
+        self.assertIn(">Dupliquer<", bloc)
+
+    def test_sans_action_principale_tout_reste_visible(self):
+        """Chantier à planifier : pas d'action principale ; un « ··· » tout seul ne dit pas quoi faire, les boutons restent visibles."""
+        bloc = self.actions(f"/chantier/{self.ids['Urgent']}")
+        self.assertNotIn("menu-fiche", bloc)
+        for texte in (">Mettre en attente<", ">Remettre en soumission<", ">Dupliquer<"):
+            self.assertIn(texte, bloc)
+
+
 if __name__ == "__main__":
     unittest.main()

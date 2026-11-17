@@ -102,7 +102,7 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .onglets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.onglet{padding:7px 14px;border:1px solid var(--trait);border-radius:99px;text-decoration:none;color:var(--texte);background:var(--carte)}
 .onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
 .verrou{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}.verrou b{font-size:17px}
-.total{font-weight:700}.menu-rapide{display:none}
+.total{font-weight:700}.menu-rapide{display:none}.actions-sec{display:contents}.tel-bloc{display:none}
 .sel-total[hidden]{display:none}
 .choix-paye{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:12px}.mode-paye{display:none;margin-bottom:12px}.modale-carte:has(input[value=oui]:checked) .mode-paye{display:block}.duree-reelle{margin-bottom:14px}.lien-facture-modale{margin:12px 0 0;font-size:.9rem}.modale-carte h2+.doux{margin-top:-4px}.sel-total .charge{color:#b42318}
 .sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
@@ -225,7 +225,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.texto-jour,.note-heures,.resume-jour,.total-jour{display:none}
 .carte.contact{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
 .contact-infos p{margin:0 0 2px}.contact-adresse{font-weight:600}.contact-liens{font-size:.85rem;margin-top:6px!important}.contact-liens a{color:var(--doux)}
-.contact-actions{display:flex;gap:18px}.contact-note{flex-basis:100%;margin:0;font-size:.85rem}
+.contact-actions{display:flex;gap:18px;align-items:center}.nouvelle-pc{margin-right:10px}.contact-note{flex-basis:100%;margin:0;font-size:.85rem}
 a.rond{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--texte);text-decoration:none}
 .rond-icone{display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;background:#fff;border:1px solid var(--trait)}
 a.rond:hover .rond-icone{background:var(--vert-doux);border-color:var(--vert-bord)}
@@ -406,7 +406,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
             '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
-            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}</body></html>')
+            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}</body></html>')
 
 
 # Changer de jour, de mois ou de filtre sur la même page : on reste à la même hauteur au lieu de remonter en haut.
@@ -421,6 +421,10 @@ SCRIPT_POSITION = (
 
 # « Annuler » et « Fermer » ramènent à la page d'où l'on vient (pas à une page fixe) : le navigateur garde la pile des pages visitées pendant la session.
 # Un formulaire (liens a.annuler) ne se met pas dans la pile ; une page normale s'y met (revenir en arrière la dépile) ; « Fermer » (a.fermer) va à la page d'avant.
+# Un seul menu « ··· » ouvert à la fois ; un toucher ailleurs le ferme.
+SCRIPT_MENU = ('<script>document.addEventListener("click",function(e){document.querySelectorAll("details.menu-rapide[open]").forEach('
+               'function(d){if(!d.contains(e.target))d.removeAttribute("open");});});</script>')
+
 SCRIPT_RETOUR = (
     '<script>(function(){try{var s=JSON.parse(sessionStorage.getItem("pile")||"[]"),q=document.querySelectorAll("a.annuler"),'
     'f=document.querySelectorAll("a.fermer"),l=new URL(location.href),i,p,t;["ok","err","terminer"].forEach(function(k){l.searchParams.delete(k);});'
@@ -467,6 +471,23 @@ def le_date(iso, aujourdhui=None):
     if ecart in (-1, 0, 1):
         return ("hier", "aujourd'hui", "demain")[ecart + 1]
     return "le " + date_lisible(iso, aujourdhui)
+
+
+def menu_points(contenu, classe=""):
+    """Le petit bouton « ··· » qui ouvre un menu (téléphone seulement : sur PC, il est caché). Un seul ouvert à la fois."""
+    return (f'<details class="menu-rapide{" " + classe if classe else ""}"><summary aria-label="Plus d\'actions" title="Plus d\'actions"></summary>'
+            f'<div class="menu-rapide-liste">{contenu}</div></details>')
+
+
+def rangee_actions(principal, secondaires, classe=""):
+    """Les actions d'une fiche. PC : tous les boutons à la suite. Téléphone : l'action principale (verte) bien visible,
+    les autres derrière « ··· ». Sans action principale, rien n'est caché : un « ··· » tout seul ne dit pas quoi faire."""
+    secondaires = [b for b in secondaires if b]
+    if not principal or not secondaires:
+        return f'<div class="actions-page{" " + classe if classe else ""}">{principal}{"".join(secondaires)}</div>'
+    tous = "".join(secondaires)
+    return (f'<div class="actions-page avec-menu{" " + classe if classe else ""}">{principal}<span class="actions-sec">{tous}</span>'
+            f'{menu_points(tous, "menu-fiche")}</div>')
 
 
 def case_taxes(nom, cochee):

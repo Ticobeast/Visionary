@@ -26,7 +26,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_
                    mettre_a_jour_fiche, remettre_en_soumission, taxes_pour, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
                    valeurs_client)
 from vue import (libelle_statut, est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, MODES, adresses, argent, avance, badge, badge_statut, bloc_options_travaux,
-                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, date_lisible, esc, gabarit, heures, le_date, liste, lien_maps, lien_tel,
+                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, date_lisible, esc, gabarit, heures, le_date, liste, rangee_actions, lien_maps, lien_tel,
                  redirection, texte_attente, url_fiche, utilisateur_courant, zone)
 
 
@@ -197,13 +197,14 @@ def _rond(icone, texte, href, titre, externe=False):
             f'{_ICONES_CONTACT[icone]}</svg></span><span>{texte}</span></a>')
 
 
-def carte_contact(conn, client_id, chantier_id=None, retour="", extra=""):
+def carte_contact(conn, client_id, chantier_id=None, retour="", extra="", avant_ronds=""):
     """Le client d'une fiche, en haut : adresse, téléphone, accès (du texte à LIRE, sans lien), et les gestes du terrain en
     boutons ronds, seule façon d'agir : Appeler, Texto, Courriel, Itinéraire. Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la
     visite, suivi de la soumission, rappel de paiement : outils/messages.py). Rien ne se modifie ici : pour changer le client,
     on passe par sa fiche (lien « Fiche client »), puis « Modifier ».
     Même carte en haut de la fiche du CLIENT (chantier_id=None : pas de message déjà écrit, pas de lien « Fiche client ») ;
-    `extra` : lignes ajoutées sous l'accès (notes du client, ancienne / nouvelle adresse)."""
+    `extra` : lignes ajoutées sous l'accès (notes du client, ancienne / nouvelle adresse) ; `avant_ronds` : un bouton placé à
+    gauche des boutons ronds (fiche client sur PC : « + Nouvelle soumission »)."""
     r = conn.execute("SELECT telephone, telephone_2, courriel, sms_ok, adresse, ville, province, code_postal, notes_acces"
                      " FROM clients WHERE id = ?", (client_id,)).fetchone()
     tel, tel2, courriel, sms_ok, adresse, ville, prov, cp, acces = r
@@ -232,7 +233,7 @@ def carte_contact(conn, client_id, chantier_id=None, retour="", extra=""):
                f'{"<span class=contact-courriel>" + esc(courriel) + "</span>" if courriel else ""}</p>' if tels or courriel else "")
             + (f'<p><b>Accès :</b> {esc(acces)}</p>' if acces else "") + extra
             + (f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a></p>' if chantier_id else "") + '</div>'
-            + (f'<div class="contact-actions">{ronds}</div>' if ronds else "")
+            + (f'<div class="contact-actions">{avant_ronds}{ronds}</div>' if ronds or avant_ronds else "")
             + (f'<p class="doux contact-note">{esc(note)}</p>' if note else "") + '</div>')
 
 
@@ -358,30 +359,39 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                 f'<input type="hidden" name="retour" value="{base}/{chantier_id}"><button type="submit"{f" class={classe}" if classe else ""}>{texte}</button></form>')
 
     dupliquer = f'<a class="bouton secondaire" href="/chantier/{chantier_id}/dupliquer">Dupliquer</a>'
-    manque = ""
+    remettre = _formulaire_action(f"/chantier/{chantier_id}", f"/chantier/{chantier_id}/remettre-soumission", chantier_id, "Remettre en soumission", "secondaire",
+                                  "Remettre ce chantier en soumission ? Il retourne dans l'onglet Soumissions.")
+    def attente(texte):
+        return f'<a class="bouton secondaire" href="/chantier/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">{texte}</a>'
+    manque, principal, secondaires = "", "", []
     if soumission and not refusee:
         manques = manques_pour_accepter(conn, chantier_id)
         # depuis la fiche : accepter mène au nouveau chantier ; refuser reste sur la fiche (on peut la rouvrir tout de suite)
-        boutons = boutons_soumission(chantier_id, f"/soumission/{chantier_id}", f"/chantier/{chantier_id}", pdf=False) + dupliquer
+        principal = (f'<form class="mini" method="post" action="/soumission/{chantier_id}/accepter">'
+                     f'<input type="hidden" name="retour" value="/chantier/{chantier_id}"><button type="submit">Accepter</button></form>')
+        secondaires = [f'<a class="bouton secondaire" href="/soumission/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">En attente</a>',
+                       f'<form class="mini" method="post" action="/soumission/{chantier_id}/refuser" onsubmit="return confirm({esc(repr(CONFIRMATION_REFUS))})">'
+                       f'<input type="hidden" name="retour" value="/soumission/{chantier_id}"><button type="submit" class="secondaire">Refuser</button></form>',
+                       dupliquer]
         if manques:
             manque = f'<p class="manque">Pour accepter, il manque encore : {esc(", ".join(libelles_manques(manques)))}.</p>'
     elif refusee:
-        boutons = _formulaire_action(f"{base}/{chantier_id}", f"/soumission/{chantier_id}/rouvrir", chantier_id, "Rouvrir la soumission") + dupliquer
+        principal = _formulaire_action(f"{base}/{chantier_id}", f"/soumission/{chantier_id}/rouvrir", chantier_id, "Rouvrir la soumission")
+        secondaires = [dupliquer]
     else:
-        boutons = dupliquer
         if statut == "planifie" and est_admin():
-            boutons = f'<a class="bouton" href="/chantier/{chantier_id}?terminer={chantier_id}">Terminer</a>' + boutons
-        if statut in ("a_planifier", "en_attente"):
-            boutons = _formulaire_action(f"/chantier/{chantier_id}", f"/chantier/{chantier_id}/remettre-soumission", chantier_id, "Remettre en soumission", "secondaire",
-                                         "Remettre ce chantier en soumission ? Il retourne dans l'onglet Soumissions.") + boutons
-        if statut == "a_planifier":
-            boutons = f'<a class="bouton secondaire" href="/chantier/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">Mettre en attente</a>' + boutons
+            principal = f'<a class="bouton" href="/chantier/{chantier_id}?terminer={chantier_id}">Terminer</a>'
         if statut == "en_attente":
-            boutons = (_formulaire_action(f"/chantier/{chantier_id}", f"/chantier/{chantier_id}/reprendre", chantier_id, "Sortir de l'attente")
-                       + f'<a class="bouton secondaire" href="/chantier/{chantier_id}/attente?retour=%2Fchantier%2F{chantier_id}">Changer la date</a>' + boutons)
+            principal = _formulaire_action(f"/chantier/{chantier_id}", f"/chantier/{chantier_id}/reprendre", chantier_id, "Sortir de l'attente")
+            secondaires.append(attente("Changer la date"))
         if statut == "annule" and est_admin():
-            boutons = bouton("rouvrir", "Rouvrir (À planifier)") + boutons
-    actions = f'<div class="actions-bloc"><div class="actions-page{" actions-sou" if soumission and not refusee else ""}">{boutons}</div>{manque}</div>'
+            principal = bouton("rouvrir", "Rouvrir (À planifier)")
+        if statut == "a_planifier":
+            secondaires.append(attente("Mettre en attente"))
+        if statut in ("a_planifier", "en_attente"):
+            secondaires.append(remettre)
+        secondaires.append(dupliquer)
+    actions = f'<div class="actions-bloc">{rangee_actions(principal, secondaires)}{manque}</div>'
     documents_client = _bloc_documents(chantier_id, statut, genre, soumission) + bloc_photos(conn, chantier_id)
     bandeau = ""
     if refusee:

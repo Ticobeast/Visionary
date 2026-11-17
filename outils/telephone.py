@@ -97,7 +97,11 @@ table.chantiers.sans-finis tr.fini{display:none}
 table.chantiers td.c-client a::after,table.soumissions a.lien-carte::after{content:"";position:absolute;inset:0;z-index:0}
 table.soumissions a.tel{position:relative;z-index:1}
 table.soumissions td.col-actions{margin:0!important}table.soumissions td.col-actions>.actions-ligne{display:none}
-.menu-rapide{display:block;position:absolute;top:6px;right:6px;z-index:2}
+.menu-rapide{display:block;position:relative}table.soumissions .menu-rapide{position:absolute;top:6px;right:6px;z-index:2}
+.tel-bloc{display:block}.actions-sec{display:none!important}
+
+.menu-fiche>summary{width:46px;height:46px;border:1px solid var(--trait);border-radius:12px;background-color:#fff}
+.menu-fiche .menu-rapide-liste{top:52px;z-index:6}
 .menu-rapide>summary{list-style:none;width:40px;height:34px;border-radius:12px;cursor:pointer;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230e341d'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/svg%3E") center/20px no-repeat}
 .menu-rapide[open]{z-index:6}.menu-rapide>summary::-webkit-details-marker{display:none}.menu-rapide[open]>summary{background-color:var(--puce)}
 .menu-rapide-liste{position:absolute;right:0;top:40px;min-width:210px;display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff;border:1px solid var(--trait-leger);border-radius:16px;box-shadow:0 12px 32px rgba(14,52,29,.2)}
@@ -261,6 +265,7 @@ table.paiements td.col-actions button{font-size:0;width:38px;height:38px;min-hei
 .actions-page{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:8px}
 .actions-page>*{min-width:0}.actions-page form{display:flex;width:100%;margin:0}.actions-page .bouton,.actions-page button{width:100%;flex:none;height:100%;min-height:44px;padding:8px 4px;font-size:13.5px;white-space:normal;text-align:center;line-height:1.15}
 .actions-page>:last-child:nth-child(odd){grid-column:1/-1}
+.actions-page.avec-menu{grid-template-columns:1fr 46px;grid-auto-rows:auto}.actions-page.avec-menu>*{grid-column:auto!important}
 .actions-page.actions-sou{grid-template-columns:repeat(3,1fr)}.actions-page.actions-sou>:first-child{grid-column:1/-1}.actions-page.actions-sou>:last-child:nth-child(odd){grid-column:auto}
 .carte.documents{display:grid;grid-template-columns:1fr 1fr;gap:10px}.carte.documents h2{grid-column:1/-1;margin:0}
 .ligne-document{display:block;padding:0;margin:0}.ligne-document b{display:none}.ligne-document:only-of-type{grid-column:1/-1}
