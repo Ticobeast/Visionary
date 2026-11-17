@@ -102,7 +102,7 @@ class TestListeEtCreation(BasePages):
         self.assertNotIn('class="requis"', page)
         self.assertNotIn(" required", page)
         self.assertIn("Créer la soumission", page)
-        self.assertIn("Rien n'est obligatoire", page)
+        self.assertNotIn("Rien n'est obligatoire", page)
 
     def test_la_liste_ne_montre_que_des_soumissions(self):
         self.complete()
@@ -469,7 +469,7 @@ class TestEnAttentePages(BasePages):
         for texte in ('type="radio" name="choix" value="date" id="choix-date" checked', 'type="radio" name="choix" value="indefini"', 'type="date" name="reprise_le"',
                       'name="retour" value="/soumissions"', "Jusqu'au", "Jusqu'à nouvel ordre", "Dans 1 mois", "Dans 6 mois"):
             self.assertIn(texte, page, texte)
-        self.assertIn("pas de taille de haie en avril", page)                               # l'exemple du client qui accepte pour plus tard
+        self.assertIn("chantier accepté, en attente", page)                                 # l'exemple du client qui accepte pour plus tard
         prochain = noyau.decaler_mois(AUJOURDHUI, 2).isoformat()
         self.assertIn(f"&amp;reprise_le={prochain}", self.get(f"/soumission/{i}/attente?retour=%2Fsoumissions"))   # raccourci « Dans 2 mois »
         self.assertIn(f'name="reprise_le" value="{prochain}"', self.get(f"/soumission/{i}/attente?reprise_le={prochain}"))   # …et il préremplit la date
@@ -485,7 +485,7 @@ class TestEnAttentePages(BasePages):
         chantiers = self.get("/chantiers")
         ligne = chantiers[chantiers.rindex("<tr>", 0, chantiers.index("Hamel")):chantiers.index("</tr>", chantiers.index("Hamel"))]
         self.assertIn("En attente", ligne)
-        self.assertIn(f"reprise le {jour_dans(60)}", ligne)
+        self.assertIn(f"reprise {vue.le_date(jour_dans(60))}", ligne)
 
     def test_jusqu_a_nouvel_ordre(self):
         i = self.en_attente()
@@ -558,8 +558,8 @@ class TestEnAttentePages(BasePages):
         self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=mis_en_attente")
         page = self.texte(en_tetes["Location"])
         self.assertIn("Mis en attente", page)
-        self.assertIn(f"En attente : reprise le {jour_dans(70)}", page)
-        self.assertIn(f"Il redevient « À planifier » le <b>{jour_dans(70)}</b>", page)
+        self.assertIn(f"En attente : reprise {vue.le_date(jour_dans(70))}", page)
+        self.assertIn(f"Il redevient « À planifier » <b>{vue.le_date(jour_dans(70))}</b>", page)
         for bouton in ("Sortir de l'attente", "Changer la date", "Remettre en soumission", "Dupliquer"):
             self.assertIn(bouton, page, bouton)
         self.assertNotIn(">Terminer<", page)

@@ -17,7 +17,7 @@ from noyau import (STATUTS_SOUMISSION, TYPES_AVEC_BOIS, accepter_soumission, app
                    refuser_soumission, rouvrir_chantier, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import (_formulaire_action, _genre_et_statut, _vers_la_bonne_page, boutons_soumission, lire_formulaire, modifier,
                             supprimer_chantier, types_triees, valeurs_chantier)
-from vue import (argent, badge_attente, bloc_options_travaux, bloc_types, case_taxes, champ, champ_secteur, esc, gabarit, heures, lien_tel, redirection,
+from vue import (argent, badge_attente, bloc_options_travaux, bloc_types, case_taxes, champ, champ_secteur, date_lisible, esc, gabarit, heures, lien_tel, redirection,
                  url_fiche, utilisateur_courant)
 
 LIMITE_REFUSEES = 50
@@ -35,7 +35,7 @@ def _table(conn, lignes, retour, refusees=False):
         i = l["chantier_id"]
         nom = l["client_nom_complet"] if not l["entreprise"] or l["entreprise"] in l["client_nom_complet"] else f'{l["client_nom_complet"]} · {l["entreprise"]}'
         jours = jours_attente(l["attente_depuis"], aujourdhui)
-        demande = esc(l["attente_depuis"] or "")
+        demande = esc(date_lisible(l["attente_depuis"]))
         if not refusees:
             demande += f'<div>{badge_attente(jours, priorite(jours))}</div>'
         if l["cree_par"]:
@@ -90,7 +90,7 @@ def page_soumissions(conn, query):
     en_attente = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'en_attente'").fetchone()[0]
     lien_attente = f' <a class="doux" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
     section_refusees = (f'<h2 id="refusees" style="margin-top:32px">Refusées <small class="doux">({total_refusees})</small></h2>'
-                        '<p class="doux">Soumissions refusées par le client. Elles ne sont plus dans les chantiers ; « Rouvrir » la remet en cours.</p>' + bas)
+                        + bas)
     contenu = (f'<h1>Soumissions{lien_attente}{lien_refusees}</h1><div class="barre barre-ajout" style="margin-bottom:16px"><a class="bouton" href="/nouveau" aria-label="Nouvelle soumission">+ Nouvelle soumission</a></div>'
                f'{raccourcis.barre(conn, "soumissions", query)}{recherche}{tableau}{section_refusees}')
     return gabarit("Soumissions", contenu, query.get("ok"), query.get("err"), large=True)

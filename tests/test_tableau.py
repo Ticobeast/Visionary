@@ -12,6 +12,7 @@ RACINE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE / "outils"))
 import interface  # noqa: E402
 import noyau  # noqa: E402
+import vue  # noqa: E402
 
 AUJOURDHUI = datetime.date.today()
 SECTEURS = {"Blainville": "cap_de_la_madeleine", "Mirabel": "trois_rivieres_ouest", "Saint-Jérôme": "shawinigan"}    # ville -> secteur
@@ -154,8 +155,8 @@ class TestChantiersListe(BaseTableau):
         texte, brut = self.ligne(self.get("/chantiers")[1], "Urgent")
         self.assertIn("45 j", texte)
         self.assertIn("depuis l'acceptation", texte)                       # le nombre seul ne dit pas de quelle date on part
-        self.assertIn(il_y_a(45), texte)                                   # et la date de départ est juste au-dessus
-        self.assertIn("À planifier depuis 45 jours (soumission acceptée le " + il_y_a(45) + ")", brut)
+        self.assertIn(vue.date_lisible(il_y_a(45)), texte)                                   # et la date de départ est juste au-dessus
+        self.assertIn("À planifier depuis 45 jours (soumission acceptée " + vue.le_date(il_y_a(45)) + ")", brut)
         self.ecrire("UPDATE chantiers SET reprise_le = ? WHERE id = ?", (il_y_a(9), self.ids["Urgent"]))     # sorti de l'attente il y a 9 jours
         texte, brut = self.ligne(self.get("/chantiers")[1], "Urgent")
         self.assertIn("9 j", texte)
@@ -170,10 +171,10 @@ class TestChantiersListe(BaseTableau):
         texte, brut = self.ligne(self.get("/chantiers")[1], "Fait")
         self.assertIn("40 j", texte)                                       # 40 jours depuis la fin (il_y_a(40)), pas 190 ni 200
         self.assertIn("depuis la fin des travaux", texte)
-        self.assertIn(il_y_a(40), texte)
-        self.assertNotIn(il_y_a(190), texte)
+        self.assertIn(vue.date_lisible(il_y_a(40)), texte)
+        self.assertNotIn(vue.date_lisible(il_y_a(190)), texte)
         self.assertIn("a-urgente", brut)                                   # plus de 30 jours : rouge
-        self.assertIn("Paiement attendu depuis 40 jours : travaux terminés le " + il_y_a(40) + ", solde à recevoir 919,80 $", brut)
+        self.assertIn("Paiement attendu depuis 40 jours : travaux terminés " + vue.le_date(il_y_a(40)) + ", solde à recevoir 919,80 $", brut)
         # un acompte (paiement partiel) ne change rien : on attend toujours le reste
         self.post(f"/chantier/{self.ids['Fait']}/paiement", {"paiement_date": il_y_a(1), "paiement_montant": "100", "paiement_mode": "cheque"})
         self.assertEqual(self.sql("SELECT statut_paiement FROM v_chantiers WHERE chantier_id = ?", (self.ids["Fait"],)), [("partiel",)])

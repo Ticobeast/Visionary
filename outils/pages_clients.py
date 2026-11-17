@@ -13,7 +13,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprima
                    client_remplacant, doublons_fusionnes, erreurs_fusion, fiche_gardee, fusionner_clients, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, champ_secteur, client_avance,
-                 client_essentiel, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
+                 client_essentiel, date_lisible, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
 
 def _types(conn):
@@ -101,7 +101,7 @@ def page_client(conn, client_id, query):
         " FROM v_chantiers WHERE client_id = ? OR client_id IN (SELECT id FROM clients WHERE fusionne_dans = ?)"       # + chantiers terminés restés sur un doublon fusionné
         " ORDER BY 2 DESC, chantier_id DESC", (client_id, client_id)).fetchall()
     lignes = "".join(
-        f'<tr><td class="c-date"><a href="{url_fiche(i, g)}">{esc(d) or "sans date"}</a></td><td class="c-travaux">{esc(t) or "<span class=doux>à préciser</span>"}</td>'
+        f'<tr><td class="c-date"><a href="{url_fiche(i, g)}">{esc(date_lisible(d)) or "sans date"}</a></td><td class="c-travaux">{esc(t) or "<span class=doux>à préciser</span>"}</td>'
         f'<td class="c-statut">{badge_statut(st, g)}{" <span class=doux>archivé</span>" if arch and g == "chantier" else ""}</td></tr>'
         for i, d, t, st, arch, g in fiches)
     historique = (f'<div class="liste-defile" style="margin-bottom:16px"><table class="historique"><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
@@ -174,9 +174,7 @@ def page_client_modifier(conn, client_id, query=None):
     if valeurs is None:
         return _introuvable()
     retour = retour_valide((query or {}).get("retour"), "")
-    note = ("Ces informations s\'appliquent à toutes les soumissions et à tous les chantiers de ce client."
-            + ("" if a_des_chantiers(conn, client_id) else " Rien n\'est obligatoire tant que le client n\'a que des soumissions."))
-    return gabarit("Modifier le client", f'<h1>Modifier le client</h1><p class="doux">{note}</p>{_form_client(conn, client_id, valeurs, retour=retour)}')
+    return gabarit("Modifier le client", f'<h1>Modifier le client</h1>{_form_client(conn, client_id, valeurs, retour=retour)}')
 
 
 def client_modifier(conn, client_id, form):
@@ -221,8 +219,7 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
 {champ("duree_estimee_h", "Durée estimée (heures)", valeurs, inputmode="decimal", placeholder="2,5")}
 {champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal", placeholder="480,00")}
 {case_taxes("taxes_auto", taxes)}
-{zone("description", "Notes (description, imprimée sur la feuille de route)", valeurs)}</div>
-<p class="doux">Rien n'est obligatoire : remplis ce que tu sais. Pour <b>accepter</b> la soumission, il faudra la durée, le prix, les travaux, le téléphone, l'adresse et le secteur.</p></div>
+{zone("description", "Notes (description, imprimée sur la feuille de route)", valeurs)}</div></div>
 {avance('<div class="carte"><h2>Demande et règlement</h2><div class="grille">' + champ("date_soumission", "Date de la demande de soumission", valeurs, "date") + champ_modalite(valeurs) + "</div></div>", ouvert=bool(erreurs))}
 <div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire annuler" href="/client/{client_id}">Annuler</a></div></form>
 <p class="doux">La soumission est créée « en cours » : tu reviens à la fiche du client. Elle se règle ensuite dans l'onglet Soumissions (Accepter ou Refuser).</p>"""

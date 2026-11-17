@@ -153,7 +153,7 @@ class TestRecherche(BaseArchives):
         self.assertEqual(self.noms(chemin), ["Hamel"])
         page = self.get(chemin)
         self.assertIn("1 client", page)
-        self.assertIn(il_y_a(400), page)
+        self.assertIn(vue.date_lisible(il_y_a(400)), page)
         self.assertIn('href="/client/', page)
         self.assertIn("Relancer", page)
 
@@ -162,8 +162,8 @@ class TestRecherche(BaseArchives):
         self.assertEqual(self.noms("/archives?q=hamel&par_client=1"), ["Hamel"])
         page = self.get("/archives?q=hamel&par_client=1")
         self.assertIn("1 client", page)
-        self.assertIn(il_y_a(40), page)                                                                   # son DERNIER chantier
-        self.assertNotIn(il_y_a(400), page)
+        self.assertIn(vue.date_lisible(il_y_a(40)), page)                                                                   # son DERNIER chantier
+        self.assertNotIn(vue.date_lisible(il_y_a(400)), page)
         self.assertIn(vue.argent(1100), page)                                                             # 800 + 300
 
     def test_tris(self):
@@ -526,8 +526,8 @@ class TestAcces(BaseComptes):
             return page[page.index("<header"):page.index("</header>")]
         self.assertIn('<a href="/archives">Archives</a>', menu(self.admin))
         self.assertNotIn("/archives", menu(self.alice))
-        self.assertIn('href="/archives">onglet Archives</a>', self.get("/chantiers", cookie=self.admin))           # lien depuis Chantiers
-        self.assertNotIn("onglet Archives", self.get("/chantiers", cookie=self.alice))
+        self.assertIn('href="/archives">Chercher dans tout l\'historique</a>', self.get("/chantiers", cookie=self.admin))           # lien depuis Chantiers
+        self.assertNotIn("Chercher dans tout l'historique", self.get("/chantiers", cookie=self.alice))
         page = self.get("/archives", cookie=self.admin)
         self.assertIn('.nav-bureau a[href="/archives"]{', page)                                                 # l'onglet courant est surligné
         self.assertIn('<span class="tag-badge">Archives</span>', page)

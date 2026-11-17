@@ -63,8 +63,7 @@ def page_attente(conn, i, query, erreurs=(), saisie=None):
         for t, n in RACCOURCIS_DATE)
     err = ('<div class="erreurs"><ul>' + "".join(f"<li>{esc(e)}</li>" for e in erreurs) + "</ul></div>") if erreurs else ""
     if genre == "soumission":
-        intro = ("Le client a accepté, mais on ne fera pas le travail tout de suite (par exemple, pas de taille de haie en avril). La soumission devient un "
-                 "<b>chantier accepté, en attente</b> : il est dans Chantiers et n'est plus proposé dans la Journée.")
+        intro = "La soumission devient un <b>chantier accepté, en attente</b> : il n'est pas proposé dans la Journée."
     else:
         intro = "Un chantier en attente n'est plus proposé dans la Journée."
     etat = (f'<p class="doux">Actuellement : en attente, <b>{esc(texte_attente(reprise))}</b>.</p>' if deja else "")
@@ -82,10 +81,10 @@ def page_attente(conn, i, query, erreurs=(), saisie=None):
                f'{" checked" if choix == "date" else ""}> Jusqu\'au</label>'
                f'<input type="date" name="reprise_le" value="{esc(date_choisie)}" min="{demain}" style="max-width:190px" aria-label="Date de reprise" '
                'onchange="document.getElementById(\'choix-date\').checked=true" oninput="document.getElementById(\'choix-date\').checked=true"></div>'
-               f'<p class="doux" style="margin:8px 0 14px">Il redevient « À planifier » ce jour-là, tout seul. Rapide : {rapides}</p>'
+               f'<p class="doux" style="margin:8px 0 14px">{rapides}</p>'
                '<label class="coche"><input type="radio" name="choix" value="indefini"'
                f'{" checked" if choix == "indefini" else ""}> Jusqu\'à nouvel ordre</label>'
-               '<p class="doux" style="margin:8px 0 0">Il reste en attente tant que tu ne l\'as pas sorti toi-même (bouton « Sortir de l\'attente » sur sa fiche).</p></div>'
+               "</div>"
                f'<div class="barre"><button type="submit">{"Enregistrer" if deja else "Mettre en attente"}</button>'
                f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form>{sortir}')
     return gabarit("Mettre en attente", contenu, section="soumissions" if genre == "soumission" else "chantiers")

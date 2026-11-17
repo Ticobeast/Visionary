@@ -12,7 +12,7 @@ import io
 from urllib.parse import urlencode
 
 from noyau import cle, decaler_mois, lister_secteurs
-from vue import argent, badge_statut, esc, gabarit, heures, lien_tel, url_fiche
+from vue import argent, badge_statut, date_lisible, esc, gabarit, heures, lien_tel, url_fiche
 
 LIMITE_RESULTATS = 200
 RESULTATS = (("termine", "Chantiers terminés"), ("annule", "Chantiers annulés"), ("refusee", "Soumissions refusées"), ("tout", "Tout l'historique"))
@@ -401,7 +401,7 @@ def _resultats(lignes, groupes, f, historique_vide=False):
         corps = ""
         for g in groupes[:LIMITE_RESULTATS]:
             lien_client = f"/client/{g['client_id']}"
-            corps += (f'<tr><td class="c-date">{esc(g["date_ref"])}</td><td class="c-client">{_identite(g["client_nom_complet"], g["telephone"], lien_client)}</td>'
+            corps += (f'<tr><td class="c-date">{esc(date_lisible(g["date_ref"]))}</td><td class="c-client">{_identite(g["client_nom_complet"], g["telephone"], lien_client)}</td>'
                       f'<td class="c-adresse">{_lieu(g["adresse"], g["secteur"], g["ville"])}</td>'
                       f'<td class="c-travaux"><a href="{url_fiche(g["chantier_id"], g["genre"])}">{esc(g["type_libelle"] or "à préciser")}</a></td>'
                       f'<td class="droite c-statut">{g["nb"]}<span class="tel-seul"> chantier{"s" if g["nb"] > 1 else ""}</span></td>'
@@ -413,7 +413,7 @@ def _resultats(lignes, groupes, f, historique_vide=False):
         total = len(lignes)
         corps = ""
         for l in lignes[:LIMITE_RESULTATS]:
-            corps += (f'<tr><td class="c-date">{esc(l["date_ref"])}</td><td class="c-client">{_identite(l["client_nom_complet"], l["telephone"], url_fiche(l["chantier_id"], l["genre"]))}</td>'
+            corps += (f'<tr><td class="c-date">{esc(date_lisible(l["date_ref"]))}</td><td class="c-client">{_identite(l["client_nom_complet"], l["telephone"], url_fiche(l["chantier_id"], l["genre"]))}</td>'
                       f'<td class="c-adresse">{_lieu(l["adresse"], l["secteur"], l["ville"])}</td><td class="c-travaux">{esc(l["travaux_detail"] or "à préciser")}</td>'
                       f'<td class="c-statut">{badge_statut(l["statut"], l["genre"])}</td><td class="montant c-montant">{_montant_ou_tiret(l["prix_ht"])}</td>{_relancer(l["client_id"])}</tr>')
         tete = ('<th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Résultat</th><th class="droite">Prix avant taxes</th><th></th>')

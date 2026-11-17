@@ -91,7 +91,7 @@ class TestPages(BaseInterface):
         self.assertNotIn('class="onglet', page)                        # plus d'onglets : une seule section principale
         entete = page[page.index("<header"):page.index("</header>")]
         self.assertIn('href="/archives"', entete)                # l'onglet Archives (historique complet, recherches, statistiques) est dans le menu
-        self.assertIn('href="/archives">onglet Archives</a>', page)     # et la petite section d'archives de cette page y mène
+        self.assertIn('href="/archives">Chercher dans tout l\'historique</a>', page)     # et la petite section d'archives de cette page y mène
 
     def test_un_chantier_termine_et_paye_rejoint_les_archives_tout_seul(self):
         self.assertIn("Pierre Lavoie", self.partie_active(self.get("/chantiers")[1]))
@@ -469,7 +469,7 @@ class TestModification(BaseInterface):
         formulaire = page[page.index('<form method="post" action="/chantier/3">'):page.index("</form>", page.index('<form method="post" action="/chantier/3">'))]
         for interdit in ("client_nom", "client_prenom", "client_telephone", "client_courriel", "adresse", "ville", "client_secteur", "code_postal", "client_sms_ok"):
             self.assertNotIn(f'name="{interdit}"', formulaire)
-        self.assertIn("Lecture seule", page)
+        self.assertIn('class="lecture-seule"', page)
         self.assertIn("850 Boulevard du Lac", page)                                   # mais le client est bien affiché
         self.assertIn('href="/client/3/modifier?retour=%2Fchantier%2F3"', page)       # seul point d'entrée : la fiche client (puis retour ici)
 
@@ -484,7 +484,7 @@ class TestModification(BaseInterface):
     def test_le_recap_apres_enregistrement_montre_le_client_verrouille(self):
         self.post("/nouveau", fiche())
         page = self.get("/soumission/4")[1]
-        self.assertIn("Lecture seule", page)
+        self.assertIn('class="lecture-seule"', page)
         self.assertNotIn('name="client_nom"', page)
         self.assertIn("Sylvie Roy", page)
         self.assertIn("22 Rue des Pins", page)

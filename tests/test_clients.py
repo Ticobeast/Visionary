@@ -90,7 +90,7 @@ class TestFormulaireSimplifie(BaseClients):
                           "nacelle", "debarrasser_bois", "bois_format"})
         self.assertIn(f'name="date_soumission" type="date" value="{datetime.date.today().isoformat()}"', page)   # aujourd'hui
         self.assertNotRegex(page, r'name="duree_estimee_h"[^>]*required')                                       # rien d'obligatoire
-        self.assertIn("Rien n'est obligatoire", page)
+        self.assertNotIn("Rien n'est obligatoire", page)                                                        # plus de paragraphe d'aide
         self.assertEqual(re.findall(r'<option value="([a-z]*)"', page[page.index('name="modalite_paiement"'):]),
                          ["", "comptant", "cheque", "interac", "carte", "autre"])
         self.assertTrue({"type_elagage", "precision_elagage", "type_taille_haie"} <= champs)

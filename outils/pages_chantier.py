@@ -26,7 +26,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_
                    mettre_a_jour_fiche, remettre_en_soumission, taxes_pour, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
                    valeurs_client)
 from vue import (libelle_statut, est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, MODES, adresses, argent, avance, badge, badge_statut, bloc_options_travaux,
-                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, esc, gabarit, heures, liste, lien_maps, lien_tel,
+                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, date_lisible, esc, gabarit, heures, le_date, liste, lien_maps, lien_tel,
                  redirection, texte_attente, url_fiche, utilisateur_courant, zone)
 
 
@@ -151,12 +151,7 @@ def cartes_chantier(conn, valeurs, creation, soumission=False):
     """
     taxes = " checked" if valeurs.get("taxes_auto") else ""
     exige = {} if soumission else {"required": True}
-    if soumission:
-        aide = ('<p class="doux">Rien n\'est obligatoire : remplis ce que tu sais. Pour <b>accepter</b> la soumission, il faudra le nom, le téléphone, '
-                "l'adresse, le secteur, les travaux, la durée et le prix : le programme demandera ce qui manque.</p>")
-    else:
-        aide = ('<p class="doux">Durée = temps passé sur place, en heures décimales (2,5 = 2 h 30) : <b>obligatoire</b>, '
-                'elle sert à calculer les heures de la journée.</p>')
+    aide = ""       # plus de paragraphe d'aide : l'étoile dit ce qui est obligatoire, « Accepter » demande ce qui manque
     essentiel = f"""<div class="carte"><h2>Travaux</h2><div class="grille">
 {bloc_types(types_triees(conn), valeurs)}
 {bloc_options_travaux(valeurs)}
@@ -185,7 +180,7 @@ def formulaire_nouveau(conn, valeurs, erreurs=()):
     return (f'{_erreurs_html(erreurs)}<form method="post" action="/nouveau">{client_essentiel(valeurs, lister_secteurs(conn), exige=False)}{essentiel}'
             f'{avance(client_avance(valeurs) + avance_chantier, ouvert=bool(erreurs))}'
             '<div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire annuler" href="/soumissions">Annuler</a></div></form>'
-            '<p class="doux">La soumission créée, tu reviens à la fiche du client. Elle s\'ouvre ensuite depuis l\'onglet Soumissions.</p>')
+            )
 
 
 def carte_client_lecture(conn, client_id, retour=""):
@@ -201,8 +196,7 @@ def carte_client_lecture(conn, client_id, retour=""):
             f'<a class="bouton secondaire" href="/client/{client_id}">Fiche client</a></div>'
             f'<p style="margin:8px 0 0"><b>Adresse :</b> {lien_maps(adresse_maps, adresse_texte)}</p>'
             f'<p style="margin:4px 0 0"><b>Téléphone :</b> {tels}{" · <b>Courriel :</b> " + esc(courriel) if courriel else ""}'
-            f'{" · <b>Accès :</b> " + esc(acces) if acces else ""}</p>'
-            '<p class="doux" style="margin:8px 0 0">Lecture seule : le nom, l\'adresse et les coordonnées du client ne se modifient que depuis sa fiche.</p></div>')
+            f'{" · <b>Accès :</b> " + esc(acces) if acces else ""}</p></div>')
 
 
 # ---------------------------------------------------------------------------
@@ -211,8 +205,8 @@ def carte_client_lecture(conn, client_id, retour=""):
 def _bloc_lecture(conn, chantier_id, v):
     """Chantier terminé : toutes les informations, en lecture seule."""
     detail = conn.execute("SELECT travaux_detail FROM v_chantiers WHERE chantier_id = ?", (chantier_id,)).fetchone()[0]
-    lignes = [("Travaux", detail), ("Description", v.get("description")), ("Date de la demande", v.get("date_soumission")),
-              ("Date des travaux", v.get("date_prevue")), ("Durée estimée", heures(float(v["duree_estimee_h"])) if v.get("duree_estimee_h") else ""),
+    lignes = [("Travaux", detail), ("Description", v.get("description")), ("Date de la demande", date_lisible(v.get("date_soumission"))),
+              ("Date des travaux", date_lisible(v.get("date_prevue"))), ("Durée estimée", heures(float(v["duree_estimee_h"])) if v.get("duree_estimee_h") else ""),
               ("Durée réelle", heures(float(v["duree_reelle_h"])) if v.get("duree_reelle_h") else ""),
               ("Prix avant taxes", argent(float(v["prix_ht"])) if v.get("prix_ht") else ""),
               ("TPS", argent(float(v["tps"])) if v.get("tps") else ""), ("TVQ", argent(float(v["tvq"])) if v.get("tvq") else ""),
@@ -224,7 +218,7 @@ def _bloc_lecture(conn, chantier_id, v):
 def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
     pmts = conn.execute("SELECT id, date_paiement, mode, montant, reference FROM paiements WHERE chantier_id = ? ORDER BY date_paiement, id", (chantier_id,)).fetchall()
     lignes = "".join(
-        f'<tr><td class="c-date">{esc(d)}</td><td class="c-mode">{esc(LIBELLES_MODE[m])}</td><td class="c-ref">{esc(ref)}</td><td class="droite c-montant">{argent(mt)}</td>'
+        f'<tr><td class="c-date">{esc(date_lisible(d))}</td><td class="c-mode">{esc(LIBELLES_MODE[m])}</td><td class="c-ref">{esc(ref)}</td><td class="droite c-montant">{argent(mt)}</td>'
         f'<td class="droite col-actions"><form method="post" action="/paiement/{pid}/supprimer" onsubmit="return confirm(\'Supprimer ce paiement ?\')">'
         f'<button class="danger" type="submit" aria-label="Supprimer ce paiement" title="Supprimer ce paiement">Supprimer</button></form></td></tr>' for pid, d, m, mt, ref in pmts)
     table = (f'<div class="liste-defile"><table class="paiements"><thead><tr><th>Date</th><th>Mode</th><th>Référence</th><th class="droite">Montant</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
@@ -251,7 +245,7 @@ def _bloc_paiements(conn, chantier_id, prix, solde, termine, erreur_paiement):
 def _autres_chantiers(conn, client_id, chantier_id):
     autres = conn.execute("SELECT chantier_id, type_libelle, attente_depuis, statut, genre"
                           " FROM v_chantiers WHERE client_id = ? AND chantier_id <> ? ORDER BY 3 DESC", (client_id, chantier_id)).fetchall()
-    liste_html = ("<ul>" + "".join(f'<li><a href="{url_fiche(i, g)}">{esc(d)} — {esc(t)}</a> {badge_statut(st, g)}</li>'
+    liste_html = ("<ul>" + "".join(f'<li><a href="{url_fiche(i, g)}">{esc(date_lisible(d))} — {esc(t)}</a> {badge_statut(st, g)}</li>'
                                    for i, t, d, st, g in autres) + "</ul>") if autres else '<p class="doux">Aucune autre fiche pour ce client.</p>'
     return (f'<div class="carte pc-seul"><h2>Autres soumissions et chantiers de ce client</h2>{liste_html}'
             f'<div class="barre"><a class="bouton secondaire" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission pour ce client</a></div></div>')
@@ -285,7 +279,7 @@ def _bloc_documents(chantier_id, statut, genre, soumission=False):
     lignes = [("Soumission", liens_pdf(chantier_id, "soumission") + lien_telecharger(chantier_id, "soumission"))]
     if est_admin() and facture_possible(statut, genre):
         lignes.append(("Facture", liens_pdf(chantier_id, "facture") + lien_telecharger(chantier_id, "facture")))
-    corps = "".join(f'<div class="ligne-document"><b>{nom}</b><div class="actions-page">{liens}</div></div>' for nom, liens in lignes)
+    corps = "".join(f'<div class="ligne-document"><div class="actions-page">{liens}</div></div>' for _, liens in lignes)
     return f'<div class="carte documents{" documents-pc" if soumission else ""}"><h2>Documents pour le client</h2>{corps}</div>'
 
 
@@ -304,10 +298,10 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     mot = "Soumission" if soumission else "Chantier"
     badges = badge_statut(statut, genre)
     if not soumission:
-        badges += (badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else "") + ('<span class="badge">Archivé</span>' if archive else "")
+        badges += (badge(stp, LIBELLES_PAIEMENT[stp]) if stp not in ("sans_objet", "a_venir") else "") + ('<span class="badge">Archivé</span>' if archive else "")
     infos = " · ".join(x for x in (
-        (f"Demande du {demande}" if soumission and demande else ""),
-        (f"Prévu le {date_prevue}" if date_prevue and not termine else (f"Fait le {date_prevue}" if date_prevue else "")),
+        (f"Demande : {le_date(demande)}" if soumission and demande else ""),
+        (f"Prévu {le_date(date_prevue)}" if date_prevue and not termine else (f"Fait {le_date(date_prevue)}" if date_prevue else "")),
         (f"Durée {heures(duree)}" if duree else ""),
         (f"Ouverte par {cree_par}" if soumission and cree_par else ""),
         (f"En attente : {texte_attente(reprise)}" if statut == "en_attente" else "")) if x)
@@ -316,7 +310,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                 + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and est_admin() and not soumission else "") + "</div>")
     coin = (f'<a class="lien-pdf-coin" href="/soumission/{chantier_id}/pdf" target="_blank" rel="noopener" '
             'title="Ouvrir la soumission en PDF (nouvel onglet)">Soumission</a>') if soumission else ""      # téléphone : discret, en haut à droite
-    resume = (f'<div class="carte resume-chantier">{coin}<div><div class="barre"><h2 style="margin:0">{esc(nom)}</h2>{badges}</div>'
+    resume = (f'<div class="carte resume-chantier">{coin}<div><div class="barre"><span class="no-fiche">{mot} n° {chantier_id}</span>{badges}</div>'
               f'<p style="margin:10px 0 0"><b>Travaux :</b> {esc(detail) if detail else "à préciser"}</p>'
               f'{f"<p class=doux style=margin-bottom:0>{esc(infos)}</p>" if infos else ""}</div>{montants}</div>')
 
@@ -357,7 +351,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                    'Tu peux la rouvrir si le client a changé d\'avis.</div>')
     elif statut == "en_attente":
         bandeau = ('<div class="verrou-termine">Chantier <b>en attente</b> : il n\'est pas proposé dans la Journée. '
-                   + ("Il redevient « À planifier » le <b>" + esc(reprise) + "</b>, ou dès que tu l'en sors." if reprise
+                   + ("Il redevient « À planifier » <b>" + esc(le_date(reprise)) + "</b>, ou dès que tu l'en sors." if reprise
                       else "Il reste en attente jusqu'à ce que tu l'en sortes.") + '</div>')
     elif statut == "annule":
         bandeau = ('<div class="verrou-termine">Chantier <b>annulé</b> : il est dans les archives. Il disparaît des journées ; '
@@ -373,13 +367,13 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         verrou = ('<div class="verrou-termine"><b>Chantier terminé : verrouillé en lecture seule.</b> Le client est considéré comme facturé. Il ne peut plus être modifié, '
                   'rouvert ni supprimé. Restent possibles : les paiements et la duplication (pour un travail récurrent).'
                   + (' Il est <b>archivé</b> (terminé et payé).' if archive else '') + '</div>')
-        contenu = (f'<h1>Chantier #{chantier_id}</h1>{resume}{verrou}{actions}{documents_client}{corps}{paiements}'
+        contenu = (f'<h1>{esc(nom)}</h1>{resume}{verrou}{actions}{documents_client}{corps}{paiements}'
                    f'{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres)}')
     elif refusee:
         suppression = (f'<div class="carte"><h2>Supprimer</h2><form method="post" action="/soumission/{chantier_id}/supprimer" '
                        f'onsubmit="return confirm({esc(repr(msg_suppr))})"><button class="danger" type="submit">Supprimer cette soumission</button></form></div>'
                        if est_admin() else "")
-        contenu = f'<h1>Soumission #{chantier_id}</h1>{resume}{bandeau}{actions}{documents_client}{corps}{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres + suppression)}'
+        contenu = f'<h1>{esc(nom)}</h1>{resume}{bandeau}{actions}{documents_client}{corps}{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres + suppression)}'
     else:
         essentiel, avance_chantier = cartes_chantier(conn, valeurs if valeurs is not None else depuis_base, creation=False, soumission=soumission)
         annuler = ('<button class="danger" type="submit" form="annuler-chantier" onclick="return confirm(\'Annuler ce chantier ? Il disparaît de sa journée '
@@ -396,7 +390,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                       f'<form id="supprimer-chantier" method="post" action="{base}/{chantier_id}/supprimer"></form>'
                       f'<form id="annuler-chantier" method="post" action="/action/annuler"><input type="hidden" name="chantier_id" value="{chantier_id}">'
                       f'<input type="hidden" name="retour" value="{base}/{chantier_id}"></form>')
-        contenu = f'<h1>{mot} #{chantier_id}</h1>{resume}{bandeau}{actions}{documents_client}{corps}{paiements}{formulaire}'
+        contenu = f'<h1>{esc(nom)}</h1>{resume}{bandeau}{actions}{documents_client}{corps}{paiements}{formulaire}'
     return gabarit(f"{mot} {chantier_id}", contenu, query.get("ok") if query else None, erreur_globale or (query.get("err") if query else None))
 
 
@@ -475,7 +469,7 @@ def _form_duplication(conn, chantier_id, valeurs, erreurs=()):
     taxes = " checked" if valeurs.get("avec_taxes") else ""
     return (f'{_erreurs_html(erreurs)}<div class="lecture-seule"><b>Fiche d\'origine :</b> {esc(r[0])} — {esc(r[1])} '
             f'({esc(libelle_statut(r[2], r[3]))}). Les travaux, la durée, le prix et le mode de règlement sont repris ; les dates repartent '
-            f'd\'aujourd\'hui ({datetime.date.today().isoformat()}) ; les paiements et la durée réelle ne sont pas copiés.</div>'
+            f'd\'aujourd\'hui ; les paiements et la durée réelle ne sont pas copiés.</div>'
             f'<form method="post" action="/chantier/{chantier_id}/dupliquer"><div class="carte"><h2>Nouvelle soumission</h2><div class="grille">'
             f'{champ("prix_ht", "Prix avant taxes ($)", valeurs, inputmode="decimal")}'
             f'{case_taxes("avec_taxes", taxes)}'
@@ -490,7 +484,7 @@ def page_dupliquer(conn, chantier_id):
         return gabarit("Introuvable", "<h1>Chantier introuvable</h1>"), 404
     valeurs = {"prix_ht": f"{r[0]:.2f}" if r[0] is not None else "", "avec_taxes": "1" if (r[1] or 0) + (r[2] or 0) > 0 else "",
                "duree_estimee_h": f"{r[3]:g}" if r[3] else "", "description": r[4] or ""}
-    return gabarit("Dupliquer le chantier", f'<h1>Dupliquer le chantier #{chantier_id}</h1>{_form_duplication(conn, chantier_id, valeurs)}')
+    return gabarit("Dupliquer le chantier", f'<h1>Dupliquer</h1>{_form_duplication(conn, chantier_id, valeurs)}')
 
 
 def dupliquer(conn, chantier_id, form):
@@ -506,7 +500,7 @@ def dupliquer(conn, chantier_id, form):
     if erreurs:
         valeurs = {c: form.get(c, "") for c in ("prix_ht", "duree_estimee_h", "description")}
         valeurs["avec_taxes"] = "1" if form.get("avec_taxes") else ""
-        return gabarit("Dupliquer le chantier", f'<h1>Dupliquer le chantier #{chantier_id}</h1>{_form_duplication(conn, chantier_id, valeurs, erreurs)}')
+        return gabarit("Dupliquer le chantier", f'<h1>Dupliquer</h1>{_form_duplication(conn, chantier_id, valeurs, erreurs)}')
     return redirection(f"/soumission/{nouveau}?ok=duplique")
 
 

@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 705 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 711 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -71,6 +71,12 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
 - **Chefs d'équipe (précisé en novembre 2026)** : 2 pour l'instant, peut-être plus un jour. Ils VOIENT LES PRIX et
   PEUVENT ENREGISTRER LES PAIEMENTS (donc aussi le rappel de paiement par texto). À préciser au moment de créer le rôle :
   ce qui leur reste interdit (probablement : comptes, journal, suppressions, Archives et export).
+- **Revue de l'interface (novembre 2026)**, iPhone et PC, en quatre lots. Lot 1 fait : dates lisibles (« ven. 4 déc. »,
+  « prévu demain »), titre des fiches au nom du client, plus de pastille « À venir », textes d'aide retirés, téléphone
+  lisible dans les champs. À venir : lot 2, nouvelle fiche chantier / soumission (lecture d'abord ; boutons appeler,
+  texto, itinéraire en haut ; « Modifier » ouvre le formulaire) ; lot 3, iPhone (barre du bas à 4 onglets SI elle reste
+  assez grosse, à décider sur capture ; listes allégées ; barre de la Journée ; fenêtre Terminer) ; lot 4, PC (tableau de
+  bord calendrier + journée côte à côte, filtres des Archives repliés, bandeau).
 - Feuille de route de la revue : étapes 1 et 2 faites ; étape 3 commencée (12. textos et courriels faits ;
   restent 13. itinéraire Google Maps, 14. feuille de style en cache, 15. HTTPS par Tailscale Serve).
 - Numéros de TPS et TVQ à inscrire dans outils/entreprise.py quand ils existeront.

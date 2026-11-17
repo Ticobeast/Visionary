@@ -16,7 +16,7 @@ from composants import (FILTRES_ATTENTE, JOURNEE_H, TRIS, avec_params, cellule_a
 from noyau import (annuler_chantier, changer_statut, cle, deplacer, jours_attente, planifier_lot, priorite, rouvrir_chantier,
                    terminer_chantier, transaction)
 from pdf import journee_pdf
-from vue import _BASE, badge_attente, esc, gabarit, heures, redirection
+from vue import _BASE, badge_attente, esc, gabarit, heures, le_date, redirection
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ def page_journee(conn, query):
             corps += (f'<tr><td colspan="6"><b>Secteur : {esc(secteur_courant)}</b> <span class="doux">{len(dans)} chantier{"s" if len(dans) > 1 else ""}'
                       f'{" · " + heures(h) if h else ""}</span></td></tr>')
         prio = priorite(l["jours"])
-        autre_jour = f'<div class="doux">prévu le {esc(l["date_prevue"])}</div>' if l["statut"] == "planifie" else ""
+        autre_jour = f'<div class="doux">prévu {esc(le_date(l["date_prevue"]))}</div>' if l["statut"] == "planifie" else ""
         if l["duree_estimee_h"]:
             duree = f'<span class="total">Durée {heures(l["duree_estimee_h"])}</span>'
             case = (f'<input type="checkbox" name="sel_{l["chantier_id"]}" value="1" aria-label="Choisir {esc(nom_client(l))}">')
@@ -153,7 +153,7 @@ def page_journee(conn, query):
             duree = f'<a href="/chantier/{l["chantier_id"]}">durée à estimer : ouvrir le chantier</a>'
             case = '<input type="checkbox" disabled title="La durée estimée est obligatoire pour planifier">'
         corps += (f'<tr data-id="{l["chantier_id"]}" data-h="{l["duree_estimee_h"] or 0}" data-m="{l["total_ttc"] or 0}" class="ligne-{prio}"><td class="c-case">{case}</td>'
-                  f'<td class="c-depuis">{badge_attente(l["jours"], prio)}<div class="doux">depuis {esc(l["attente_depuis"])}</div></td>'
+                  f'<td class="c-depuis">{badge_attente(l["jours"], prio)}<div class="doux">depuis {esc(le_date(l["attente_depuis"]))}</div></td>'
                   f'<td class="c-client">{cellule_client(l)}</td><td class="c-adresse">{cellule_adresse(l)}</td><td class="c-travaux"><a href="/chantier/{l["chantier_id"]}">{esc(l["travaux_detail"] or l["type_libelle"])}</a>'
                   f'<div>{duree}</div>{"<div class=doux>" + esc(l["description"]) + "</div>" if l["description"] else ""}{autre_jour}</td>'
                   f'<td class="c-montant">{cellule_montant(l)}</td></tr>')

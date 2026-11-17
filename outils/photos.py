@@ -99,7 +99,7 @@ def bloc(conn, chantier_id):
     noms = lister(dossier)
     vignettes = "".join(f'<a class="photo" href="{base}/{esc(n)}" data-nom="{esc(n)}"><img src="{base}/{esc(n)}?v=1" alt="Photo" loading="lazy"></a>' for n in noms)
     corps = (f'<div class="photos-grille">{vignettes}</div>' if noms
-             else '<p class="doux photos-vide">Aucune photo. Prends-en avec le téléphone, ou ajoute-en depuis la galerie ou l\'ordinateur.</p>')
+             else '<p class="doux photos-vide">Aucune photo.</p>')
     return (f'<div class="carte photos" id="photos" data-base="{base}"><h2>Photos{f" ({len(noms)})" if noms else ""}</h2>{corps}'
             '<div class="barre photos-actions">'
             '<label class="bouton photo-prendre">Prendre une photo<input type="file" accept="image/*" capture="environment" hidden></label>'

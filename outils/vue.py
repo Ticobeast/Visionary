@@ -1,4 +1,5 @@
 """Éléments d'affichage partagés par toutes les pages : styles, gabarit, composants de formulaire."""
+import datetime
 import html
 import re
 import threading
@@ -188,7 +189,7 @@ td a{color:var(--vert-fonce)}
 .actions-page .bouton,.actions-page button{padding:11px 20px;font-size:.95rem;white-space:nowrap}.actions-bloc .manque{margin:8px 0 0;font-size:.9rem}
 .actions-soumission .bouton,.actions-soumission button{padding:7px 14px;font-size:14px;line-height:1.3;white-space:nowrap}
 .actions-ligne.actions-soumission{flex-wrap:wrap}.groupe-actions{display:inline-flex;gap:8px;align-items:center}
-.lien-pdf-coin{display:none;position:absolute;top:10px;right:14px;font-size:.78rem;font-weight:600;color:var(--doux)!important;text-decoration:underline}.carte.documents h2{margin:0 0 8px}.ligne-document{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0}.ligne-document b{min-width:112px}.ligne-document .actions-page .bouton{padding:8px 16px;font-size:.9rem}
+.lien-pdf-coin{display:none;position:absolute;top:10px;right:14px;font-size:.78rem;font-weight:600;color:var(--doux)!important;text-decoration:underline}.carte.documents h2{margin:0 0 8px}.ligne-document{display:inline-flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 8px 6px 0}.ligne-document b{min-width:112px}.ligne-document .actions-page .bouton{padding:8px 16px;font-size:.9rem}
 .tuiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0}
 .tuile{background:#fff;border:1px solid var(--trait-leger);border-radius:14px;box-shadow:var(--ombre-sm);padding:12px 16px}
 .tuile b{display:block;font-size:1.35rem;font-weight:800;color:var(--vert-fonce);line-height:1.2}.tuile span{color:var(--doux);font-size:.78rem;font-weight:700}
@@ -217,6 +218,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
 .barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.texto-jour,.note-heures,.resume-jour,.total-jour{display:none}
+.no-fiche{font-weight:700;color:var(--doux);font-size:.9rem}
 .message-client .sorte-message{margin:0 0 6px}.message-client .apercu-message{margin:0 0 12px;padding:10px 14px;background:var(--fond);border:1px solid var(--trait-leger);border-radius:12px;color:var(--doux);white-space:pre-line}
 .carte-jour{position:relative}.carte-jour h2{padding-right:48px}
 .info-btn{--loupe:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E");position:absolute;top:12px;right:14px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;box-shadow:none;cursor:pointer}
@@ -403,6 +405,35 @@ def heures(h):
     return f"{minutes // 60} h" + (f" {minutes % 60:02d}" if minutes % 60 else "")
 
 
+JOURS_COURTS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
+MOIS_COURTS = ["janv.", "févr.", "mars", "avril", "mai", "juin", "juill.", "août", "sept.", "oct.", "nov.", "déc."]
+
+
+def date_lisible(iso, aujourdhui=None):
+    """« 2026-12-04 » -> « ven. 4 déc. » (cette année) ; « 2025-04-12 » -> « 12 avril 2025 » (une autre année).
+    Vide ou illisible : rendu tel quel. La base, les formulaires et les adresses gardent le format AAAA-MM-JJ."""
+    try:
+        d = datetime.date.fromisoformat((iso or "")[:10])
+    except ValueError:
+        return iso or ""
+    jour = f"{d.day}{'er' if d.day == 1 else ''} {MOIS_COURTS[d.month - 1]}"
+    if d.year != (aujourdhui or datetime.date.today()).year:
+        return f"{jour} {d.year}"
+    return f"{JOURS_COURTS[d.weekday()]} {jour}"
+
+
+def le_date(iso, aujourdhui=None):
+    """Dans une phrase : « aujourd'hui », « demain », « hier », sinon « le ven. 4 déc. » (« prévu demain », « prévu le ven. 4 déc. »)."""
+    aujourdhui = aujourdhui or datetime.date.today()
+    try:
+        ecart = (datetime.date.fromisoformat((iso or "")[:10]) - aujourdhui).days
+    except ValueError:
+        return iso or ""
+    if ecart in (-1, 0, 1):
+        return ("hier", "aujourd'hui", "demain")[ecart + 1]
+    return "le " + date_lisible(iso, aujourdhui)
+
+
 def case_taxes(nom, cochee):
     """« Ajouter TPS et TVQ » : sur sa propre ligne de la grille (le libellé est trop long pour une colonne)."""
     return (f'<div class="large"><label class="coche"><input type="checkbox" name="{nom}" value="1"{" checked" if cochee else ""}>'
@@ -456,8 +487,8 @@ def badge(code, libelle):
 
 
 def texte_attente(reprise):
-    """« reprise le 2026-06-01 » ou « jusqu'à nouvel ordre » : la fin de l'attente d'un chantier mis de côté."""
-    return f"reprise le {reprise}" if reprise else "jusqu'à nouvel ordre"
+    """« reprise le lun. 1er juin » ou « jusqu'à nouvel ordre » : la fin de l'attente d'un chantier mis de côté."""
+    return f"reprise {le_date(reprise)}" if reprise else "jusqu'à nouvel ordre"
 
 
 def url_fiche(chantier_id, genre):
@@ -537,7 +568,7 @@ def bloc_options_travaux(valeurs):
 <label class="coche"><input type="checkbox" name="debarrasser_bois" id="debarrasser_bois" value="1"{" checked" if valeurs.get("debarrasser_bois") == "1" else ""}>Débarrasser le bois</label>
 <span id="bois-format" class="coche">Bois laissé sur place, format :
 <select name="bois_format" aria-label="Format du bois laissé sur place"><option value="">—</option>{options}</select></span></div>
-<p class="doux" style="margin:4px 0 0">Abattage / élagage : si le bois n'est pas débarrassé, précise son format (16 pouces ou 4 pieds).</p>
+
 <script>(function(){{var c=document.getElementById('debarrasser_bois'),b=document.getElementById('bois-format');
 function m(){{b.style.display=c.checked?'none':'';}}c.addEventListener('change',m);m();}})();</script></div>"""
 
@@ -554,6 +585,12 @@ def puces_options(nacelle, debarrasser_bois, bois_format):
     return "".join(f'<span class="puce-opt">{esc(p)}</span>' for p in puces)
 
 
+def _tel_lisible(valeurs, nom):
+    """Dans le champ de saisie, « +18195550107 » s'affiche « 819-555-0107 » (enregistré, il reprend la forme de la base)."""
+    t = valeurs.get(nom) or ""
+    return {**valeurs, nom: f"{t[2:5]}-{t[5:8]}-{t[8:]}"} if len(t) == 12 and t.startswith("+1") and t[1:].isdigit() else valeurs
+
+
 def client_essentiel(valeurs, secteurs, exige=True):
     """Ce qu'il faut pour retrouver un client : nom, téléphone, adresse des travaux, ville / secteur (liste).
 
@@ -561,7 +598,7 @@ def client_essentiel(valeurs, secteurs, exige=True):
     """
     return f"""<div class="carte"><h2>Client</h2><div class="grille">
 {champ("client_nom", "Nom", valeurs, autocomplete="off")}{champ("client_prenom", "Prénom", valeurs, autocomplete="off")}
-{champ("client_telephone", "Téléphone", valeurs, "tel", placeholder="450-555-0142")}
+{champ("client_telephone", "Téléphone", _tel_lisible(valeurs, "client_telephone"), "tel", placeholder="450-555-0142")}
 {champ("adresse", "Adresse (numéro + rue)", valeurs, large=True, placeholder="123 Rue des Érables", **({"required": True} if exige else {}))}
 {champ_secteur(secteurs, valeurs, requis=exige)}</div></div>"""
 
@@ -570,7 +607,7 @@ def client_avance(valeurs):
     """Le reste de la fiche client (rarement utile) : à placer dans « Paramètres avancés »."""
     sms = " checked" if valeurs.get("client_sms_ok", "1") != "0" else ""
     return f"""<div class="carte"><h2>Client : autres informations</h2><div class="grille">
-{champ("client_entreprise", "Entreprise / syndicat", valeurs)}{champ("client_telephone_2", "Téléphone 2", valeurs, "tel")}
+{champ("client_entreprise", "Entreprise / syndicat", valeurs)}{champ("client_telephone_2", "Téléphone 2", _tel_lisible(valeurs, "client_telephone_2"), "tel")}
 {champ("client_courriel", "Courriel", valeurs, "email")}
 <div><label>&nbsp;</label><label style="color:inherit"><input type="checkbox" name="client_sms_ok" value="1"{sms}>Rappels par texto acceptés</label></div>
 {zone("client_notes", "Notes sur le client (préférences, historique)", valeurs)}

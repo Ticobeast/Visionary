@@ -32,7 +32,7 @@ from noyau import (DB_DEFAUT, Index, Resultat, cle, creer_chantier, jours_attent
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
 from reseau import adresses_tailscale, client_autorise, hote_autorise  # noqa: E402
-from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, badge_depuis, badge_statut, esc,  # noqa: E402,F401
+from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, badge_depuis, badge_statut, date_lisible, esc, le_date,  # noqa: E402,F401
                  gabarit, heures, redirection, select_secteur, texte_attente, texte_jours)
 
 # ---------------------------------------------------------------------------
@@ -49,26 +49,26 @@ def _table_chantiers(lignes, finances=True):
         nom, entreprise = l["client_nom_complet"], l["entreprise"]
         nom_aff = nom if not entreprise or entreprise in nom else f"{nom} · {entreprise}"
         st, stp, solde, total = l["statut"], l["statut_paiement"], l["solde"], l["total_ttc"]
-        date_ = esc(l["attente_depuis"] or "")                          # chantier : depuis l'acceptation de la soumission
+        date_ = esc(date_lisible(l["attente_depuis"]))                    # chantier : depuis l'acceptation de la soumission
         if st == "a_planifier" and l["attente_depuis"]:
             jours = jours_attente(l["attente_depuis"], aujourdhui)
             retour = bool(l["reprise_le"])                              # sorti de l'attente (ou rouvert) : on compte depuis ce retour
             date_ += badge_depuis(jours, priorite(jours), "depuis la reprise" if retour else "depuis l'acceptation",
                                   f"À planifier depuis {texte_jours(jours)} (" + ("de retour à planifier" if retour else "soumission acceptée")
-                                  + f" le {l['attente_depuis']})")
+                                  + f" {le_date(l['attente_depuis'])})")
         elif finances and st == "termine" and stp in ("a_payer", "partiel") and l["date_prevue"]:
             # on attend l'argent : on compte depuis la FIN DES TRAVAUX (pas depuis la soumission ni l'acceptation)
             jours = jours_attente(l["date_prevue"], aujourdhui)
-            date_ = esc(l["date_prevue"]) + badge_depuis(
+            date_ = esc(date_lisible(l["date_prevue"])) + badge_depuis(
                 jours, priorite(jours), "depuis la fin des travaux",
-                f"Paiement attendu depuis {texte_jours(jours)} : travaux terminés le {l['date_prevue']}, "
+                f"Paiement attendu depuis {texte_jours(jours)} : travaux terminés {le_date(l['date_prevue'])}, "
                 + (f"solde à recevoir {argent(solde)}" if solde else "paiement à recevoir"))
-        prevu = f'<div class="doux">prévu le {esc(l["date_prevue"])}</div>' if l["date_prevue"] and st == "planifie" else ""
+        prevu = f'<div class="doux">prévu {esc(le_date(l["date_prevue"]))}</div>' if l["date_prevue"] and st == "planifie" else ""
         if st == "en_attente":
             prevu = f'<div class="doux">{esc(texte_attente(l["reprise_le"]))}</div>'
         if prevu:                                # téléphone : la date prévue remplace la date d'acceptation, sur la ligne du bas
             date_ = f'<span class="date-depuis">{date_}</span><span class="tel-seul">{re.sub("<[^>]+>", "", prevu)}</span>'
-        paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp != "sans_objet" else ""
+        paiement = badge(stp, LIBELLES_PAIEMENT[stp]) if stp not in ("sans_objet", "a_venir") else ""      # « À venir » ne dit rien : pas de pastille
         if stp in ("a_payer", "partiel") and solde and total and abs(solde - total) > 0.004:
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
         duree_aff = f'<div class="doux">Durée {esc(heures(l["duree_estimee_h"]))}</div>' if l["duree_estimee_h"] else ""
@@ -129,9 +129,8 @@ def page_chantiers(conn, query):
     en_attente = conn.execute("SELECT count(*) FROM v_chantiers WHERE statut = 'en_attente'").fetchone()[0]
     lien_attente = f' <a class="doux pc-seul" href="/chantiers?statut=en_attente">En attente ({en_attente})</a>' if en_attente else ""
     section_archives = (f'<h2 id="archives" style="margin-top:32px">Archives <small class="doux">({total_archives})</small></h2>'
-                        '<p class="doux">Chantiers <b>annulés</b>, et chantiers <b>terminés et payés</b> : ils sont déplacés ici automatiquement. '
-                        'Les terminés sont verrouillés en lecture seule ; « Dupliquer » crée une nouvelle soumission pour un travail récurrent. '
-                        + ('Pour chercher dans tout l\'historique, comparer et voir les statistiques : <a href="/archives">onglet Archives</a>.</p>' if admin else "</p>")
+                        '<p class="doux">Chantiers annulés, et chantiers terminés et payés.'
+                        + (' <a href="/archives">Chercher dans tout l\'historique</a></p>' if admin else "</p>")
                         + archives_html)
     return gabarit("Chantiers", f'<h1>Chantiers{lien_attente}{lien_archives}</h1>{raccourcis.barre(conn, "chantiers", query)}{recherche}{tableau}{section_archives}', query.get("ok"), large=True)
 
