@@ -310,6 +310,11 @@ table.gerer td:nth-child(2) b{font-size:1rem}table.gerer td:nth-child(2) .doux{f
 
 /* fenêtre « Terminer » : feuille qui monte du bas */
 .modale{align-items:flex-end;padding:0;z-index:1100}
+@keyframes feuille{from{transform:translateY(100%)}to{transform:none}}
+.modale-carte{animation:feuille .28s cubic-bezier(.2,.8,.2,1)}
+body.menu-ouvert .menu-feuille{animation:monte .22s cubic-bezier(.2,.8,.2,1)}body.menu-ouvert .menu-fond{animation:fondu .2s ease-out}
+table.soumissions tbody tr:active,table.chantiers tbody tr:active,table.clients tbody tr:active{background:var(--vert-doux)}
+.barre-mobile a,.barre-mobile button.menu-bouton{transition:color .15s,transform .1s}.barre-mobile a:active,.barre-mobile button.menu-bouton:active{transform:scale(.94)}
 .modale-carte{max-width:none;width:100%;border-radius:22px 22px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
 .modale .question{font-size:1.05rem;margin:8px 0 12px}
 .modale .barre{display:grid;grid-template-columns:1fr;gap:8px}.modale .barre .bouton{width:100%}.lien-facture-modale{text-align:center}

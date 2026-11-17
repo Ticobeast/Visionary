@@ -173,5 +173,19 @@ class TestActionsDesFiches(BaseTableau):
             self.assertIn(texte, bloc)
 
 
+class TestAnimations(unittest.TestCase):
+    def test_courtes_et_coupees_si_reduire_les_animations(self):
+        """Les animations répondent à un geste, durent 0,1 à 0,3 s, et se coupent avec le réglage « Réduire les animations »."""
+        import telephone
+        css = vue.CSS + telephone.CSS_TELEPHONE
+        self.assertIn("@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}", css)
+        for regle in (".menu-rapide[open]>.menu-rapide-liste{animation:apparait .18s", ".modale-carte{animation:monte .25s",
+                      "details.avance[open]>:not(summary)", ".message,.erreurs{animation:descend .25s", "button:active,.bouton:active{transform:scale(.97)",
+                      ".modale-carte{animation:feuille .28s"):
+            self.assertIn(regle, css, regle)
+        durees = [float(d) for d in re.findall(r"animation:[a-z-]+ (\.\d+)s", css)]
+        self.assertTrue(durees and max(durees) <= 0.3, durees)              # jamais plus de 0,3 s
+
+
 if __name__ == "__main__":
     unittest.main()

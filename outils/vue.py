@@ -243,6 +243,21 @@ a.rond{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:1
 a.rond:hover .rond-icone{background:var(--vert-doux);border-color:var(--vert-bord)}
 .rond-icone svg{width:22px;height:22px;fill:none;stroke:var(--vert-fonce);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 details.modifier-fiche>summary{font-weight:700}
+/* Animations : elles répondent à un geste et montrent ce qui a changé ; courtes (0,1 à 0,3 s). Voir le skill design-sylvainculteur. */
+@keyframes apparait{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes fondu{from{opacity:0}to{opacity:1}}
+@keyframes monte{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes descend{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.menu-rapide[open]>.menu-rapide-liste{animation:apparait .18s ease-out;transform-origin:top right}
+.modale{animation:fondu .2s ease-out}.modale-carte{animation:monte .25s cubic-bezier(.2,.8,.2,1)}
+details.avance[open]>:not(summary),details.filtres-det[open]>:not(summary){animation:descend .2s ease-out}
+.message,.erreurs{animation:descend .25s ease-out}
+button:active,.bouton:active{transform:scale(.97);transition-duration:.1s}
+.rond-icone{transition:transform .1s,background-color .15s,border-color .15s}a.rond:active .rond-icone{transform:scale(.92)}
+.menu-rapide>summary{transition:background-color .15s}
+table.soumissions tbody tr,table.chantiers tbody tr,table.clients tbody tr{transition:background-color .12s}
+@view-transition{navigation:auto}::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}@view-transition{navigation:none}}
 .no-fiche{font-weight:700;color:var(--doux);font-size:.9rem}
 
 .carte-jour{position:relative}.carte-jour h2{padding-right:48px}

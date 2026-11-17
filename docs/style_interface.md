@@ -58,6 +58,14 @@ Toujours dans cet ordre :
 - Téléphone : « 819-555-0107 ». Adresse : « 1650 Rue des Érables, Bécancour ».
 - Tutoiement dans l'interface ; vouvoiement dans ce qui part au client (textos, courriels, PDF).
 
+## Animations
+
+- Elles répondent à un geste et montrent ce qui a changé : le menu « ··· » qui s'ouvre, la fenêtre Terminer qui monte, « Modifier »
+  et les filtres qui se déplient, le message « Enregistré » qui glisse, un bouton qui s'enfonce un peu sous le doigt, un fondu
+  court entre deux pages.
+- Courtes : 0,1 s pour un bouton, 0,2 à 0,3 s pour ce qui apparaît. Jamais d'effet décoratif (cartes qui arrivent en cascade...).
+- Coupées quand l'appareil est réglé sur « Réduire les animations ». En CSS seulement (dans outils/vue.py et outils/telephone.py).
+
 ## Téléphone et PC
 
 - Le style du téléphone est dans `outils/telephone.py`, dans un seul bloc. Une demande « pour le téléphone » ne change pas le PC.
