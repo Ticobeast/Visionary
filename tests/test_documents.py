@@ -675,7 +675,7 @@ class TestBoutons(BaseDocuments):
         page = self.get(f"/soumission/{i}")
         rangee = re.search(r'<div class="actions-bloc">.*?</div></div>', page, re.S).group(0)
         self.assertNotIn("/pdf", rangee)                                              # rien dans la rangée Accepter / En attente / Refuser
-        self.assertNotIn("lien-pdf-coin", page.split("</style>", 1)[1])                # plus de raccourci en double en haut de la fiche
+        self.assertNotIn("lien-pdf-coin", page)                # plus de raccourci en double en haut de la fiche
         self.assertEqual(page.count(f'href="/soumission/{i}/pdf"'), 1)                  # la carte Documents, une seule fois
         self.assertIn('class="carte documents"', page)
         self.assertNotIn("/facture/", page)                                           # pas de facture avant l'acceptation

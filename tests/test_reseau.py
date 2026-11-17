@@ -207,7 +207,8 @@ class TestTelephone(unittest.TestCase):
         self.assertNotIn("background:var(--vert)!important", mobile)
         self.assertNotIn("--teinte", mobile)                                           # boutons secondaires : blancs, comme sur le site
         self.assertIn("button.secondaire,.bouton.secondaire{background:#fff;border:1px solid var(--trait)", mobile)
-        self.assertIn(mobile, vue.gabarit("t", "x"))
+        self.assertIn(mobile, vue.FEUILLE_DE_STYLE.decode("utf-8"))                   # dans la feuille servie à part...
+        self.assertIn(f'<link rel="stylesheet" href="{vue.URL_STYLE}">', vue.gabarit("t", "x"))      # ... que chaque page appelle
 
 
 if __name__ == "__main__":

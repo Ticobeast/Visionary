@@ -11,6 +11,8 @@ Arrêter : Ctrl+C dans la fenêtre du terminal.
 """
 import argparse
 import datetime
+import functools
+import gzip
 import re
 import sqlite3
 import sys
@@ -273,6 +275,16 @@ EN_TETES_SECURITE = [
 ]
 
 
+@functools.lru_cache(maxsize=4)
+def _compresser_fixe(corps):
+    return gzip.compress(corps, 9)
+
+
+def _compresser(corps):
+    """gzip. La feuille de style ne change pas pendant que le programme tourne : compressée une seule fois."""
+    return _compresser_fixe(corps) if corps is vue.FEUILLE_DE_STYLE else gzip.compress(corps, 5)
+
+
 class Gestionnaire(BaseHTTPRequestHandler):
     db_path = DB_DEFAUT
     hotes_autorises = ()
@@ -337,6 +349,13 @@ class Gestionnaire(BaseHTTPRequestHandler):
             self.send_header(k, v)
         for k, v in EN_TETES_SECURITE:
             self.send_header(k, v)
+        # Pages et feuille de style compressées quand le navigateur l'accepte : 4 à 6 fois plus légères sur le réseau cellulaire
+        type_ = next((v for k, v in en_tetes if k.lower() == "content-type"), "")
+        if (len(corps) > 1024 and type_.startswith(("text/html", "text/css"))
+                and "gzip" in (self.headers.get("Accept-Encoding") or "").lower()):
+            corps = _compresser(corps)
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Content-Length", str(len(corps)))
         if not any(k.lower() == "cache-control" for k, _ in en_tetes):
             self.send_header("Cache-Control", "no-store")

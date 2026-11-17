@@ -281,10 +281,12 @@ def connexion(conn, nom, mot_de_passe, ip):
 # Refus par défaut : le rôle « soumission » n'a accès QU'À ce qui est écrit ici. Une page ajoutée plus tard lui est donc fermée
 # tant qu'on ne l'a pas listée volontairement. Chaque ligne est (méthode, motif) : le motif est celui de la route dans interface.ROUTES.
 # L'administrateur a tout. Un rôle inconnu n'a rien.
+MOTIF_STYLE = r"^/style-[0-9a-f]{12}\.css$"      # la feuille de style : sans secret, nécessaire dès la page de connexion
+
 PERMIS_SOUMISSION = (
     # connexion, déconnexion, logo et icône
     ("GET", r"^/connexion$"), ("POST", r"^/connexion$"), ("POST", r"^/deconnexion$"),
-    ("GET", r"^/logo\.(svg|png)$"), ("GET", r"^/favicon\.ico$"),
+    ("GET", r"^/logo\.(svg|png)$"), ("GET", r"^/favicon\.ico$"), ("GET", MOTIF_STYLE),
     # pages d'accueil : calendrier, chantiers, nouvelle soumission, liste des clients
     ("GET", r"^/$"), ("GET", r"^/chantiers$"), ("GET", r"^/nouveau$"), ("POST", r"^/nouveau$"), ("GET", r"^/clients$"),
     # fiche client : voir, modifier, ajouter une soumission ou un chantier (pas de suppression)
@@ -366,7 +368,7 @@ def _page_refus(titre, message, statut="403 Forbidden"):
 def controler(conn, requete, methode, chemin, query=None):
     """Porte d'entrée : None si la requête peut continuer (le compte est mis dans vue.CONTEXTE), sinon une réponse toute faite."""
     vue.CONTEXTE.utilisateur = None
-    public = chemin in ("/connexion", "/favicon.ico") or chemin.startswith("/logo.")
+    public = chemin in ("/connexion", "/favicon.ico") or chemin.startswith("/logo.") or bool(re.match(MOTIF_STYLE, chemin))
     if nombre_actifs(conn) == 0:
         if not _est_local(requete.get("ip", "")):
             return _page_refus("Aucun compte", "Aucun compte n'est encore créé : l'accès à distance est fermé. Sur l'ordinateur de l'atelier, "
@@ -553,5 +555,6 @@ ROUTES_AUTH = [
     ("POST", r"^/utilisateurs/(\d+)/mot-de-passe$", lambda c, q, f, i: mot_de_passe(c, i, f)),
     ("POST", r"^/utilisateurs/(\d+)/actif$", lambda c, q, f, i: actif(c, i, f)),
     ("GET", r"^/logo\.(svg|png)$", lambda c, q, f, ext: logo(ext)),
+    ("GET", MOTIF_STYLE, lambda c, q, f, *g: vue.feuille_de_style()),
     ("GET", r"^/favicon\.ico$", lambda c, q, f, *g: logo("png")),
 ]

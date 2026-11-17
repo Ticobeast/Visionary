@@ -1,5 +1,6 @@
 """Éléments d'affichage partagés par toutes les pages : styles, gabarit, composants de formulaire."""
 import datetime
+import hashlib
 import html
 import json
 import re
@@ -397,6 +398,20 @@ def _barre_mobile(section):
             f'<div class="menu-feuille">{qui}{feuille}{sortie}</div></div>')
 
 
+# La feuille de style (ordinateur + téléphone) n'est plus recopiée dans chaque page : elle est servie à part, à une adresse qui
+# porte son empreinte (/style-<empreinte>.css). Le navigateur la garde en mémoire (un an) et ne la redemande plus ; dès que le
+# style change, l'empreinte change, donc l'adresse aussi, et la nouvelle feuille est prise tout de suite. Rien à vider à la main.
+FEUILLE_DE_STYLE = (CSS + CSS_TELEPHONE).encode("utf-8")
+VERSION_STYLE = hashlib.sha256(FEUILLE_DE_STYLE).hexdigest()[:12]
+URL_STYLE = f"/style-{VERSION_STYLE}.css"
+
+
+def feuille_de_style():
+    """Réponse de /style-<empreinte>.css : la feuille actuelle, à garder en mémoire (l'adresse change quand le style change)."""
+    return ("200 OK", [("Content-Type", "text/css; charset=utf-8"), ("Cache-Control", "private, max-age=31536000, immutable")],
+            FEUILLE_DE_STYLE)
+
+
 LIBELLES_RETOUR = {"/": "Accueil", "/chantiers": "Chantiers", "/soumissions": "Soumissions", "/clients": "Clients", "/journee": "Journée",
                    "/archives": "Archives", "/utilisateurs": "Utilisateurs"}
 
@@ -417,7 +432,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     if erreur:
         msg += f'<div class="erreurs"><strong>Action refusée :</strong> {esc(erreur)}</div>'
     section = section or section_de(getattr(CONTEXTE, "chemin", ""))
-    tete = f'<style>{CSS}{CSS_TELEPHONE}</style></head><body>'
+    tete = f'<link rel="stylesheet" href="{URL_STYLE}"></head><body>'
     entete = ('<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">'
               f'<meta name="theme-color" content="#0e341d"><title>{esc(titre)} — SylvainCulteur</title>')
     if public:           # page de connexion et refus : pas de menu

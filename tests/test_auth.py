@@ -602,6 +602,7 @@ def _chemins_exemples(motif):
     """Chemins réels qui correspondent à un motif de route (un par variante « soumission » / « chantier »)."""
     chemin = motif.lstrip("^").rstrip("$").replace("\\.", ".")
     chemin = chemin.replace("(\\d+)", "3").replace("([^/]+)", "photo.jpg").replace("(svg|png)", "svg")
+    chemin = chemin.replace("[0-9a-f]{12}", "0123456789ab")                       # la feuille de style : /style-<empreinte>.css
     variantes = ("soumission", "chantier") if "(?:soumission|chantier)" in chemin else (None,)
     return [chemin if v is None else chemin.replace("(?:soumission|chantier)", v) for v in variantes]
 

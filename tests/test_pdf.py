@@ -19,6 +19,7 @@ sys.path.insert(0, str(RACINE / "tests"))
 import fixtures  # noqa: E402
 import interface  # noqa: E402
 import pdf  # noqa: E402
+import vue  # noqa: E402
 
 
 def png_minimal(couleur=(200, 100, 50)):
@@ -185,7 +186,7 @@ class TestBoutons(BasePdf):
         self.assertIsNotNone(m)
         self.assertIn(">Terminer</a>", m.group(1))
         self.assertIn(">Retirer</button>", m.group(1))
-        self.assertIn(".actions-ligne{display:flex", page)                     # rangée horizontale
+        self.assertIn(".actions-ligne{display:flex", vue.CSS)                  # rangée horizontale (feuille de style, servie à part)
 
 
 class TestPhotos(BasePdf):

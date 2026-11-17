@@ -68,6 +68,8 @@ Toujours dans cet ordre :
 
 ## Téléphone et PC
 
+- Le style (ordinateur dans `outils/vue.py`, téléphone dans `outils/telephone.py`) est servi à part, à l'adresse
+  `/style-<empreinte>.css` : le navigateur le garde en mémoire. Rien à faire quand on le modifie : l'adresse change toute seule.
 - Le style du téléphone est dans `outils/telephone.py`, dans un seul bloc. Une demande « pour le téléphone » ne change pas le PC.
 - Barre du bas de l'iPhone : Accueil, Soumissions, Chantiers, Clients, puis le menu (Journée, Archives, Utilisateurs).
 - Sur PC, les listes gardent leurs colonnes. Les fiches suivent les mêmes règles que sur le téléphone.
