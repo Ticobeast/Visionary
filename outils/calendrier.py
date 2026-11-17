@@ -171,8 +171,8 @@ def _grille(conn, premier, selection, aujourdhui):
             if h > JOURNEE_H:
                 classes.append("chargee")
             info = (f'<span class="cal-info"><b>{n} chantier{"s" if n > 1 else ""}</b>'
-                    f'<span class="cal-ligne">Temps total : {heures(h) if h else "?"}</span>'
-                    f'<span class="cal-ligne">Montant total : <span class="nw">{esc(argent_entier(montant))}</span></span></span>')
+                    f'<span class="cal-ligne">{heures(h) if h else "durée ?"}</span>'
+                    f'<span class="cal-ligne nw">{esc(argent_entier(montant))}</span></span>')
             if planifies and j < aujourdhui:
                 classes.append("a-cloturer")
                 info += '<span class="cal-alerte">à clôturer</span>'
@@ -198,6 +198,7 @@ def page_calendrier(conn, query):
     premier = _mois_valide(query.get("mois")) or d.replace(day=1)
     mois_code = f"{premier.year}-{premier.month:02d}"
     retour = "/?" + urlencode({"date": jour, "mois": mois_code})
-    contenu = (f'<h1>Tableau de bord</h1>{_grille(conn, premier, jour, aujourdhui)}'
-               f'{panneau_jour(conn, jour, retour)}')
+    # PC : le calendrier à gauche, la journée choisie à droite (plus besoin de descendre) ; téléphone : l'un sous l'autre
+    contenu = (f'<h1>Tableau de bord</h1><div class="tableau-bord">{_grille(conn, premier, jour, aujourdhui)}'
+               f'{panneau_jour(conn, jour, retour)}</div>')
     return gabarit("Tableau de bord", contenu, query.get("ok"), query.get("err"), large=True)

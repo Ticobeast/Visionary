@@ -45,9 +45,10 @@ Toujours dans cet ordre :
 
 ## Une liste
 
-- **Toute la carte s'ouvre d'un toucher.** Pas de boutons sur la carte.
-- **Les actions rapides** (Accepter, En attente, Refuser, PDF) sont derrière le petit bouton **« ··· »** en haut à droite de
-  la carte : on agit sans quitter la liste.
+- **Toute la carte (ou la ligne, sur PC) s'ouvre d'un toucher.** Pas de boutons sur la carte.
+- **Les actions rapides** (Appeler, Accepter, En attente, Refuser, PDF) sont derrière le petit bouton **« ··· »** de la carte,
+  sur iPhone comme sur PC : on agit sans quitter la liste.
+- **Le numéro de téléphone se lit, en gris** (pas de lien) : on appelle par « Appeler » (bouton rond de la fiche, ou menu « ··· »).
 - Par défaut, on montre ce qui est en cours. Le reste (terminés, archives) se voit avec une pastille ou une recherche.
 
 ## Les mots et les nombres
@@ -62,3 +63,4 @@ Toujours dans cet ordre :
 - Le style du téléphone est dans `outils/telephone.py`, dans un seul bloc. Une demande « pour le téléphone » ne change pas le PC.
 - Barre du bas de l'iPhone : Accueil, Soumissions, Chantiers, Clients, puis le menu (Journée, Archives, Utilisateurs).
 - Sur PC, les listes gardent leurs colonnes. Les fiches suivent les mêmes règles que sur le téléphone.
+- Tableau de bord sur PC : le calendrier à gauche, la journée choisie à droite ; sur iPhone, l'un sous l'autre.

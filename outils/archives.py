@@ -12,7 +12,7 @@ import io
 from urllib.parse import urlencode
 
 from noyau import cle, decaler_mois, lister_secteurs
-from vue import argent, badge_statut, date_lisible, esc, gabarit, heures, lien_tel, url_fiche
+from vue import argent, badge_statut, date_lisible, esc, gabarit, heures, tel_texte, url_fiche
 
 LIMITE_RESULTATS = 200
 RESULTATS = (("termine", "Chantiers terminés"), ("annule", "Chantiers annulés"), ("refusee", "Soumissions refusées"), ("tout", "Tout l'historique"))
@@ -383,7 +383,7 @@ def _bloc_soumissions(ss):
 
 def _identite(nom, tel, lien):
     """Le nom du client (lien) et, dessous, son téléphone."""
-    return f'<a href="{lien}">{esc(nom)}</a>' + (f'<div class="doux">{lien_tel(tel)}</div>' if tel else "")
+    return f'<a href="{lien}">{esc(nom)}</a>' + (f'<div class="doux">{tel_texte(tel)}</div>' if tel else "")
 
 
 def _lieu(adresse, secteur, ville):

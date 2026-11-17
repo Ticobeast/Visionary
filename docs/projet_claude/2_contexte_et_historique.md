@@ -88,7 +88,10 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   Fiche client sur PC : « + Nouvelle soumission » à gauche d'Appeler.
   Chasse aux doublons : lien PDF en double retiré, pastille « Soumission » retirée, surtitres en double retirés (PC),
   filtres des Archives repliés aussi sur PC ; test automatique tests/test_doublons.py.
-  À venir : lot 4, PC (reste : tableau de bord calendrier + journée côte à côte, liste des soumissions avec « ··· ») ; lot 4, PC (tableau de
+  Lot 4 fait (PC) : tableau de bord calendrier à gauche + journée à droite ; liste des soumissions avec « ··· » (Appeler compris) ;
+  lignes entières cliquables (Soumissions, Chantiers, Clients) ; numéros de téléphone des listes en texte gris (choix de l'utilisateur).
+  La revue de l'interface (lots 1 à 4) est terminée ; reste de l'étape 3 de la revue : 13. itinéraire, 14. feuille de style en cache,
+  15. HTTPS par Tailscale Serve. ; lot 4, PC (tableau de
   bord calendrier + journée côte à côte, filtres des Archives repliés, bandeau).
 - Feuille de route de la revue : étapes 1 et 2 faites ; étape 3 commencée (12. textos et courriels faits ;
   restent 13. itinéraire Google Maps, 14. feuille de style en cache, 15. HTTPS par Tailscale Serve).

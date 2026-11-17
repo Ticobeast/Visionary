@@ -658,7 +658,7 @@ class TestBoutons(BaseDocuments):
     def ligne_de(page, i):
         return next(tr for tr in re.findall(r"<tr>.*?</tr>", page, re.S) if f'href="/soumission/{i}"' in tr)
 
-    def test_liste_des_soumissions_pdf_a_cote_d_accepter_en_attente_refuser(self):
+    def test_liste_des_soumissions_menu_avec_accepter_en_attente_refuser_et_pdf(self):
         a, b = self.soumission_complete(client_nom="Alpha"), self.soumission_complete(client_nom="Beta", adresse="2 Rue B")
         page = self.get("/soumissions")
         for i in (a, b):
@@ -666,8 +666,9 @@ class TestBoutons(BaseDocuments):
             self.assertIn(f'<a class="bouton secondaire lien-pdf" href="/soumission/{i}/pdf" target="_blank" rel="noopener"', ligne)
             self.assertNotIn("telecharger", ligne)                                    # un seul bouton, pas de « Télécharger »
             ordre = [ligne.index(x) for x in (">Accepter<", ">En attente<", ">Refuser<", ">Soumission<")]
-            self.assertEqual(ordre, sorted(ordre))                                    # dans cet ordre, sur la même ligne de boutons
-            self.assertEqual(ligne.count("actions-ligne"), 1)
+            self.assertEqual(ordre, sorted(ordre))                                    # dans cet ordre, dans le menu « ··· »
+            self.assertEqual(ligne.count('<details class="menu-rapide">'), 1)          # une seule fois (plus de boutons sur la ligne)
+            self.assertNotIn("actions-ligne", ligne)
 
     def test_fiche_d_une_soumission_carte_documents_sans_encombrer_les_boutons_du_haut(self):
         i = self.soumission_complete()

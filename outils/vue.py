@@ -103,11 +103,25 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
 .verrou{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}.verrou b{font-size:17px}
 .total{font-weight:700}.barre-filtres .chercher-filtres{display:none}.filtres:has(.filtres-det[open]) .barre-filtres .chercher-filtres{display:inline-flex}
-.menu-rapide{display:none}.actions-sec{display:contents}.tel-bloc{display:none}
+.actions-sec{display:contents}.tel-bloc{display:none}
+.menu-rapide{position:relative;display:inline-block}.menu-rapide.menu-fiche{display:none}.menu-rapide[open]{z-index:6}
+.menu-rapide>summary{list-style:none;width:40px;height:34px;border-radius:10px;cursor:pointer;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230e341d'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/svg%3E") center/20px no-repeat}
+.menu-rapide>summary::-webkit-details-marker{display:none}.menu-rapide>summary:hover,.menu-rapide[open]>summary{background-color:var(--puce)}
+.menu-rapide-liste{position:absolute;right:0;top:40px;z-index:6;min-width:210px;display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff;border:1px solid var(--trait-leger);border-radius:16px;box-shadow:0 12px 32px rgba(14,52,29,.2)}
+.menu-rapide-liste .mini{display:block;margin:0}.menu-rapide-liste .bouton,.menu-rapide-liste button{width:100%;justify-content:center}
+.menu-rapide-liste .lien-pdf{position:static!important;padding:8px 12px!important;border:1px solid var(--trait)!important;background:#fff!important;font-size:14px!important;color:var(--texte)!important;text-decoration:none;text-align:center}
+table.soumissions tbody tr,table.chantiers tbody tr,table.clients tbody tr{position:relative}@media (hover:hover){table.soumissions tbody tr:hover,table.chantiers tbody tr:hover,table.clients tbody tr:hover{background:var(--vert-doux)}}
+table.chantiers td.c-client a::after,table.clients td.c-client a::after,table.soumissions a.lien-carte::after{content:"";position:absolute;inset:0;z-index:0}
+table.soumissions td.col-actions{text-align:right;width:56px}table.soumissions .menu-rapide{z-index:2}table.soumissions .menu-rapide[open]{z-index:7}
+table.soumissions,.liste-defile:has(table.soumissions){overflow:visible}.menu-rapide-liste{text-align:center}
+.menu-rapide-liste .bouton,.menu-rapide-liste button{min-height:40px;padding:8px 12px;font-size:14px}
 .sel-total[hidden]{display:none}
 .choix-paye{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:12px}.mode-paye{display:none;margin-bottom:12px}.modale-carte:has(input[value=oui]:checked) .mode-paye{display:block}.duree-reelle{margin-bottom:14px}.lien-facture-modale{margin:12px 0 0;font-size:.9rem}.modale-carte h2+.doux{margin-top:-4px}.sel-total .charge{color:#b42318}
 .sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
 .cal-nav{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.cal-nav h2{margin:0;flex:1;text-align:center;font-size:20px;min-width:140px}
+@media (min-width:701px){.tableau-bord{display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:20px;align-items:start}
+.tableau-bord>.carte{margin-bottom:0}.tableau-bord .cal-jour{min-height:70px;padding:4px 6px}.tableau-bord .cal-info{font-size:11px}
+.tableau-bord .cal-nav .bouton{padding:6px 10px;font-size:13px}.tableau-bord .cal-nav h2{font-size:17px;min-width:110px}}
 .cal-grille{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-tete{font-size:13px;color:var(--doux);text-align:center;font-weight:600;padding:4px 0;text-transform:capitalize}
 .cal-jour{min-height:124px;padding:6px 8px;border:1px solid var(--trait);border-radius:8px;text-decoration:none;color:var(--texte);display:flex;flex-direction:column;gap:2px;background:var(--carte)}
@@ -503,13 +517,12 @@ def case_taxes(nom, cochee):
             'Ajouter TPS 5 % et TVQ 9,975 %</label></div>')
 
 
-def lien_tel(t):
-    """Numéro de téléphone cliquable : sur un téléphone, un toucher lance l'appel. Le texte reste « 819-555-0106 » (ordinateur : rien ne change)."""
+def tel_texte(t):
+    """Numéro à LIRE : « 819-555-0106 », en texte (pas de lien). Pour appeler : le bouton rond Appeler de la fiche,
+    ou « Appeler » dans le menu « ··· » d'une carte (docs/style_interface.md : on agit par les boutons)."""
     if not t:
         return ""
-    texte = f"{t[2:5]}-{t[5:8]}-{t[8:]}" if len(t) == 12 else t
-    chiffres = "+" * t.startswith("+") + "".join(c for c in t if c.isdigit())
-    return f'<a class="tel" href="tel:{esc(chiffres)}">{esc(texte)}</a>'
+    return esc(f"{t[2:5]}-{t[5:8]}-{t[8:]}" if len(t) == 12 else t)
 
 
 def lien_maps(adresse_maps, texte):

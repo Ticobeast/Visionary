@@ -26,7 +26,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, STATUTS_SOUMISSION, TYPES_
                    mettre_a_jour_fiche, remettre_en_soumission, taxes_pour, supprimer_chantier as supprimer_chantier_noyau, transaction, travaux_depuis_formulaire,
                    valeurs_client)
 from vue import (libelle_statut, est_admin, LIBELLES_MODE, LIBELLES_PAIEMENT, MODES, adresses, argent, avance, badge, badge_statut, bloc_options_travaux,
-                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, date_lisible, esc, gabarit, heures, le_date, liste, rangee_actions, lien_maps, lien_tel,
+                 bloc_types, case_taxes, champ, champ_modalite, client_avance, client_essentiel, date_lisible, esc, gabarit, heures, le_date, liste, rangee_actions, lien_maps, tel_texte,
                  redirection, texte_attente, url_fiche, utilisateur_courant, zone)
 
 
