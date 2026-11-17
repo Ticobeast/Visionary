@@ -12,6 +12,8 @@ clients, soumissions, chantiers, journées, paiements, PDF, photos. Voir README.
   (un seul bloc @media (max-width:700px)) ; une demande « pour téléphone » ne doit pas changer l'ordinateur.
 - Style : celui du site de l'entreprise. Vert principal #4a7a28, vert foncé #0e341d, fond #fbfbf9, bordures #dbe2d6 / #ecefe9.
   Bouton principal vert plein ; boutons secondaires BLANCS à bordure grise (jamais vert pâle) ; cartes blanches arrondies à fine bordure.
+- Règles d'interface communes (titre, flèche de retour, carte de contact, « Modifier » replié, listes et menu « ··· », dates, prix) :
+  docs/style_interface.md. Toute nouvelle page les suit.
 
 ## Contraintes techniques
 - Python 3.9+ (le PC a 3.9.13), bibliothèque standard SEULEMENT (Pillow facultatif pour les photos du PDF). Pas de framework.

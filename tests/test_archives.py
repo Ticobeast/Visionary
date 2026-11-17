@@ -452,7 +452,8 @@ class TestPresentationTelephone(BaseArchives):
         lien = '<a class="tel" href="tel:+18195550106">819-555-0106</a>'
         self.assertIn(lien, self.get("/archives?resultat=tout"))
         self.assertIn(lien, self.get("/clients"))
-        self.assertIn(lien, self.get("/client/%d" % self.sql("SELECT id FROM clients WHERE nom = 'Hamel'")[0][0]))
+        fiche = self.get("/client/%d" % self.sql("SELECT id FROM clients WHERE nom = 'Hamel'")[0][0])
+        self.assertIn('<a class="rond" href="tel:+18195550106"', fiche)          # fiche : le bouton rond Appeler (le numéro se lit)
 
     def test_soumissions_et_chantiers_ont_la_bulle_modifier_et_le_plus_rond(self):
         soumissions, chantiers = self.get("/soumissions"), self.get("/chantiers")

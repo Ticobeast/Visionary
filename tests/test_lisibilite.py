@@ -116,5 +116,20 @@ class TestNavigation(BaseTableau):
         self.assertIn('<table class="liste chantiers">', page)                 # on cherche quelque chose : tout est montré
 
 
+class TestMenuRapide(BaseTableau):
+    def test_menu_des_cartes_de_soumission(self):
+        """Téléphone : Accepter, En attente, Refuser et le PDF restent à portée, derrière le petit bouton « ··· » de la carte."""
+        _, page = self.get("/soumissions")
+        devis = self.ids["Devis"]
+        ligne = page[page.index(f'<a class="lien-carte" href="/soumission/{devis}">'):]
+        ligne = ligne[:ligne.index("</tr>")]
+        menu = ligne[ligne.index('<details class="menu-rapide">'):]
+        for attendu in (f'action="/soumission/{devis}/accepter"', f'href="/soumission/{devis}/attente', f'action="/soumission/{devis}/refuser"',
+                        f'href="/soumission/{devis}/pdf"'):
+            self.assertIn(attendu, menu)
+        self.assertIn('<summary aria-label="Actions" title="Actions"></summary>', menu)
+        self.assertIn('details.menu-rapide[open]', page)                   # un toucher ailleurs ferme le menu
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 from composants import retour_valide
 from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprimable, resume_suppression_client, supprimer_client as supprimer_client_noyau, Resultat, alias_types_travaux, appliquer_secteur, cle, creer_chantier, lire_client, lire_ligne,
                    client_remplacant, doublons_fusionnes, erreurs_fusion, fiche_gardee, fusionner_clients, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
-from pages_chantier import appliquer_options
+from pages_chantier import appliquer_options, carte_contact
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, champ_secteur, client_avance,
                  client_essentiel, date_lisible, esc, gabarit, lien_maps, lien_tel, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
@@ -107,28 +107,20 @@ def page_client(conn, client_id, query):
     historique = (f'<div class="liste-defile" style="margin-bottom:16px"><table class="historique"><thead><tr><th>Date</th><th>Travaux</th><th>Statut</th></tr></thead>'
                   f'<tbody>{lignes}</tbody></table></div>'
                   if lignes else '<p class="doux">Aucune soumission ni chantier pour ce client.</p>')
-    tels = " · ".join(lien_tel(t) for t in (c["telephone"], c["telephone_2"]) if t) or "—"
-
-    def ligne(libelle, contenu_html):
-        return f'<p style="margin:6px 0 0"><b>{libelle} :</b> {contenu_html}</p>'
     anciennes = conn.execute("SELECT id, adresse, ville FROM clients WHERE remplace_par = ? ORDER BY id", (client_id,)).fetchall()
     nouvelle = _client(conn, c["remplace_par"]) if c["remplace_par"] else None
-    fiche = ('<div class="carte">' + ('<span class="badge">Ancienne adresse</span>' if c["remplace_par"] else "")
-             + (ligne("Nouvelle adresse", f'<a href="/client/{nouvelle["id"]}">{esc(nouvelle["adresse"] or nouvelle["ville"] or "voir la fiche")}</a>') if nouvelle else "")
-             + (ligne("Ancienne adresse" if len(anciennes) == 1 else "Anciennes adresses",
-                      " · ".join(f'<a href="/client/{i}">{esc(a or v or "voir la fiche")}</a>' for i, a, v in anciennes)) if anciennes else "")
-             + ligne("Adresse", lien_maps(c["adresse_maps"], c["adresse_texte"]) if c["adresse"] else "<b>à saisir</b> (« Modifier le client »)")
-             + ligne("Secteur", esc(c["secteur"]) if c["secteur"] else "<b>à choisir</b> (« Modifier le client »)")
-             + ligne("Téléphone", tels + ("" if c["sms_ok"] else " · <b>pas de rappels par texto</b>"))
-             + (ligne("Courriel", esc(c["courriel"])) if c["courriel"] else "")
-             + (ligne("Accès", esc(c["notes_acces"])) if c["notes_acces"] else "")
-             + (ligne("Notes", esc(c["notes"])) if c["notes"] else "") + "</div>")
+    extra = ((f'<p><b>Nouvelle adresse :</b> <a href="/client/{nouvelle["id"]}">{esc(nouvelle["adresse"] or nouvelle["ville"] or "voir la fiche")}</a></p>'
+              if nouvelle else "")
+             + (f'<p><b>{"Ancienne adresse" if len(anciennes) == 1 else "Anciennes adresses"} :</b> '
+                + " · ".join(f'<a href="/client/{i}">{esc(a or v or "voir la fiche")}</a>' for i, a, v in anciennes) + "</p>" if anciennes else "")
+             + ("" if c["secteur"] or not c["adresse"] else "<p><b>Secteur :</b> à choisir</p>")
+             + (f'<p><b>Notes :</b> {esc(c["notes"])}</p>' if c["notes"] else ""))
+    # même carte de contact qu'en haut d'un chantier : adresse, téléphone, courriel, accès, puis Appeler, Texto, Courriel, Itinéraire
+    fiche = (('<p><span class="badge">Ancienne adresse</span></p>' if c["remplace_par"] else "")
+             + carte_contact(conn, client_id, extra=extra))
     supprimable = client_supprimable(conn, client_id)
-    actions = (f'<div class="barre actions-client" style="margin-bottom:16px">'
-               + ("" if c["remplace_par"] else f'<a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a>')
-               + f'<a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a>'
-               + ("" if supprimable or c["remplace_par"] else f'<a class="bouton secondaire" href="/client/{client_id}/nouvelle-adresse">Nouvelle adresse</a>')
-               + '</div>')
+    actions = ("" if c["remplace_par"] else
+               f'<div class="actions-bloc"><div class="actions-page"><a class="bouton" href="/client/{client_id}/soumission/nouveau">+ Nouvelle soumission</a></div></div>')
     suppression = ""
     if supprimable:                # sinon : pas de bouton (le serveur refuse de toute façon)
         n = resume_suppression_client(conn, client_id)[0]
@@ -150,7 +142,13 @@ def page_client(conn, client_id, query):
         fusion = (f'<div class="barre pc-seul" style="margin-top:16px"><a class="bouton secondaire" href="/client/{client_id}/fusionner">'
                   'Fusionner avec un autre client</a></div>')
     titre = _nom_client(c) if (c["prenom"] or c["nom"] or c["entreprise"]) else "Client à identifier"
-    return gabarit(titre, f'<h1>{esc(titre)}</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}{fusion}', query.get("ok"), query.get("err"), retour="/clients")
+    # tout ce qui CHANGE le client est replié sous « Modifier », en bas, comme sur un chantier
+    modifs = (f'<div class="barre"><a class="bouton secondaire" href="/client/{client_id}/modifier">Modifier le client</a>'
+              + ("" if supprimable or c["remplace_par"] else f'<a class="bouton secondaire" href="/client/{client_id}/nouvelle-adresse">Nouvelle adresse</a>')
+              + "</div>" + fusion + (suppression if est_admin() else ""))
+    modifier = f'<details class="avance modifier-fiche" id="modifier"><summary>Modifier</summary>{modifs}</details>'
+    return gabarit(titre, f'<h1>{esc(titre)}</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{modifier}',
+                   query.get("ok"), query.get("err"), retour="/clients")
 
 
 # ---------------------------------------------------------------------------

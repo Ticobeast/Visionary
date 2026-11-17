@@ -656,8 +656,7 @@ class TestClientsSansRenseignements(BasePages):
         cid = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (i,))[0][0]
         page = self.get(f"/client/{cid}")
         self.assertIn("<h1>Client à identifier</h1>", page)
-        self.assertIn("à saisir", page)
-        self.assertIn("à choisir", page)
+        self.assertIn("adresse à saisir", page)
         self.assertNotIn(", ,", page)
         self.assertIn("+ Nouvelle soumission", page)
         self.assertIn(f'href="/soumission/{i}"', page)

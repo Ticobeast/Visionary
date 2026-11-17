@@ -75,6 +75,7 @@ lancer_interface.py                     idem, sur la VRAIE base
 docs/tableau_de_bord.md                 guide : tableau de bord, journée, chantiers et archives, fiche client
 docs/dictionnaire_donnees.md            toutes les colonnes : type, format, règle, exemple
 docs/plan_de_tests.md                   plan de mise en route et de tests, phase par phase
+docs/style_interface.md                 règles de l'interface (titre, retour, carte de contact, listes, dates, prix)
 tests/                                  tests automatiques (schéma, règles, interface, données d'essai)
 data/                                   TES données (exclu de Git) : base, sauvegardes/, photos/
 ```

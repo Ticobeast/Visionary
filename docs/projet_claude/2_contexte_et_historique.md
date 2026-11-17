@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 719 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 720 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -82,6 +82,8 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   même après un enregistrement) ; une soumission créée s'ouvre tout de suite ; listes du téléphone allégées (carte de soumission
   entière cliquable, sans boutons ; chantiers en cours seulement) ; barre de la Journée « 2 choisis · 3 h · journée 4 h sur 8 h » ;
   fenêtre Terminer réduite (payé ? mode si oui, durée, Terminer / Annuler, lien Facture). Fiche client au nom du client.
+  Style commun écrit dans docs/style_interface.md (à valider) ; fiche client avec la même carte de contact et « Modifier » replié ;
+  menu « ··· » sur les cartes de soumission (téléphone) : Accepter, En attente, Refuser, PDF sans quitter la liste.
   À venir : lot 4, PC ; lot 4, PC (tableau de
   bord calendrier + journée côte à côte, filtres des Archives repliés, bandeau).
 - Feuille de route de la revue : étapes 1 et 2 faites ; étape 3 commencée (12. textos et courriels faits ;

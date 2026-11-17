@@ -58,8 +58,11 @@ class TestFicheClient(BaseClients):
         self.assertTrue(statut.startswith("200"))
         self.assertIn("Marie Gagnon", page)
         self.assertIn("450-555-0142", page)
-        self.assertIn("google.com/maps/search", page)
+        self.assertIn("google.com/maps/dir/", page)                         # bouton rond Itinéraire, comme sur un chantier
         self.assertIn("123%20Rue%20des%20%C3%89rables", page)              # adresse encodée dans le lien Maps
+        self.assertIn('<a class="rond" href="tel:+14505550142"', page)
+        self.assertIn('<details class="avance modifier-fiche" id="modifier"><summary>Modifier</summary>', page)
+        self.assertLess(page.index("<summary>Modifier</summary>"), page.index('href="/client/1/modifier"'))     # « Modifier le client » est replié
         self.assertIn('href="/client/1/soumission/nouveau"', page)
         self.assertIn("+ Nouvelle soumission", page)
         self.assertIn('href="/chantier/1"', page)                          # historique

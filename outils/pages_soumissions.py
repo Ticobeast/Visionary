@@ -48,13 +48,21 @@ def _table(conn, lignes, retour, refusees=False):
         travaux = esc(l["type_libelle"]) if l["type_libelle"] else '<span class="doux">à préciser</span>'
         montant = f'<td class="montant">{esc(argent(l["total_ttc"]))}</td>' if l["total_ttc"] else '<td class="montant"><small>prix à saisir</small></td>'
         if refusees:
-            action = f'<div class="actions-ligne actions-soumission">{_formulaire_action(retour, f"/soumission/{i}/rouvrir", i, "Rouvrir", "secondaire")}</div>'
+            boutons = _formulaire_action(retour, f"/soumission/{i}/rouvrir", i, "Rouvrir", "secondaire")
         else:
-            action = f'<div class="actions-ligne actions-soumission">{boutons_soumission(i, retour)}</div>'
+            boutons = boutons_soumission(i, retour)
+        # ordinateur : les boutons sur la ligne ; téléphone : derrière le petit bouton « ··· » de la carte (on reste sur la liste)
+        action = (f'<div class="actions-ligne actions-soumission">{boutons}</div>'
+                  f'<details class="menu-rapide"><summary aria-label="Actions" title="Actions"></summary><div class="menu-rapide-liste">{boutons}</div></details>')
         corps += (f'<tr><td>{demande}</td><td><a class="lien-carte" href="{url_fiche(i, "soumission")}">{esc(nom)}</a>{tel}{manque}</td><td>{adresse}</td>'
                   f'<td>{travaux}{duree}</td>{montant}<td class="col-actions">{action}</td></tr>')
-    return ('<div class="liste-defile"><table class="tableau soumissions"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th>'
+    return (_SCRIPT_MENU + '<div class="liste-defile"><table class="tableau soumissions"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th>'
             f'<th class="droite">Montant</th><th></th></tr></thead><tbody>{corps}</tbody></table></div>')
+
+
+# Un seul menu « ··· » ouvert à la fois ; un toucher ailleurs le ferme.
+_SCRIPT_MENU = ('<script>document.addEventListener("click",function(e){document.querySelectorAll("details.menu-rapide[open]").forEach('
+                'function(d){if(!d.contains(e.target))d.removeAttribute("open");});});</script>')
 
 
 def page_soumissions(conn, query):

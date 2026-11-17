@@ -96,7 +96,14 @@ table.chantiers tr{position:relative;display:grid;grid-template-columns:1fr auto
 table.chantiers.sans-finis tr.fini{display:none}
 table.chantiers td.c-client a::after,table.soumissions a.lien-carte::after{content:"";position:absolute;inset:0;z-index:0}
 table.soumissions a.tel{position:relative;z-index:1}
-table.soumissions td.col-actions{display:none}
+table.soumissions td.col-actions{margin:0!important}table.soumissions td.col-actions>.actions-ligne{display:none}
+.menu-rapide{display:block;position:absolute;top:6px;right:6px;z-index:2}
+.menu-rapide>summary{list-style:none;width:40px;height:34px;border-radius:12px;cursor:pointer;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230e341d'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Ccircle cx='19' cy='12' r='2'/%3E%3C/svg%3E") center/20px no-repeat}
+.menu-rapide[open]{z-index:6}.menu-rapide>summary::-webkit-details-marker{display:none}.menu-rapide[open]>summary{background-color:var(--puce)}
+.menu-rapide-liste{position:absolute;right:0;top:40px;min-width:210px;display:flex;flex-direction:column;gap:6px;padding:8px;background:#fff;border:1px solid var(--trait-leger);border-radius:16px;box-shadow:0 12px 32px rgba(14,52,29,.2)}
+.menu-rapide-liste .mini{display:block;margin:0}.menu-rapide-liste .bouton,.menu-rapide-liste button{width:100%;min-height:42px}
+table.soumissions .menu-rapide-liste .lien-pdf{position:static!important;padding:8px 12px!important;border:1px solid var(--trait)!important;background:#fff!important;font-size:14px!important;color:var(--texte)!important;text-decoration:none;text-align:center}
+table.soumissions td:nth-child(1){padding-right:44px}
 table.chantiers td{padding:0}
 table.chantiers td.c-client{grid-column:1;grid-row:1;font-size:1.06rem;font-weight:700}table.chantiers td.c-client a{color:var(--vert-fonce)}
 table.chantiers td.c-statut{grid-column:2;grid-row:1;text-align:right!important}

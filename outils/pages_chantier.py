@@ -197,11 +197,13 @@ def _rond(icone, texte, href, titre, externe=False):
             f'{_ICONES_CONTACT[icone]}</svg></span><span>{texte}</span></a>')
 
 
-def carte_contact(conn, client_id, chantier_id, retour=""):
+def carte_contact(conn, client_id, chantier_id=None, retour="", extra=""):
     """Le client d'une fiche, en haut : adresse, téléphone, accès (du texte à LIRE, sans lien), et les gestes du terrain en
     boutons ronds, seule façon d'agir : Appeler, Texto, Courriel, Itinéraire. Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la
     visite, suivi de la soumission, rappel de paiement : outils/messages.py). Rien ne se modifie ici : pour changer le client,
-    on passe par sa fiche (lien « Fiche client »), puis « Modifier le client »."""
+    on passe par sa fiche (lien « Fiche client »), puis « Modifier ».
+    Même carte en haut de la fiche du CLIENT (chantier_id=None : pas de message déjà écrit, pas de lien « Fiche client ») ;
+    `extra` : lignes ajoutées sous l'accès (notes du client, ancienne / nouvelle adresse)."""
     r = conn.execute("SELECT telephone, telephone_2, courriel, sms_ok, adresse, ville, province, code_postal, notes_acces"
                      " FROM clients WHERE id = ?", (client_id,)).fetchone()
     tel, tel2, courriel, sms_ok, adresse, ville, prov, cp, acces = r
@@ -209,7 +211,7 @@ def carte_contact(conn, client_id, chantier_id, retour=""):
     adresse_texte = ", ".join(x for x in (adresse, ville) if x)           # à lire : la rue et la ville suffisent
     tel = tel if tel and len(tel) == 12 else None
     tels = " · ".join(f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12)       # à lire ; pour appeler : le bouton
-    m = messages.message(conn, chantier_id, finances=est_admin())
+    m = messages.message(conn, chantier_id, finances=est_admin()) if chantier_id else None
     ronds, note = "", ""
     if tel:
         ronds += _rond("appel", "Appeler", "tel:" + tel, "Appeler le client")
@@ -228,8 +230,8 @@ def carte_contact(conn, client_id, chantier_id, retour=""):
             f'<p class="contact-adresse">{esc(adresse_texte) if adresse_texte else "<span class=doux>adresse à saisir</span>"}</p>'
             + (f'<p class="doux">{esc(tels)}{"<span class=contact-sep> · </span>" if courriel and tels else ""}'
                f'{"<span class=contact-courriel>" + esc(courriel) + "</span>" if courriel else ""}</p>' if tels or courriel else "")
-            + (f'<p><b>Accès :</b> {esc(acces)}</p>' if acces else "")
-            + f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a></p></div>'
+            + (f'<p><b>Accès :</b> {esc(acces)}</p>' if acces else "") + extra
+            + (f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a></p>' if chantier_id else "") + '</div>'
             + (f'<div class="contact-actions">{ronds}</div>' if ronds else "")
             + (f'<p class="doux contact-note">{esc(note)}</p>' if note else "") + '</div>')
 
