@@ -415,11 +415,10 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         supprimer = (f'<button class="danger" type="submit" form="supprimer-chantier" onclick="return confirm({esc(repr(msg_suppr))})">'
                      f'Supprimer {ce}</button>')
         danger = f'<div class="carte"><h2>{"Supprimer" if soumission else "Annuler ou supprimer"}</h2><div class="barre">{annuler}{supprimer}</div></div>'
-        fermer = "/soumissions" if soumission else "/chantiers"
         formulaire = (f'{_erreurs_html(erreurs)}<form method="post" action="{base}/{chantier_id}">'
                       f'<input type="hidden" name="empreinte" value="{empreinte(depuis_base)}">{essentiel}'
                       '<div class="barre" style="margin-bottom:16px"><button type="submit">Enregistrer les modifications</button>'
-                      f'<a class="bouton secondaire fermer" href="{fermer}">Fermer</a></div>'
+                      f'</div>'
                       f'{avance(avance_chantier + autres + (danger if est_admin() else ""), ouvert=bool(erreurs))}</form>'
                       f'<form id="supprimer-chantier" method="post" action="{base}/{chantier_id}/supprimer"></form>'
                       f'<form id="annuler-chantier" method="post" action="/action/annuler"><input type="hidden" name="chantier_id" value="{chantier_id}">'
@@ -429,7 +428,8 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         ouvert = bool(erreurs) or bool(manque)
         modifier = f'<details class="avance modifier-fiche" id="modifier"{" open" if ouvert else ""}><summary>Modifier</summary>{formulaire}</details>'
         contenu = f'<h1>{esc(nom)}</h1>{resume}{corps}{bandeau}{actions}{documents_client}{paiements}{modifier}'
-    return gabarit(f"{mot} {chantier_id}", contenu, query.get("ok") if query else None, erreur_globale or (query.get("err") if query else None))
+    return gabarit(nom or f"{mot} {chantier_id}", contenu, query.get("ok") if query else None, erreur_globale or (query.get("err") if query else None),
+                   retour="/soumissions" if soumission else "/chantiers")
 
 
 def _genre_et_statut(conn, chantier_id):

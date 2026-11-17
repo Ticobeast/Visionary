@@ -41,8 +41,9 @@ from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, ba
 LIMITE_ARCHIVES = 50     # archives affichées d'un coup (les plus récentes) ; la recherche couvre tout
 
 
-def _table_chantiers(lignes, finances=True):
-    """Liste des chantiers (jamais de soumissions). finances=False : sans la colonne des paiements (compte « soumission »)."""
+def _table_chantiers(lignes, finances=True, sans_finis=False):
+    """Liste des chantiers (jamais de soumissions). finances=False : sans la colonne des paiements (compte « soumission »).
+    sans_finis : sur téléphone, les terminés (en attente de paiement) sont cachés ; la pastille « À recevoir » les montre."""
     aujourdhui = datetime.date.today()
     corps = ""
     for l in lignes:
@@ -73,13 +74,13 @@ def _table_chantiers(lignes, finances=True):
             paiement += f'<div class="doux">solde {esc(argent(solde))}</div>'
         duree_aff = f'<div class="doux">Durée {esc(heures(l["duree_estimee_h"]))}</div>' if l["duree_estimee_h"] else ""
         colonne_paiement = f'<td class="c-paiement">{paiement}</td>' if finances else ""
-        corps += (f'<tr><td class="c-depuis">{date_}</td><td class="c-client"><a href="/chantier/{l["chantier_id"]}">{esc(nom_aff)}</a></td>'
+        corps += (f'<tr{" class=fini" if st == "termine" else ""}><td class="c-depuis">{date_}</td><td class="c-client"><a href="/chantier/{l["chantier_id"]}">{esc(nom_aff)}</a></td>'
                   f'<td class="c-adresse">{esc(l["adresse"])}<div class="doux">{esc(l["secteur"] or l["ville"])}</div></td>'
                   f'<td class="c-travaux">{esc(l["type_libelle"])}{duree_aff}</td>'
                   f'<td class="c-statut">{badge_statut(st, l["genre"])}{prevu}</td>'
                   f'{colonne_paiement}<td class="montant c-montant">{esc(argent(total)) if total else ""}</td></tr>')
     entete_paiement = "<th>Paiement</th>" if finances else ""
-    return ('<table class="liste chantiers"><thead><tr><th>Depuis</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
+    return (f'<table class="liste chantiers{" sans-finis" if sans_finis else ""}"><thead><tr><th>Depuis</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Statut</th>'
             f'{entete_paiement}<th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table>')
 
 
@@ -111,7 +112,7 @@ def page_chantiers(conn, query):
                  f'{opt_paiement}{select_sect}<button type="submit">Chercher</button></form>')
 
     if actifs:
-        tableau = _table_chantiers(actifs, admin)
+        tableau = _table_chantiers(actifs, admin, sans_finis=not recherche_filtre)     # téléphone : ce qui est en cours
         if n_actifs > len(actifs):
             tableau += f'<p class="doux">{len(actifs)} premiers résultats sur {n_actifs} : précise la recherche.</p>'
     else:
@@ -160,7 +161,7 @@ def page_nouveau(conn, query):
 
 
 def creer(conn, form):
-    """Nouvelle soumission (client + travaux) : rien n'est obligatoire. On revient ensuite à la fiche du client."""
+    """Nouvelle soumission (client + travaux) : rien n'est obligatoire. On arrive ensuite sur la soumission créée."""
     brut, v, erreurs = lire_formulaire(conn, form)
     if not erreurs:
         res = Resultat()
@@ -168,9 +169,9 @@ def creer(conn, form):
             with transaction(conn):
                 # un client déjà connu (même adresse) est réutilisé TEL QUEL : sa fiche ne se modifie que depuis la fiche client
                 client_id = trouver_ou_creer_client(conn, Index(conn), v, res)
-                creer_chantier(conn, client_id, v, res, cree_par=(vue.utilisateur_courant() or {}).get("nom"))
+                nouvelle = creer_chantier(conn, client_id, v, res, cree_par=(vue.utilisateur_courant() or {}).get("nom"))
             ok = "soumission_reutilisee" if res.clients_reutilises else "soumission_creee"
-            return redirection(f"/client/{client_id}?ok={ok}")
+            return redirection(f"/soumission/{nouvelle}?ok={ok}")          # on arrive sur la soumission qu'on vient d'ouvrir
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]
     contenu = f'<h1>Nouvelle soumission</h1>{formulaire_nouveau(conn, brut, erreurs)}'

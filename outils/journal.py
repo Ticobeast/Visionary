@@ -27,7 +27,7 @@ NOM_INCONNU = "(nom inconnu)"
 # (motif de la route, libellé ou fonction(form) -> libellé, cible)
 # cible : genre de la fiche visée, dont le numéro est celui de l'adresse (premier groupe du motif) ;
 #   "fiche"      : « soumission » ou « chantier » selon le début de l'adresse
-#   "location"   : le numéro de client vient de l'adresse de redirection (nouveau client créé)
+#   "location"   : la fiche vient de l'adresse de redirection (la soumission créée)
 #   "action"     : le numéro vient du champ `chantier_id` du formulaire (routes /action/...)
 #   "lot"        : les numéros des champs `sel_N` du formulaire (planification en lot)
 #   None         : pas de cible
@@ -82,7 +82,6 @@ SANS_PARAMETRE_OK = (r"^/deconnexion$", r"^/raccourcis/(\d+)/deplacer$")
 
 _LIBELLES = {motif: (libelle, cible) for motif, libelle, cible in LIBELLES}
 _FICHE = re.compile(r"^/(soumission|chantier)/")
-_CLIENT = re.compile(r"^/client/(\d+)")
 _PHOTO = r"^/(?:soumission|chantier)/(\d+)/photos$"
 
 
@@ -148,8 +147,8 @@ def _cible(genre, chemin, groupes, form, resultat):
         return f"chantier {numero}" if numero.isdigit() else None
     if genre == "location":
         adresse = next((v for k, v in resultat[1] if k == "Location"), "")
-        m = _CLIENT.match(urlsplit(adresse).path)
-        return f"client {m.group(1)}" if m else None
+        m = re.match(r"^/(client|soumission)/(\d+)$", urlsplit(adresse).path)       # la soumission créée (avant : le client)
+        return f"{m.group(1)} {m.group(2)}" if m else None
     if genre == "fiche":
         genre = _FICHE.match(chemin).group(1)
     return f"{genre} {groupes[0]}" if groupes else None

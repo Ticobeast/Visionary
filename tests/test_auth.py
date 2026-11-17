@@ -402,7 +402,7 @@ class TestDroits(BaseAuth):
                 "client_secteur": "centre_ville", "province": "QC", "type_emondage": "1", "statut": "soumission", "duree_estimee_h": "2", "prix_ht": "300"}
         statut, en_tetes, _ = self.req("POST", "/nouveau", form, cookie=self.soum)
         self.assertTrue(statut.startswith("303"))
-        self.assertRegex(en_tetes["Location"], r"^/client/\d+\?ok=soumission_creee$")
+        self.assertRegex(en_tetes["Location"], r"^/soumission/\d+\?ok=soumission_creee$")
         nouveau = self.sql("SELECT max(id) FROM chantiers")[0][0]
         self.assertEqual(self.sql("SELECT statut, cree_par FROM chantiers WHERE id = ?", (nouveau,)), [("soumission", "Soumission")])   # qui l'a ouverte
         page = self.req("GET", f"/soumission/{nouveau}", cookie=self.soum)[2]

@@ -56,7 +56,7 @@ class TestEcriture(BaseJournal):
     def test_le_compte_est_celui_qui_agit(self):
         self.req("POST", "/nouveau", NOUVEAU, cookie=self.soum)
         self.req("POST", "/action/annuler", {"chantier_id": "3"}, cookie=self.admin)
-        self.assertEqual(self.lignes(), [("Soumission", "Nouvelle soumission (nouveau client)", "client 4", "/nouveau"),
+        self.assertEqual(self.lignes(), [("Soumission", "Nouvelle soumission (nouveau client)", "soumission 4", "/nouveau"),
                                          ("Admin", "Chantier annulé", "chantier 3", "/action/annuler")])
 
     def test_libelles_et_cibles_de_quelques_routes(self):
@@ -68,7 +68,7 @@ class TestEcriture(BaseJournal):
         self.req("POST", "/utilisateurs/2/actif", {"actif": "1"}, cookie=self.admin)
         self.req("POST", "/deconnexion", {}, cookie=self.admin)
         self.assertEqual([r[:3] for r in self.lignes()], [
-            ("Admin", "Nouvelle soumission (nouveau client)", "client 4"), ("Admin", "Soumission refusée", "soumission 4"),
+            ("Admin", "Nouvelle soumission (nouveau client)", "soumission 4"), ("Admin", "Soumission refusée", "soumission 4"),
             ("Admin", "Soumission rouverte", "soumission 4"), ("Admin", "Soumission supprimée", "soumission 4"),
             ("Admin", "Compte désactivé", "compte 2"), ("Admin", "Compte réactivé", "compte 2"), ("Admin", "Déconnexion", None)])
 

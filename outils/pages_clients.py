@@ -113,8 +113,7 @@ def page_client(conn, client_id, query):
         return f'<p style="margin:6px 0 0"><b>{libelle} :</b> {contenu_html}</p>'
     anciennes = conn.execute("SELECT id, adresse, ville FROM clients WHERE remplace_par = ? ORDER BY id", (client_id,)).fetchall()
     nouvelle = _client(conn, c["remplace_par"]) if c["remplace_par"] else None
-    fiche = (f'<div class="carte"><div class="barre"><h2 style="margin:0">{esc(_nom_client(c))}</h2>'
-             + ('<span class="badge">Ancienne adresse</span>' if c["remplace_par"] else "") + '</div>'
+    fiche = ('<div class="carte">' + ('<span class="badge">Ancienne adresse</span>' if c["remplace_par"] else "")
              + (ligne("Nouvelle adresse", f'<a href="/client/{nouvelle["id"]}">{esc(nouvelle["adresse"] or nouvelle["ville"] or "voir la fiche")}</a>') if nouvelle else "")
              + (ligne("Ancienne adresse" if len(anciennes) == 1 else "Anciennes adresses",
                       " · ".join(f'<a href="/client/{i}">{esc(a or v or "voir la fiche")}</a>' for i, a, v in anciennes)) if anciennes else "")
@@ -150,7 +149,8 @@ def page_client(conn, client_id, query):
     if est_admin() and not c["remplace_par"]:       # réservé à l'administrateur et à l'ordinateur (classe pc-seul) ; pas sur une ancienne adresse
         fusion = (f'<div class="barre pc-seul" style="margin-top:16px"><a class="bouton secondaire" href="/client/{client_id}/fusionner">'
                   'Fusionner avec un autre client</a></div>')
-    return gabarit(_nom_client(c), f'<h1>Fiche client</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}{fusion}', query.get("ok"), query.get("err"))
+    titre = _nom_client(c) if (c["prenom"] or c["nom"] or c["entreprise"]) else "Client à identifier"
+    return gabarit(titre, f'<h1>{esc(titre)}</h1>{fiche}{actions}<h2>Soumissions et chantiers</h2>{historique}{suppression if est_admin() else ""}{fusion}', query.get("ok"), query.get("err"), retour="/clients")
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ def _form_simplifie(conn, client_id, valeurs, erreurs=()):
 {zone("description", "Notes (description, imprimée sur la feuille de route)", valeurs)}</div></div>
 {avance('<div class="carte"><h2>Demande et règlement</h2><div class="grille">' + champ("date_soumission", "Date de la demande de soumission", valeurs, "date") + champ_modalite(valeurs) + "</div></div>", ouvert=bool(erreurs))}
 <div class="barre"><button type="submit">Créer la soumission</button><a class="bouton secondaire annuler" href="/client/{client_id}">Annuler</a></div></form>
-<p class="doux">La soumission est créée « en cours » : tu reviens à la fiche du client. Elle se règle ensuite dans l'onglet Soumissions (Accepter ou Refuser).</p>"""
+"""
 
 
 def page_soumission_nouvelle(conn, client_id):
@@ -258,8 +258,8 @@ def soumission_creer(conn, client_id, form):
     if not erreurs:
         try:
             with transaction(conn):
-                creer_chantier(conn, client_id, v, Resultat(), cree_par=(utilisateur_courant() or {}).get("nom"))
-            return redirection(f"/client/{client_id}?ok=soumission_creee")
+                nouvelle = creer_chantier(conn, client_id, v, Resultat(), cree_par=(utilisateur_courant() or {}).get("nom"))
+            return redirection(f"/soumission/{nouvelle}?ok=soumission_creee")          # on arrive sur la soumission qu'on vient d'ouvrir
         except sqlite3.IntegrityError as e:
             erreurs = [f"Refusé par la base : {e}"]
     return gabarit("Nouvelle soumission", f'<h1>Nouvelle soumission</h1>{_form_simplifie(conn, client_id, saisie, erreurs)}', section="soumissions")

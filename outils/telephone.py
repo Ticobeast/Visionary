@@ -92,7 +92,11 @@ table:not(.stat) .groupe-secteur td,table:not(.stat) tr:has(> td[colspan]){backg
 table.stat th,table.stat td{font-size:13px;padding:6px 6px}
 
 /* chantiers */
-table.chantiers tr{display:grid;grid-template-columns:1fr auto;gap:3px 10px}
+table.chantiers tr{position:relative;display:grid;grid-template-columns:1fr auto;gap:3px 10px}
+table.chantiers.sans-finis tr.fini{display:none}
+table.chantiers td.c-client a::after,table.soumissions a.lien-carte::after{content:"";position:absolute;inset:0;z-index:0}
+table.soumissions a.tel{position:relative;z-index:1}
+table.soumissions td.col-actions{display:none}
 table.chantiers td{padding:0}
 table.chantiers td.c-client{grid-column:1;grid-row:1;font-size:1.06rem;font-weight:700}table.chantiers td.c-client a{color:var(--vert-fonce)}
 table.chantiers td.c-statut{grid-column:2;grid-row:1;text-align:right!important}
@@ -304,6 +308,6 @@ table.gerer td:nth-child(2) b{font-size:1rem}table.gerer td:nth-child(2) .doux{f
 .modale{align-items:flex-end;padding:0;z-index:1100}
 .modale-carte{max-width:none;width:100%;border-radius:22px 22px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
 .modale .question{font-size:1.05rem;margin:8px 0 12px}
-.modale .barre{display:grid;grid-template-columns:1fr 1fr;gap:8px}.modale .barre button{grid-column:1/-1}.modale .barre .bouton{width:100%}
+.modale .barre{display:grid;grid-template-columns:1fr;gap:8px}.modale .barre .bouton{width:100%}.lien-facture-modale{text-align:center}
 }
 """

@@ -712,10 +712,10 @@ class TestBoutons(BaseDocuments):
 
     def test_la_fenetre_terminer_propose_aussi_la_facture(self):
         page = self.get("/?date=2026-10-14&terminer=3")
-        self.assertIn("Terminer ce chantier", page)
+        self.assertIn('id="modale-titre">Terminer : ', page)
         fenetre = page[page.index('class="modale"'):]
-        self.assertLess(fenetre.index("Oui, il est terminé"), fenetre.index('href="/facture/3/pdf"'))
-        self.assertLess(fenetre.index('href="/facture/3/pdf"'), fenetre.index(">Annuler<"))
+        self.assertLess(fenetre.index(">Terminer</button>"), fenetre.index('href="/facture/3/pdf"'))       # un simple lien, sous les boutons
+        self.assertLess(fenetre.index(">Annuler<"), fenetre.index('href="/facture/3/pdf"'))
         self.assertIn('target="_blank"', fenetre[fenetre.index('href="/facture/3/pdf"'):][:200])
         self.assertIn("Facture (PDF)", fenetre)
 

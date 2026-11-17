@@ -308,7 +308,7 @@ class TestCreation(BaseInterface):
             prix_ht="300,00", taxes_auto="1", code_postal="j7j1a1", dossier_photos="photos/2026/2026-10-20_roy",
             paiement_date="2026-10-01", paiement_montant="100", paiement_mode="interac"))
         self.assertTrue(statut.startswith("303"))
-        self.assertEqual(en_tetes["Location"], "/client/4?ok=soumission_creee")             # retour à la fiche du client
+        self.assertEqual(en_tetes["Location"], "/soumission/4?ok=soumission_creee")         # on arrive sur la soumission créée
         self.assertEqual(self.sql("SELECT telephone, code_postal, geocode_statut, secteur, ville FROM clients WHERE nom = 'Roy'"),
                          [("+14505550111", "J7J 1A1", "a_faire", "trois_rivieres_ouest", "Trois-Rivières")])     # la ville vient du secteur
         self.assertEqual(self.sql("SELECT statut, date_prevue, ordre_jour, duree_estimee_h, prix_ht, tps, tvq, nacelle, debarrasser_bois, bois_format, accepte_le FROM chantiers WHERE id = 4"),
@@ -322,7 +322,7 @@ class TestCreation(BaseInterface):
 
     def test_rien_n_est_obligatoire(self):
         statut, en_tetes, _ = self.post("/nouveau", {})
-        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/client/4?ok=soumission_creee"))
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/soumission/4?ok=soumission_creee"))
         self.assertEqual(self.sql("SELECT statut, duree_estimee_h, prix_ht FROM chantiers WHERE id = 4"), [("soumission", None, None)])
         self.assertEqual(self.sql("SELECT nom, adresse, ville, secteur FROM clients WHERE id = 4"), [(None, "", "", None)])
         for chemin in ("/client/4", "/soumission/4", "/soumissions", "/soumission/4/completer"):          # aucune page ne plante
@@ -361,7 +361,7 @@ class TestCreation(BaseInterface):
         clients = self.sql("SELECT count(*) FROM clients")
         _, en_tetes, _ = self.post("/nouveau", fiche(client_nom="Roy", client_prenom="Sylvie", adresse="22 rue des pins",
                                                      type_emondage="", type_elagage="1", debarrasser_bois="1"))
-        self.assertEqual(en_tetes["Location"], "/client/4?ok=soumission_reutilisee")
+        self.assertEqual(en_tetes["Location"], "/soumission/5?ok=soumission_reutilisee")
         self.assertEqual(self.sql("SELECT count(*) FROM clients"), clients)
         self.assertEqual(self.sql("SELECT client_id FROM chantiers WHERE id = 5"), self.sql("SELECT client_id FROM chantiers WHERE id = 4"))
 

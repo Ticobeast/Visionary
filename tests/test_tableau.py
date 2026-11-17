@@ -146,7 +146,7 @@ class TestChantiersListe(BaseTableau):
     @staticmethod
     def ligne(page, nom):
         """Le texte (sans balises ni entités HTML) de la ligne du tableau qui contient ce client."""
-        for tr in re.findall(r"<tr>.*?</tr>", page, re.S):
+        for tr in re.findall(r"<tr(?: class=[a-z-]+)?>.*?</tr>", page, re.S):
             if f">{nom}</a>" in tr:
                 return html.unescape(re.sub(r"<[^>]+>", " ", tr)), html.unescape(tr)
         raise AssertionError(f"{nom} n'est pas dans la liste")
@@ -284,14 +284,14 @@ class TestActionsRapides(BaseTableau):
             page = self.get(chemin, {"date": dans(1)})[1]
             self.assertIn(f"terminer={i}", page)
             self.assertIn(">Terminer</a>", page)
-            self.assertNotIn("Terminer ce chantier", page)                   # la fenêtre n'est ouverte que sur demande
+            self.assertNotIn('id="modale-titre">Terminer : ', page)                   # la fenêtre n'est ouverte que sur demande
         fenetre = self.get("/", {"date": dans(1), "terminer": str(i)})[1]
-        self.assertIn("Terminer ce chantier", fenetre)
-        self.assertIn("Confirmes-tu que ce chantier est terminé ?", fenetre)
-        self.assertIn("Le client a-t-il payé ?", fenetre)
+        self.assertIn('id="modale-titre">Terminer : ', fenetre)
+        self.assertIn("Le client a payé ?", fenetre)
+        self.assertIn("Le client a payé ?", fenetre)
         self.assertIn('name="paye" value="oui"', fenetre)
-        self.assertIn("Pas encore payé", fenetre)
-        self.assertIn("Oui, il est terminé", fenetre)
+        self.assertIn("Pas encore", fenetre)
+        self.assertIn(">Terminer</button>", fenetre)
         self.assertRegex(fenetre, r'name="duree_reelle_h" value="3"')       # durée réelle préremplie avec l'estimée
 
     def test_la_fenetre_propose_le_mode_de_reglement_prevu(self):

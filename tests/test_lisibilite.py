@@ -86,5 +86,35 @@ class TestPrix(BaseTableau):
         self.assertNotIn("+ tx", resume)
 
 
+class TestNavigation(BaseTableau):
+    def test_fleche_de_retour_en_haut_des_fiches(self):
+        """« ‹ Chantiers » en haut d'une fiche ; le navigateur la fait pointer vers la page d'où l'on vient vraiment."""
+        _, page = self.get(f"/chantier/{self.ids['Demain']}")
+        self.assertIn('<a class="fermer retour-haut" href="/chantiers"><span>Chantiers</span></a><h1>Demain</h1>', page)
+        _, page = self.get(f"/soumission/{self.ids['Devis']}")
+        self.assertIn('<a class="fermer retour-haut" href="/soumissions"><span>Soumissions</span></a>', page)
+        cid = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (self.ids["Devis"],))[0][0]
+        _, page = self.get(f"/client/{cid}")
+        self.assertIn('<a class="fermer retour-haut" href="/clients"><span>Clients</span></a><h1>Devis</h1>', page)
+        _, page = self.get("/chantiers")
+        self.assertNotIn('class="fermer retour-haut"', page)               # une page principale n'en a pas : la barre du bas suffit
+
+    def test_libelle_de_retour(self):
+        self.assertEqual([vue.libelle_retour(c) for c in ("/", "/chantiers?statut=planifie", "/client/4", "/soumission/2", "/journee", "/x")],
+                         ["Accueil", "Chantiers", "Client", "Soumission", "Journée", "Retour"])
+
+    def test_listes_du_telephone(self):
+        """Soumissions : la carte entière ouvre la fiche (les boutons sont sur la fiche) ; Chantiers : les terminés se cachent sur
+        téléphone tant qu'on ne cherche rien (la pastille « À recevoir » les montre)."""
+        _, page = self.get("/soumissions")
+        devis = self.ids["Devis"]
+        self.assertIn(f'<a class="lien-carte" href="/soumission/{devis}">', page)
+        _, page = self.get("/chantiers")
+        self.assertIn('<table class="liste chantiers sans-finis">', page)
+        self.assertIn("<tr class=fini>", page)
+        _, page = self.get("/chantiers", {"paiement": "a_recevoir"})
+        self.assertIn('<table class="liste chantiers">', page)                 # on cherche quelque chose : tout est montré
+
+
 if __name__ == "__main__":
     unittest.main()

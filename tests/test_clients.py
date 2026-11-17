@@ -105,7 +105,7 @@ class TestFormulaireSimplifie(BaseClients):
             "prix_ht": "600,00", "taxes_auto": "1", "modalite_paiement": "interac", "duree_estimee_h": "2,5",
             "date_soumission": "2026-10-01",
             "description": "Appeler avant de venir."})
-        self.assertEqual(en_tetes["Location"], "/client/1?ok=soumission_creee")                     # retour à la fiche du client
+        self.assertEqual(en_tetes["Location"], "/soumission/4?ok=soumission_creee")                 # on arrive sur la soumission créée
         self.assertEqual(self.sql("SELECT client_id, statut, date_prevue, prix_ht, tps, tvq, modalite_paiement, description, date_soumission, duree_estimee_h, duree_reelle_h, accepte_le FROM chantiers WHERE id = 4"),
                          [(1, "soumission", None, 600.0, 30.0, 59.85, "interac", "Appeler avant de venir.", "2026-10-01", 2.5, None, None)])
         self.assertEqual(self.sql("SELECT nacelle, debarrasser_bois, bois_format FROM chantiers WHERE id = 4"), [(1, 0, "4_pieds")])
@@ -119,7 +119,7 @@ class TestFormulaireSimplifie(BaseClients):
 
     def test_rien_n_est_obligatoire(self):
         statut, en_tetes, _ = self.post(self.NOUVELLE, {})
-        self.assertEqual(en_tetes["Location"], "/client/1?ok=soumission_creee")
+        self.assertEqual(en_tetes["Location"], "/soumission/4?ok=soumission_creee")
         self.assertEqual(self.sql("SELECT statut, duree_estimee_h, prix_ht FROM chantiers WHERE id = 4"), [("soumission", None, None)])
         self.assertEqual(self.sql("SELECT count(*) FROM chantier_travaux WHERE chantier_id = 4"), [(0,)])
 

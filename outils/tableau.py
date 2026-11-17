@@ -162,7 +162,7 @@ def page_journee(conn, query):
                  f'<input type="hidden" name="date" value="{jour}"><input type="hidden" name="retour" value="{esc(retour)}">'
                  f'<div class="liste-defile"><table class="tableau candidats"><thead><tr><th></th><th>Attente</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th>'
                  f'<th class="droite">Montant</th></tr></thead><tbody>{corps}</tbody></table></div>'
-                 f'<div class="sel-total barre"><span id="sel">0 sélectionné</span><button type="submit">Ajouter à la journée du {jour}</button></div></form>'
+                 f'<div class="sel-total barre" hidden><span id="sel"></span><button type="submit">Ajouter à la journée</button></div></form>'
                  + _SCRIPT_SELECTION)
     else:
         liste = '<div class="carte">Aucun chantier ne correspond à ces filtres.</div>'
@@ -171,12 +171,14 @@ def page_journee(conn, query):
     return gabarit("Journée", contenu, query.get("ok"), query.get("err"), large=True)
 
 
+# Barre qui apparaît dès qu'un chantier est coché : « 2 choisis · 4 h 30 · journée 5 h 30 sur 8 h », et le bouton Ajouter.
 _SCRIPT_SELECTION = """<script>
-(function(){var f=document.getElementById('lot');if(!f)return;var base=parseFloat(f.dataset.deja)||0,baseM=parseFloat(f.dataset.dejaM)||0,cap=parseFloat(f.dataset.cap)||8;
-function fr(x,n){return x.toFixed(n).replace('.',',');}
-function maj(){var n=0,t=0,m=0;f.querySelectorAll('tr[data-id]').forEach(function(tr){var c=tr.querySelector('input[type=checkbox]');
-if(c.checked){n++;t+=parseFloat(tr.dataset.h)||0;m+=parseFloat(tr.dataset.m)||0;}});
-document.getElementById('sel').textContent=n+' sélectionné'+(n>1?'s':'')+' · '+fr(t,1)+' h, '+fr(m,2)+' $, journée : '+fr(base+t,1)+' h sur '+cap+' h, '+fr(baseM+m,2)+' $';}
+(function(){var f=document.getElementById('lot');if(!f)return;var base=parseFloat(f.dataset.deja)||0,cap=parseFloat(f.dataset.cap)||8,
+b=f.querySelector('.sel-total'),s=document.getElementById('sel');
+function h(x){var m=Math.round(x*60);return Math.floor(m/60)+' h'+(m%60?' '+('0'+m%60).slice(-2):'');}
+function maj(){var n=0,t=0;f.querySelectorAll('tr[data-id]').forEach(function(tr){var c=tr.querySelector('input[type=checkbox]');
+if(c.checked){n++;t+=parseFloat(tr.dataset.h)||0;}});b.hidden=!n;
+s.innerHTML=n+' choisi'+(n>1?'s':'')+' · '+h(t)+' · journée <b'+(base+t>cap?' class="charge"':'')+'>'+h(base+t)+'</b> sur '+h(cap);}
 f.addEventListener('change',maj);maj();})();
 </script>"""
 

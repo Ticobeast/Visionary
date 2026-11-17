@@ -1,6 +1,7 @@
 """Éléments d'affichage partagés par toutes les pages : styles, gabarit, composants de formulaire."""
 import datetime
 import html
+import json
 import re
 import threading
 from pathlib import Path
@@ -101,7 +102,9 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .onglets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.onglet{padding:7px 14px;border:1px solid var(--trait);border-radius:99px;text-decoration:none;color:var(--texte);background:var(--carte)}
 .onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
 .verrou{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}.verrou b{font-size:17px}
-.total{font-weight:700}.sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
+.total{font-weight:700}.sel-total[hidden]{display:none}
+.choix-paye{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:12px}.mode-paye{display:none;margin-bottom:12px}.modale-carte:has(input[value=oui]:checked) .mode-paye{display:block}.duree-reelle{margin-bottom:14px}.lien-facture-modale{margin:12px 0 0;font-size:.9rem}.modale-carte h2+.doux{margin-top:-4px}.sel-total .charge{color:#b42318}
+.sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
 .cal-nav{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.cal-nav h2{margin:0;flex:1;text-align:center;font-size:20px;min-width:140px}
 .cal-grille{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-tete{font-size:13px;color:var(--doux);text-align:center;font-weight:600;padding:4px 0;text-transform:capitalize}
@@ -153,6 +156,7 @@ button.lien{background:none;border:0;box-shadow:none;color:var(--doux);padding:4
 .bandeau-page{background:var(--vert-doux);border-bottom:1px solid var(--vert-bord);padding:30px 0 24px}
 .conteneur{max-width:1100px;margin:0 auto;padding:0 20px}.conteneur.large{max-width:1500px}main.conteneur{padding:24px 20px 44px}
 .tag-badge{display:inline-flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--vert);margin-bottom:6px}
+.retour-haut{display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;font-size:.9rem;font-weight:600;color:var(--vert);text-decoration:none}.retour-haut::before{content:"";width:8px;height:8px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-right:2px}.retour-haut:hover{text-decoration:underline}
 .tag-badge::before{content:"";display:inline-block;width:24px;height:1.8px;background:var(--vert);border-radius:2px}
 h1{font-size:clamp(1.6rem,4.5vw,2.3rem);font-weight:800;line-height:1.15;letter-spacing:-.02em;color:var(--vert-fonce);margin:0}
 .bandeau-page h1 a{font-size:.9rem;font-weight:600;letter-spacing:0}
@@ -365,7 +369,22 @@ def _barre_mobile(section):
             f'<div class="menu-feuille">{qui}{feuille}{sortie}</div></div>')
 
 
-def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False, section=None):
+LIBELLES_RETOUR = {"/": "Accueil", "/chantiers": "Chantiers", "/soumissions": "Soumissions", "/clients": "Clients", "/journee": "Journée",
+                   "/archives": "Archives", "/utilisateurs": "Utilisateurs"}
+
+
+def libelle_retour(chemin):
+    """« ‹ Chantiers » : le nom de la page où l'on revient (la même règle est reprise par SCRIPT_RETOUR, dans le navigateur)."""
+    chemin = (chemin or "").split("?")[0]
+    if chemin in LIBELLES_RETOUR:
+        return LIBELLES_RETOUR[chemin]
+    m = re.match(r"^/(client|chantier|soumission)/\d+$", chemin)
+    return {"client": "Client", "chantier": "Chantier", "soumission": "Soumission"}[m.group(1)] if m else "Retour"
+
+
+def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False, section=None, retour=None):
+    """`retour` : sur une page de détail (fiche), le lien « ‹ Chantiers » en haut, à la place du petit surtitre. Son adresse est
+    celle d'où l'on vient vraiment (pile des pages, SCRIPT_RETOUR) ; `retour` ne sert que si on arrive directement sur la fiche."""
     msg = f'<div class="message">{esc(MESSAGES[message])}</div>' if message in MESSAGES else ""
     if erreur:
         msg += f'<div class="erreurs"><strong>Action refusée :</strong> {esc(erreur)}</div>'
@@ -379,7 +398,9 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     bandeau = ""
     m = re.match(r"\s*(<h1[^>]*>.*?</h1>)", contenu, re.S)
     if m:              # le titre de la page va dans un bandeau vert pâle, comme le haut du site
-        bandeau = (f'<section class="bandeau-page"><div class="conteneur{classe_large}"><span class="tag-badge">{esc(NOMS_SECTIONS.get(section, "Sylvainculteur"))}</span>{m.group(1)}</div></section>')
+        haut = (f'<a class="fermer retour-haut" href="{esc(retour)}"><span>{esc(libelle_retour(retour))}</span></a>' if retour
+                else f'<span class="tag-badge">{esc(NOMS_SECTIONS.get(section, "Sylvainculteur"))}</span>')
+        bandeau = f'<section class="bandeau-page"><div class="conteneur{classe_large}">{haut}{m.group(1)}</div></section>'
         contenu = contenu[m.end():]
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
@@ -404,7 +425,10 @@ SCRIPT_RETOUR = (
     'f=document.querySelectorAll("a.fermer"),l=new URL(location.href),i,p,t;["ok","err","terminer"].forEach(function(k){l.searchParams.delete(k);});'
     'var u=l.pathname+l.search;if(q.length){t=s[s.length-1];if(t){for(i=0;i<q.length;i++){q[i].href=t;}}}'
     'else{i=s.lastIndexOf(u);if(i>=0){s.length=i+1;}else{s.push(u);}if(s.length>30){s.shift();}'
-    'sessionStorage.setItem("pile",JSON.stringify(s));p=s[s.length-2];if(p){for(i=0;i<f.length;i++){f[i].href=p;}}}}catch(e){}})();</script>')
+    'sessionStorage.setItem("pile",JSON.stringify(s));p=s[s.length-2];if(p){for(i=0;i<f.length;i++){f[i].href=p;}'
+    'var r=document.querySelector("a.retour-haut span"),c=p.split("?")[0],n=' + json.dumps(LIBELLES_RETOUR) + '[c],'
+    'k=c.split("/");if(r){r.textContent=n||(k.length===3&&/^\\d+/.test(k[2])&&{client:"Client",chantier:"Chantier",soumission:"Soumission"}[k[1]])||"Retour";}}}'
+    '}catch(e){}})();</script>')
 
 
 def heures(h):

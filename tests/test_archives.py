@@ -467,7 +467,7 @@ class TestPresentationTelephone(BaseArchives):
         self.assertIn('class="bouton secondaire annuler" href="/soumissions">Annuler</a>', nouveau)
         self.assertIn('sessionStorage.getItem("pile")', nouveau)                       # la pile des pages visitées
         chantier = self.sql("SELECT id FROM chantiers WHERE statut = 'planifie' LIMIT 1")[0][0]
-        self.assertIn('class="bouton secondaire fermer" href="/chantiers">Fermer</a>', self.get(f"/chantier/{chantier}"))
+        self.assertIn('<a class="fermer retour-haut" href="/chantiers"><span>Chantiers</span></a>', self.get(f"/chantier/{chantier}"))   # « ‹ Chantiers », en haut
         self.assertIn('class="bouton secondaire annuler"', self.get(f"/chantier/{chantier}/dupliquer"))
         self.assertIn('class="bouton secondaire annuler" href="/client/', self.get(f"/client/{self.sql('SELECT id FROM clients LIMIT 1')[0][0]}/soumission/nouveau"))
         # la page d'attente et la page « à compléter » reviennent à la page demandée (retour), pas à la fiche

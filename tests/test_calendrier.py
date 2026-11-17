@@ -384,15 +384,15 @@ class TestConfirmationTermine(BaseJour):
 
     def test_la_fenetre_s_ouvre_depuis_le_bouton(self):
         page = self.get("/", {"date": dans(1)})[1]
-        self.assertNotIn("Terminer ce chantier", page)
+        self.assertNotIn('id="modale-titre">Terminer : ', page)
         self.assertEqual(page.count(">Terminer</a>"), 3)                       # un bouton par chantier planifié (Alpha, Bravo, Charlie)
         fenetre = self.ouvrir("Alpha")
         self.assertIn('role="dialog"', fenetre)
-        self.assertIn("Confirmes-tu que ce chantier est terminé ?", fenetre[fenetre.index('role="dialog"'):])
+        self.assertIn("Le client a payé ?", fenetre[fenetre.index('role="dialog"'):])
         self.assertIn("Alpha", fenetre[fenetre.index('role="dialog"'):])
-        self.assertIn("Le client a-t-il payé ?", fenetre)
-        self.assertIn("Oui, payé en totalité : <b>300,00 $</b>", fenetre)
-        self.assertIn("Pas encore payé", fenetre)
+        self.assertIn("Le client a payé ?", fenetre)
+        self.assertIn("Oui, <b>300,00 $</b>", fenetre)
+        self.assertIn("Pas encore", fenetre)
 
     def test_oui_termine_pas_encore_paye(self):
         i = self.ids["Bravo"]
@@ -410,21 +410,21 @@ class TestConfirmationTermine(BaseJour):
 
     def test_annuler_ferme_la_fenetre_sans_rien_changer(self):
         page = self.ouvrir("Bravo", ok="termine")
-        lien = re.search(r'<a class="bouton secondaire" href="([^"]+)">Annuler</a></div></form></div></div>', page).group(1)
+        lien = re.search(r'<a class="bouton secondaire" href="([^"]+)">Annuler</a></div></form>', page).group(1)
         self.assertNotIn("terminer", lien)
         self.assertNotIn("ok=", lien)
         self.assertEqual(self.sql("SELECT statut FROM chantiers WHERE id = ?", (self.ids["Bravo"],)), [("planifie",)])
 
     def test_pas_de_fenetre_pour_un_chantier_qui_n_est_pas_planifie(self):
         for valeur in (str(self.ids["Delta"]), str(self.ids["Fox"]), "99999", "abc", ""):
-            self.assertNotIn("Terminer ce chantier", self.get("/", {"terminer": valeur})[1], valeur)
+            self.assertNotIn('id="modale-titre">Terminer : ', self.get("/", {"terminer": valeur})[1], valeur)
 
     def test_fenetre_aussi_depuis_la_page_du_chantier_et_la_journee(self):
         i = self.ids["Alpha"]
         page = self.get(f"/chantier/{i}")[1]
         self.assertIn(f'href="/chantier/{i}?terminer={i}"', page)
-        self.assertIn("Terminer ce chantier", self.get(f"/chantier/{i}", {"terminer": str(i)})[1])
-        self.assertIn("Terminer ce chantier", self.ouvrir("Alpha", "/journee"))
+        self.assertIn('id="modale-titre">Terminer : ', self.get(f"/chantier/{i}", {"terminer": str(i)})[1])
+        self.assertIn('id="modale-titre">Terminer : ', self.ouvrir("Alpha", "/journee"))
         # un paiement ajouté sur la page d'un chantier planifié ne propose PAS de le terminer : il est simplement ajouté
         _, en_tetes, _ = self.post(f"/chantier/{i}/paiement", {"paiement_date": AUJOURDHUI.isoformat(), "paiement_montant": "50", "paiement_mode": "cheque"})
         self.assertEqual(en_tetes["Location"], f"/chantier/{i}?ok=paiement")

@@ -130,7 +130,7 @@ def bouton_terminer(l, retour, extra=""):
 
 
 def fenetre_terminer(conn, chantier_id, chemin, query):
-    """Fenêtre « Terminer ce chantier » : confirmation, et le client a-t-il payé ou pas.
+    """Fenêtre « Terminer » : le client a-t-il payé (le mode ne paraît que si oui), la durée réelle, et deux boutons.
 
     Une fois terminé, le chantier est verrouillé et le client est considéré comme facturé. Vide si le chantier n'existe plus
     ou n'est plus « Planifié » (lien périmé).
@@ -145,23 +145,18 @@ def fenetre_terminer(conn, chantier_id, chemin, query):
     if prix is not None and solde and solde > 0:
         mode = mode_conseille(modalite)
         options = "".join(f'<option value="{m}"{" selected" if m == mode else ""}>{esc(LIBELLES_MODE[m])}</option>' for m in MODES)
-        paiement = (f'<p class="question">Le client a-t-il payé ?</p>'
-                    f'<p><label class="coche"><input type="radio" name="paye" value="oui"> Oui, payé en totalité : <b>{esc(argent(solde))}</b></label></p>'
-                    f'<p><label class="coche"><input type="radio" name="paye" value="non" checked> Pas encore payé</label></p>'
-                    f'<div style="margin-bottom:12px"><label for="mode">Mode de paiement (si payé)</label>'
-                    f'<select id="mode" name="mode">{options}</select></div>')
-    elif prix is None:
-        paiement = '<p class="doux">Le prix n\'est pas saisi : ajoute-le sur la page du chantier pour enregistrer un paiement.</p>'
+        paiement = (f'<p class="question">Le client a payé ?</p><div class="choix-paye">'
+                    f'<label class="coche"><input type="radio" name="paye" value="oui"> Oui, <b>{esc(argent(solde))}</b></label>'
+                    f'<label class="coche"><input type="radio" name="paye" value="non" checked> Pas encore</label></div>'
+                    f'<div class="mode-paye"><label for="mode">Mode</label><select id="mode" name="mode">{options}</select></div>')
     else:
-        paiement = '<p class="doux">Ce chantier est déjà payé en totalité.</p>'
+        paiement = ""          # déjà payé, ou prix pas saisi : rien à demander
     return (f'<div class="modale" role="dialog" aria-modal="true" aria-labelledby="modale-titre"><div class="modale-carte">'
-            f'<h2 id="modale-titre">Terminer ce chantier</h2><p><b>{esc(nom)}</b> : {esc(detail or type_)}</p>'
-            f'<p class="question">Confirmes-tu que ce chantier est terminé ?</p>'
+            f'<h2 id="modale-titre">Terminer : {esc(nom)}</h2><p class="doux">{esc(detail or type_)}</p>'
             f'<form method="post" action="/action/terminer"><input type="hidden" name="chantier_id" value="{chantier_id}">'
             f'<input type="hidden" name="retour" value="{esc(retour)}">{paiement}'
-            f'<div style="margin-bottom:12px"><label for="duree_reelle_h">Durée réelle (heures), reprise de la durée estimée</label>'
+            f'<div class="duree-reelle"><label for="duree_reelle_h">Durée réelle (heures)</label>'
             f'<input id="duree_reelle_h" name="duree_reelle_h" value="{duree and format(duree, "g") or ""}" inputmode="decimal"></div>'
-            f'<p class="doux">Une fois terminé, le chantier est verrouillé en lecture seule et le client est considéré comme facturé.</p>'
-            f'<div class="barre"><button type="submit">Oui, il est terminé</button>'
-            f'{lien_facture(chantier_id, "Facture (PDF)")}'
-            f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form></div></div>')
+            f'<div class="barre"><button type="submit">Terminer</button>'
+            f'<a class="bouton secondaire" href="{esc(retour)}">Annuler</a></div></form>'
+            f'<p class="lien-facture-modale"><a href="/facture/{chantier_id}/pdf" target="_blank" rel="noopener">Facture (PDF)</a></p></div></div>')

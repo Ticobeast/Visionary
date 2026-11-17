@@ -94,7 +94,7 @@ class TestListeEtCreation(BasePages):
         statut, en_tetes, _ = self.post("/nouveau", {"statut": "soumission", "province": "QC"})
         self.assertEqual(statut[:3], "303")
         i = self.dernier_id()
-        self.assertEqual(en_tetes["Location"], f"/client/{self.sql('SELECT client_id FROM chantiers WHERE id = ?', (i,))[0][0]}?ok=soumission_creee")
+        self.assertEqual(en_tetes["Location"], f"/soumission/{i}?ok=soumission_creee")
         self.assertEqual(self.etat(i), ("soumission", None))
 
     def test_le_formulaire_n_exige_rien(self):
@@ -655,7 +655,7 @@ class TestClientsSansRenseignements(BasePages):
         i = self.vide()
         cid = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (i,))[0][0]
         page = self.get(f"/client/{cid}")
-        self.assertIn("(client à identifier)", page)
+        self.assertIn("<h1>Client à identifier</h1>", page)
         self.assertIn("à saisir", page)
         self.assertIn("à choisir", page)
         self.assertNotIn(", ,", page)
@@ -673,16 +673,15 @@ class TestClientsSansRenseignements(BasePages):
         self.assertIn(f'href="/soumission/{j}"', page)
         self.assertIn("Soumissions et chantiers", page)
 
-    def test_une_nouvelle_soumission_depuis_la_fiche_ramene_a_la_fiche(self):
+    def test_une_nouvelle_soumission_depuis_la_fiche_ouvre_la_soumission(self):
         statut, en_tetes, _ = self.post("/client/3/soumission/nouveau", {})
-        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", "/client/3?ok=soumission_creee"))
+        self.assertEqual((statut[:3], en_tetes["Location"]), ("303", f"/soumission/{self.dernier_id()}?ok=soumission_creee"))
         self.assertEqual(self.etat(self.dernier_id())[0], "soumission")
         self.assertIn("Soumission créée.", self.get(en_tetes["Location"]))
 
-    def test_creer_depuis_le_formulaire_ramene_a_la_fiche_du_client(self):
+    def test_creer_depuis_le_formulaire_ouvre_la_soumission(self):
         statut, en_tetes, _ = self.post("/nouveau", {**COMPLETE, "statut": "soumission"})
-        cid = self.sql("SELECT client_id FROM chantiers WHERE id = ?", (self.dernier_id(),))[0][0]
-        self.assertEqual(en_tetes["Location"], f"/client/{cid}?ok=soumission_creee")
+        self.assertEqual(en_tetes["Location"], f"/soumission/{self.dernier_id()}?ok=soumission_creee")
 
     def test_modifier_le_client_revient_ou_on_etait(self):
         i = self.partielle()
@@ -1025,7 +1024,7 @@ class TestMenuTelephone(BaseComptes):
             self.assertIn(texte, bas)                                                 # quatre onglets : le travail de tous les jours
         for texte in ("Tableau de bord", "Journée", "Archives"):
             self.assertNotIn(texte, bas)                                              # pas tout en bas : le reste est dans le menu
-        feuille = page[page.index('class="menu-feuille"'):]
+        feuille = page[page.index('class="menu-feuille"'):page.index("<script", page.index('class="menu-feuille"'))]
         for texte in ("Journée", "Archives", "Utilisateurs", "Se déconnecter"):
             self.assertIn(texte, feuille)
         for texte in ("Chantiers", "Soumissions"):
@@ -1033,7 +1032,7 @@ class TestMenuTelephone(BaseComptes):
         self.assertIn("menu-ouvert", page)
         # compte « soumission » : ses trois onglets en bas, un menu réduit (pas de journée ni d'archives)
         page = self.get("/soumissions", cookie=self.alice)
-        feuille = page[page.index('class="menu-feuille"'):]
+        feuille = page[page.index('class="menu-feuille"'):page.index("<script", page.index('class="menu-feuille"'))]
         self.assertNotIn("Chantiers", feuille)                                       # Chantiers est en bas, avec Soumissions et Clients
         self.assertNotIn("Nouvelle soumission", feuille)
         self.assertIn("Se déconnecter", feuille)
