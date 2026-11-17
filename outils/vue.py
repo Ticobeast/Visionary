@@ -567,7 +567,7 @@ SCRIPT_MENU = ('<script>document.addEventListener("click",function(e){document.q
                'function(d){if(!d.contains(e.target))d.removeAttribute("open");});});</script>')
 
 # Une tuile de liste qu'on touche (n'importe où) garde un contour vert jusqu'à ce que la page suivante s'affiche : on voit que
-# le toucher a été pris. `touchstart` vide : sans lui, l'iPhone n'applique pas l'état « :active » aux tuiles.
+# le toucher a été pris. Le contour vient au « clic » seulement (un vrai toucher), jamais quand le doigt se pose pour faire défiler. `touchstart` vide : sans lui, l'iPhone n'applique pas l'état « :active » aux tuiles.
 SCRIPT_TOUCHE = ('<script>document.addEventListener("touchstart",function(){},{passive:true});'
                  'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a");if(!a||a.target)return;'
                  'var t=a.closest("table.chantiers tbody tr,table.soumissions tbody tr,table.clients tbody tr,table.historique tbody tr");'

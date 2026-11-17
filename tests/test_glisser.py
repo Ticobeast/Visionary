@@ -100,6 +100,9 @@ class TestRetourAuToucher(BaseTableau):
         self.assertIn('t.classList.add("touche")', vue.SCRIPT_TOUCHE)
         self.assertIn("tr.touche{outline:2px solid var(--vert);outline-offset:-2px}", vue.CSS)
         self.assertIn(".carte.arrive{animation:monte .28s", telephone.CSS_TELEPHONE)
+        # le contour ne vient qu'au vrai toucher (clic) : rien ne s'allume quand le doigt se pose pour faire défiler
+        self.assertNotIn("tbody tr:active", telephone.CSS_TELEPHONE)
+        self.assertIn('document.addEventListener("click"', vue.SCRIPT_TOUCHE)
         # iPhone : pas de rectangle gris sur le nom au toucher, ni de menu « Partager le lien » au toucher long sur une tuile
         self.assertIn("*{-webkit-tap-highlight-color:transparent}", telephone.CSS_TELEPHONE)
         self.assertIn("table.archive tbody tr{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}", telephone.CSS_TELEPHONE)

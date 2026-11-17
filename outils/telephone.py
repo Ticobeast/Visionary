@@ -315,7 +315,7 @@ table.gerer td:nth-child(2) b{font-size:1rem}table.gerer td:nth-child(2) .doux{f
 @keyframes feuille{from{transform:translateY(100%)}to{transform:none}}
 .modale-carte{animation:feuille .28s cubic-bezier(.2,.8,.2,1)}
 body.menu-ouvert .menu-feuille{animation:monte .22s cubic-bezier(.2,.8,.2,1)}body.menu-ouvert .menu-fond{animation:fondu .2s ease-out}
-table.soumissions tbody tr:active,table.chantiers tbody tr:active,table.clients tbody tr:active,table.historique tbody tr:active{background:var(--vert-doux);outline:2px solid var(--vert);outline-offset:-2px}
+/* pas de « :active » sur les tuiles : il s'allumait dès que le doigt se posait, donc aussi en faisant défiler. Le contour (tr.touche) ne vient qu'au vrai toucher. */
 tr.touche{background:var(--vert-doux)}
 *{-webkit-tap-highlight-color:transparent}a:not(.bouton):active{opacity:.6}
 table.chantiers tbody tr,table.soumissions tbody tr,table.clients tbody tr,table.historique tbody tr,table.archive tbody tr{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
