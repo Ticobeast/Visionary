@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 753 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 766 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -103,6 +103,10 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   soulève, on la déplace (iPhone et PC) ; poignée à la place des flèches ; routes /action/ordonner et /raccourcis/ordonner.
   Contour vert sur la tuile touchée, et journée du tableau de bord qui monte sur iPhone (À VALIDER).
   Archives : le nom d'un client ouvre sa fiche (tous ses chantiers) ; les travaux ouvrent le chantier de la ligne (demandé).
+  HTTPS par Tailscale Serve (point 15, fait côté programme, À ESSAYER sur le vrai PC) : une requête relayée par « tailscale serve »
+  (elle arrive de 127.0.0.1) est traitée comme un appareil Tailscale, jamais comme l'ordinateur ; témoin de session « Secure ».
+  Bouton Partager : en HTTPS, l'icône Télécharger des documents devient Partager (feuille de partage de l'iPhone, PDF joint).
+  L'utilisateur se sert de l'application depuis l'écran d'accueil de l'iPhone (mode plein écran, pas dans Safari).
   Règle de travail depuis : skill .claude/skills/design-sylvainculteur (montrer avant de livrer, ne pas toucher à ce qui
   est validé, animations) ; skill nielsen-usability-heuristics (les 10 règles de Nielsen, licence MIT) ajouté au projet.
   La revue de l'interface (lots 1 à 4) est terminée ; reste de l'étape 3 de la revue : 13. itinéraire, 14. feuille de style en cache,

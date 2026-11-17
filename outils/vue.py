@@ -461,7 +461,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
             '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
-            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}{SCRIPT_GLISSER}{SCRIPT_TOUCHE}</body></html>')
+            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}{SCRIPT_GLISSER}{SCRIPT_TOUCHE}{SCRIPT_PARTAGE}</body></html>')
 
 
 # Changer de jour, de mois ou de filtre sur la même page : on reste à la même hauteur au lieu de remonter en haut.
@@ -534,6 +534,33 @@ document.addEventListener('mouseup',function(){if(el&&Date.now()-tactile>=800)fi
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&el)fin(true);});
 c.addEventListener('click',function(e){if(vient){e.preventDefault();e.stopPropagation();vient=false;}},true);
 });})();</script>"""
+
+# Partager un PDF (soumission, facture) avec la feuille de partage de l'iPhone : Messages, Courriel, AirDrop, Fichiers...
+# Le navigateur ne l'offre qu'en HTTPS (voir docs/acces_a_distance.md, « Accès en HTTPS ») : là, la petite icône « Télécharger »
+# du téléphone devient « Partager ». En http, rien ne change : elle télécharge, comme avant.
+# Le PDF est demandé dès que le doigt se pose, pour que la feuille s'ouvre au toucher même (l'iPhone exige un geste « frais ») ;
+# s'il n'est pas prêt à temps, l'icône s'entoure de vert : un deuxième toucher partage aussitôt.
+SCRIPT_PARTAGE = r"""<script>(function(){
+if(!navigator.share||!navigator.canShare||!window.isSecureContext)return;
+try{if(!navigator.canShare({files:[new File([''],'a.pdf',{type:'application/pdf'})]}))return;}catch(e){return;}
+Array.prototype.forEach.call(document.querySelectorAll('a.lien-dl'),function(a){
+var fichier=null,enCours=null;
+a.classList.add('partage');a.removeAttribute('download');a.title='Partager le PDF';
+a.setAttribute('aria-label',(a.getAttribute('aria-label')||'').replace('Télécharger','Partager'));
+function charger(){if(!enCours){enCours=fetch(a.href,{credentials:'same-origin'}).then(function(r){
+if(!r.ok||(r.headers.get('Content-Type')||'').indexOf('pdf')<0)throw new Error('pdf');
+var n=((r.headers.get('Content-Disposition')||'').split('filename=')[1]||'document.pdf').replace(/[";]/g,'').trim();
+return r.blob().then(function(b){fichier=new File([b],n,{type:'application/pdf'});});
+}).catch(function(e){enCours=null;throw e;});}return enCours;}
+a.addEventListener('touchstart',function(){charger().catch(function(){});},{passive:true});
+a.addEventListener('click',function(e){e.preventDefault();a.classList.remove('pret');
+if(fichier){navigator.share({files:[fichier]}).catch(function(){});return;}
+a.classList.add('attente');
+charger().then(function(){a.classList.remove('attente');return navigator.share({files:[fichier]});})
+.catch(function(err){a.classList.remove('attente');
+if(err&&err.name==='AbortError')return;
+if(fichier){a.classList.add('pret');return;}
+location.href=a.href;});});});})();</script>"""
 
 # Un seul menu « ··· » ouvert à la fois ; un toucher ailleurs le ferme.
 SCRIPT_MENU = ('<script>document.addEventListener("click",function(e){document.querySelectorAll("details.menu-rapide[open]").forEach('

@@ -6,6 +6,9 @@ le programme n'accepte donc que :
   - cet ordinateur lui-même (127.0.0.1) ;
   - les appareils de ton Tailscale (adresses 100.64.0.0/10).
 Toute autre machine (Wi-Fi de l'atelier, Internet) est refusée, même si elle atteint le port.
+
+Accès en HTTPS (nécessaire pour le bouton Partager de l'iPhone) : « tailscale serve » relaie https://pc.mon-reseau.ts.net vers ce
+programme. Voir relais_tailscale() : une requête relayée est traitée comme venant d'un appareil Tailscale, jamais de cet ordinateur.
 """
 import ipaddress
 import shutil
@@ -14,6 +17,9 @@ import subprocess
 from pathlib import Path
 
 TAILSCALE = ipaddress.ip_network("100.64.0.0/10")
+TAILSCALE_V6 = ipaddress.ip_network("fd7a:115c:a1e0::/48")
+EN_TETES_RELAIS = ("X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Tailscale-User-Login")
+ADRESSE_RELAIS_INCONNUE = "100.64.0.0"      # relais sans adresse lisible : une adresse Tailscale neutre (jamais « cet ordinateur »)
 LOCAL = ("localhost", "127.0.0.1")
 CHEMINS_TAILSCALE_WINDOWS = (r"C:\Program Files\Tailscale\tailscale.exe", r"C:\Program Files (x86)\Tailscale\tailscale.exe")
 
@@ -64,6 +70,58 @@ def hote_autorise(valeur, port, reseau, nom_machine=None):
         return ip.version == 4 and ip in TAILSCALE
     machine = (nom_machine if nom_machine is not None else socket.gethostname()).lower()
     return nom.endswith(".ts.net") or nom == machine or nom == machine.split(".")[0]
+
+
+def _nom_ts_net(valeur):
+    """« pc.mon-reseau.ts.net » (ou avec « :443 ») -> le nom ; None pour tout autre hôte."""
+    if not valeur or valeur.startswith("["):
+        return None
+    nom, _, port = valeur.lower().partition(":")
+    return nom if nom.endswith(".ts.net") and len(nom) > 7 and port in ("", "443") else None
+
+
+def relais_tailscale(en_tetes, adresse_client, port):
+    """La requête passe-t-elle par « tailscale serve » (accès en HTTPS : https://pc.mon-reseau.ts.net) ?
+
+    « tailscale serve » tourne sur cet ordinateur et relaie vers 127.0.0.1 : la requête ARRIVE donc de 127.0.0.1, mais elle vient
+    en réalité d'un téléphone. Il ne faut surtout pas la prendre pour « cet ordinateur » (qui n'a pas besoin de se connecter).
+
+    Retourne :
+      None   : requête directe (pas de relais) ;
+      False  : relais suspect (hôte qui n'est pas un nom *.ts.net) : à refuser ;
+      dict   : relais reconnu : {"ip": adresse Tailscale de l'appareil (ou adresse neutre), "https": bool,
+               "hote": nom *.ts.net, ou None si le relais ne l'a pas transmis}.
+    Seule une requête arrivant de 127.0.0.1 peut être un relais : les mêmes en-têtes envoyés par un autre appareil sont ignorés.
+    """
+    ip = _ip(adresse_client)
+    if ip is None or not ip.is_loopback:
+        return None
+    hote = en_tetes.get("Host") or ""
+    signale = any(en_tetes.get(e) for e in EN_TETES_RELAIS)
+    nom = _nom_ts_net(hote)                                   # « pc.mon-reseau.ts.net », sans le port du programme : l'adresse HTTPS
+    if not signale and nom is None:
+        return None                                           # accès direct : les règles habituelles (hote_autorise) s'appliquent
+    if nom is None:
+        separe = _separer_hote(hote)
+        if not (separe is not None and separe[0] in LOCAL and separe[1] == str(port)):
+            return False                                      # relais annoncé pour un hôte qui n'est ni un nom *.ts.net ni cet ordinateur
+        transmis = en_tetes.get("X-Forwarded-Host") or ""
+        nom = _nom_ts_net(transmis)
+        if transmis and nom is None:
+            return False
+    appareil = ADRESSE_RELAIS_INCONNUE
+    for morceau in reversed((en_tetes.get("X-Forwarded-For") or "").split(",")):      # le dernier est celui ajouté par le relais
+        a = _ip(morceau.strip())
+        if a is not None and ((a.version == 4 and a in TAILSCALE) or (a.version == 6 and a in TAILSCALE_V6)):
+            appareil = str(a)
+            break
+    return {"ip": appareil, "https": (en_tetes.get("X-Forwarded-Proto") or "").lower() == "https", "hote": nom}
+
+
+def origine_relais_ok(origine, relais):
+    """En-tête « Origin » d'une requête relayée : le même nom *.ts.net que l'hôte (ou, s'il n'a pas été transmis, un nom *.ts.net)."""
+    nom = _nom_ts_net(origine)
+    return nom is not None and (relais["hote"] is None or nom == relais["hote"])
 
 
 def adresses_tailscale():

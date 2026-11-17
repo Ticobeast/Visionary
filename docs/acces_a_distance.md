@@ -73,6 +73,32 @@ Les couleurs et les formes suivent le site de l'entreprise : fond clair, cartes 
   du bas de l'écran comme une feuille.
 Le compte « Soumission » arrive directement sur **Soumissions** et n'a de toute façon jamais accès au tableau de bord, aux paiements ni aux factures.
 
+## Accès en HTTPS (pour le bouton Partager de l'iPhone)
+
+Avec l'adresse habituelle (`http://...:8765`), l'iPhone refuse le **partage de fichiers** : c'est une règle du téléphone, pas du
+programme. Avec une adresse en **HTTPS**, la petite icône à côté de « Soumission » et de « Facture » devient **Partager** : elle ouvre
+la feuille de partage de l'iPhone (Messages, Courriel, AirDrop, Enregistrer dans Fichiers) avec le PDF déjà joint.
+
+Tailscale fournit cette adresse gratuitement. À faire **une seule fois**, sur l'ordinateur :
+
+1. Ouvrir <https://login.tailscale.com/admin/dns> et activer **MagicDNS**, puis **HTTPS Certificates** (bouton « Enable HTTPS »).
+2. Ouvrir un terminal (touche Windows, taper `cmd`, Entrée) et lancer :
+
+   ```
+   tailscale serve --bg 8765
+   ```
+
+   Tailscale affiche l'adresse, du genre `https://ticotower.tailbb6d3b.ts.net` (sans `:8765`). Elle reste active après un redémarrage.
+3. Lancer le programme comme d'habitude (`lancer_reseau.bat`, ou `lancer_essai_reseau.bat` pour les fausses données).
+4. Sur chaque iPhone : ouvrir cette adresse **https** dans Safari, se connecter, puis Partager > **Sur l'écran d'accueil**.
+   Supprimer l'ancienne icône (celle de l'adresse en `http`).
+
+- L'ancienne adresse `http://...:8765` continue de fonctionner (sans le bouton Partager).
+- Sécurité : rien n'est ouvert sur Internet ; l'adresse HTTPS n'est visible que des appareils de ton Tailscale, et il faut toujours
+  se connecter avec son compte. Le programme ne prend jamais un téléphone qui passe par HTTPS pour « cet ordinateur ».
+- Pour arrêter : `tailscale serve reset`.
+- Sur ordinateur, rien ne change : les PDF s'ouvrent dans un onglet, d'où on les imprime ou les enregistre.
+
 ## Essayer sur le téléphone avec les fausses données
 Pour voir l'application sur un téléphone **sans toucher à tes vraies données** : double-clic sur **`lancer_essai_reseau.bat`** (Mac : `lancer_essai_reseau.command` ; VS Code : bouton « Exécuter » sur `lancer_essai_reseau.py`). C'est `lancer_essai` (base d'essai, fausses données) avec l'accès à distance de `lancer_reseau`.
 - Un compte administrateur **temporaire** existe toujours dans la base d'essai : nom **`essai`**, mot de passe **`essai1234`** (rappelés dans la fenêtre au démarrage). À chaque lancement, il est créé s'il manque (même si la base d'essai a d'autres comptes) et son mot de passe est remis à `essai1234` s'il avait été changé. Pour le retirer : le désactiver (`python gerer_utilisateurs.py --essai`) ; la fenêtre le dit alors au démarrage. Il n'existe que dans `data/test.db` : la vraie base n'en reçoit jamais, et son mot de passe est connu de tous, donc ne le réutilise pas ailleurs.
@@ -113,6 +139,8 @@ Pour afficher le logo du site dans l'application, copier `logo.svg` (ou `logo.pn
 | « Aucun compte n'est encore créé » | aucun compte, l'accès à distance reste fermé | lancer `gerer_utilisateurs.bat` sur l'ordinateur |
 | « Trop d'essais » | 5 mots de passe faux de suite | attendre 15 minutes (ou relancer le programme) |
 | Ça marchait, plus rien le matin | ordinateur en veille, redémarré par Windows Update | désactiver la veille ; raccourci dans `shell:startup` |
+| L'icône à côté de « Soumission » télécharge au lieu de partager | l'application est ouverte par l'adresse `http` | suivre « Accès en HTTPS », puis remettre l'application sur l'écran d'accueil à partir de l'adresse `https` |
+| « Accès refusé » à l'adresse `https` | le programme n'est pas lancé en mode réseau | lancer `lancer_reseau.bat` (pas `lancer_interface.bat`) |
 | « Tailscale n'a pas été trouvé » dans la fenêtre | Tailscale pas installé / pas ouvert sur l'ordinateur | l'installer, ouvrir une session, relancer |
 
 ## Pas encore là

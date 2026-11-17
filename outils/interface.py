@@ -33,7 +33,7 @@ from noyau import (DB_DEFAUT, Index, Resultat, cle, creer_chantier, jours_attent
                    priorite, reprendre_les_attentes, service_nuage, transaction, trouver_ou_creer_client)
 from pages_chantier import (ROUTES_CHANTIER, formulaire_nouveau, lire_formulaire, valeurs_chantier,  # noqa: E402,F401
                             valeurs_vides)
-from reseau import adresses_tailscale, client_autorise, hote_autorise  # noqa: E402
+from reseau import adresses_tailscale, client_autorise, hote_autorise, origine_relais_ok, relais_tailscale  # noqa: E402
 from vue import (LIBELLES_PAIEMENT, LIBELLES_STATUT, MESSAGES, _BASE, argent, badge, badge_attente, badge_depuis, badge_statut, date_lisible, esc, le_date,  # noqa: E402,F401
                  gabarit, heures, redirection, select_secteur, texte_attente, texte_jours)
 
@@ -301,7 +301,13 @@ class Gestionnaire(BaseHTTPRequestHandler):
         # Protection contre les sites web qui tenteraient d'écrire dans la base à ton insu
         # (requêtes « cross-site » et « DNS rebinding ») : l'hôte et l'origine doivent être locaux.
         origine = self.headers.get("Origin")
-        if (not client_autorise(self.client_address[0], self.reseau) or not self._hote_ok(self.headers.get("Host"))
+        relais = relais_tailscale(self.headers, self.client_address[0], self.port)
+        if relais is not None:
+            # accès en HTTPS par « tailscale serve » : seulement en mode réseau, pour un nom *.ts.net, et l'origine doit être ce même nom
+            if (relais is False or not self.reseau
+                    or (origine and not origine_relais_ok(urlsplit(origine).netloc, relais))):
+                return self._envoyer("403 Forbidden", [("Content-Type", "text/plain; charset=utf-8")], "Accès refusé.".encode())
+        elif (not client_autorise(self.client_address[0], self.reseau) or not self._hote_ok(self.headers.get("Host"))
                 or (origine and not self._hote_ok(urlsplit(origine).netloc))):
             return self._envoyer("403 Forbidden", [("Content-Type", "text/plain; charset=utf-8")], "Accès refusé.".encode())
         url = urlsplit(self.path)
@@ -323,8 +329,9 @@ class Gestionnaire(BaseHTTPRequestHandler):
             if taille > LIMITE_FORMULAIRE:
                 return self._texte("413 Payload Too Large", "Formulaire trop volumineux.")
             form = {k: v[0] for k, v in parse_qs(self.rfile.read(taille).decode("utf-8", "replace"), keep_blank_values=True).items()}
-        requete = {"cookie": self.headers.get("Cookie", ""), "ip": self.client_address[0], "agent": self.headers.get("User-Agent", ""),
-                   "https": self.headers.get("X-Forwarded-Proto", "") == "https" and self.client_address[0] in ("127.0.0.1", "::1")}
+        # relayée : l'adresse est celle du téléphone (jamais 127.0.0.1, qui dispenserait de se connecter) ; témoin « Secure » en HTTPS
+        requete = {"cookie": self.headers.get("Cookie", ""), "agent": self.headers.get("User-Agent", ""),
+                   "ip": relais["ip"] if relais else self.client_address[0], "https": bool(relais and relais["https"])}
         self._envoyer(*repondre(self.db_path, methode, url.path, query, form, requete))
 
     def _taille_corps(self):
@@ -427,6 +434,8 @@ def main(argv=None):
         c_auth.close()
         if sans_compte:
             print("ATTENTION : aucun compte n'existe encore : l'accès à distance reste FERMÉ. Lance gerer_utilisateurs.bat pour créer les comptes.")
+        print("Bouton Partager de l'iPhone (envoyer un PDF par texto ou courriel) : il demande l'adresse en HTTPS.\n"
+              "  Voir docs/acces_a_distance.md, section « Accès en HTTPS » (une commande à lancer une seule fois).")
         print("Laisse cette fenêtre ouverte et l'ordinateur allumé (mise en veille désactivée).\n")
     if a.essai:
         c_essai, _ = ouvrir_base(db)
