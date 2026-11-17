@@ -293,7 +293,7 @@ table.clients td.c-adresse{grid-column:1/-1;grid-row:2;display:flex;flex-wrap:wr
 .filtres-det[open]>summary::after{transform:rotate(-135deg);margin-top:4px}
 .filtres-det[open]{background:#fff;border:1px solid var(--trait-leger);border-radius:18px;box-shadow:var(--ombre-carte);padding:6px 14px 14px}
 .filtres-det[open]>summary{background:none;border:0;box-shadow:none;padding:0;margin-bottom:6px}
-.barre-filtres{display:grid;grid-template-columns:1fr 1fr;gap:8px}.barre-filtres button{display:none}.barre-filtres .bouton{width:100%;font-size:14px;padding:8px 6px}
+.barre-filtres{display:grid;grid-template-columns:1fr 1fr;gap:8px}.barre-filtres .bouton{width:100%;font-size:14px;padding:8px 6px}
 @supports selector(:has(a)){.filtres:has(.filtres-det[open]) .barre-filtres button{display:inline-flex;grid-column:1/-1}}
 .idees{margin:0 0 12px}.idees .sep{display:none}
 .idees-liens{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:6px -16px 0;padding:2px 16px 6px;scrollbar-width:none}.idees-liens::-webkit-scrollbar{display:none}

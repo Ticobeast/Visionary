@@ -102,7 +102,8 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .onglets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.onglet{padding:7px 14px;border:1px solid var(--trait);border-radius:99px;text-decoration:none;color:var(--texte);background:var(--carte)}
 .onglet.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
 .verrou{background:var(--fond);border:1px dashed var(--doux);border-radius:10px;padding:12px 16px;margin-bottom:16px}.verrou b{font-size:17px}
-.total{font-weight:700}.menu-rapide{display:none}.actions-sec{display:contents}.tel-bloc{display:none}
+.total{font-weight:700}.barre-filtres .chercher-filtres{display:none}.filtres:has(.filtres-det[open]) .barre-filtres .chercher-filtres{display:inline-flex}
+.menu-rapide{display:none}.actions-sec{display:contents}.tel-bloc{display:none}
 .sel-total[hidden]{display:none}
 .choix-paye{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:12px}.mode-paye{display:none;margin-bottom:12px}.modale-carte:has(input[value=oui]:checked) .mode-paye{display:block}.duree-reelle{margin-bottom:14px}.lien-facture-modale{margin:12px 0 0;font-size:.9rem}.modale-carte h2+.doux{margin-top:-4px}.sel-total .charge{color:#b42318}
 .sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
@@ -399,8 +400,14 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     bandeau = ""
     m = re.match(r"\s*(<h1[^>]*>.*?</h1>)", contenu, re.S)
     if m:              # le titre de la page va dans un bandeau vert pâle, comme le haut du site
-        haut = (f'<a class="fermer retour-haut" href="{esc(retour)}"><span>{esc(libelle_retour(retour))}</span></a>' if retour
-                else f'<span class="tag-badge">{esc(NOMS_SECTIONS.get(section, "Sylvainculteur"))}</span>')
+        surtitre = NOMS_SECTIONS.get(section, "Sylvainculteur")
+        titre_h1 = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+        if retour:
+            haut = f'<a class="fermer retour-haut" href="{esc(retour)}"><span>{esc(libelle_retour(retour))}</span></a>'
+        elif titre_h1.lower().startswith(surtitre.lower()):
+            haut = ""                    # le surtitre répéterait le titre (« TABLEAU DE BORD » au-dessus de « Tableau de bord »)
+        else:
+            haut = f'<span class="tag-badge">{esc(surtitre)}</span>'
         bandeau = f'<section class="bandeau-page"><div class="conteneur{classe_large}">{haut}{m.group(1)}</div></section>'
         contenu = contenu[m.end():]
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'

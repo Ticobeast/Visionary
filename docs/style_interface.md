@@ -25,6 +25,9 @@ et pareille partout. Si une règle ne convient plus, on la change ici d'abord, p
    Nouvelle adresse). S'il n'y a pas d'action principale, rien n'est caché : un « ··· » tout seul ne dit pas quoi faire.
    Sur PC, les boutons restent côte à côte.
 6. **Aucun texte d'aide.** Si un bouton a besoin d'une explication, c'est le bouton qu'il faut changer.
+7. **Rien en double.** Un même lien ou bouton ne paraît qu'une fois sur une page (ex. le PDF de la soumission : seulement dans
+   « Documents pour le client ») ; une pastille ne répète pas ce qui est écrit à côté ; un surtitre ne répète pas le titre.
+   Le test automatique `tests/test_doublons.py` le vérifie sur les fiches, pour l'ordinateur et pour le téléphone.
 
 ## Une fiche (chantier, soumission ou client)
 

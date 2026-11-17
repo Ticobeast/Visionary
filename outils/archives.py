@@ -294,10 +294,11 @@ def _formulaire(conn, f):
         '</div>'
         f'<p><label class="coche"><input type="checkbox" name="par_client" value="1"{" checked" if f.get("par_client") else ""}> '
         'Un seul résultat par client (son dernier chantier) : pour savoir qui relancer</label></p></details>'
-        '<div class="barre barre-filtres"><button type="submit">Chercher</button><a class="bouton secondaire" href="/archives">Tout effacer</a>'
+        '<div class="barre barre-filtres"><button type="submit" class="chercher-filtres">Chercher</button><a class="bouton secondaire" href="/archives">Tout effacer</a>'
         f'<a class="bouton secondaire pc-seul" href="/archives.csv?{esc(urlencode(f))}" title="Un fichier qui s\'ouvre dans Excel">Exporter (Excel)</a></div></form>'
-        # ordinateur : les filtres restent toujours affichés ; téléphone : repliés sous « Filtres » (sauf s'il y en a d'actifs)
-        '<script>if(window.innerWidth>700){var d=document.getElementById("filtres-det");if(d)d.open=true;}</script>')
+        # iPhone et PC : les filtres sont repliés sous « Filtres » (ouverts s'il y en a d'actifs) ; le 2e « Chercher » ne paraît que
+        # quand ils sont ouverts (sinon il répète celui de la recherche)
+        )
 
 
 def _idees(aujourdhui):

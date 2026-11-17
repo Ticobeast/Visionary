@@ -318,7 +318,7 @@ def _bloc_documents(chantier_id, statut, genre, soumission=False):
     if est_admin() and facture_possible(statut, genre):
         lignes.append(("Facture", liens_pdf(chantier_id, "facture") + lien_telecharger(chantier_id, "facture")))
     corps = "".join(f'<div class="ligne-document"><div class="actions-page">{liens}</div></div>' for _, liens in lignes)
-    return f'<div class="carte documents{" documents-pc" if soumission else ""}"><h2>Documents pour le client</h2>{corps}</div>'
+    return f'<div class="carte documents"><h2>Documents pour le client</h2>{corps}</div>'
 
 
 def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_paiement=(), erreur_globale=None):
@@ -334,7 +334,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     termine = statut == "termine"
     base = "/soumission" if soumission else "/chantier"
     mot = "Soumission" if soumission else "Chantier"
-    badges = badge_statut(statut, genre)
+    badges = "" if soumission and statut == "soumission" else badge_statut(statut, genre)      # « Soumission n° 3 » le dit déjà
     if not soumission:
         badges += (badge(stp, LIBELLES_PAIEMENT[stp]) if stp not in ("sans_objet", "a_venir") else "") + ('<span class="badge">Archivé</span>' if archive else "")
     infos = " · ".join(x for x in (
@@ -347,9 +347,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
                 + (f'<small>{argent(prix)} + tx</small>' if total and prix is not None and (tps or tvq) else "")       # le détail des taxes : sur le PDF
                 + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and paye and est_admin() and not soumission else "")
                 + "</div>")
-    coin = (f'<a class="lien-pdf-coin" href="/soumission/{chantier_id}/pdf" target="_blank" rel="noopener" '
-            'title="Ouvrir la soumission en PDF (nouvel onglet)">Soumission</a>') if soumission else ""      # téléphone : discret, en haut à droite
-    resume = (f'<div class="carte resume-chantier">{coin}<div><div class="barre"><span class="no-fiche">{mot} n° {chantier_id}</span>{badges}</div>'
+    resume = (f'<div class="carte resume-chantier"><div><div class="barre"><span class="no-fiche">{mot} n° {chantier_id}</span>{badges}</div>'
               f'<p style="margin:10px 0 0"><b>Travaux :</b> {esc(detail) if detail else "à préciser"}</p>'
               f'{f"<p class=doux style=margin-bottom:0>{esc(infos)}</p>" if infos else ""}</div>{montants}</div>')
 

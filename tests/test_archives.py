@@ -428,7 +428,8 @@ class TestPresentationTelephone(BaseArchives):
     def test_les_filtres_sont_repliables_et_s_ouvrent_quand_on_en_utilise(self):
         page = self.get("/archives")
         self.assertIn('<details class="filtres-det" id="filtres-det"><summary>Filtres</summary>', page)
-        self.assertIn("window.innerWidth>700", page)                                   # ordinateur : toujours ouverts
+        self.assertNotIn("window.innerWidth>700", page)                                # ordinateur aussi : repliés (comme sur le téléphone)
+        self.assertIn('class="chercher-filtres"', page)                                 # le 2e « Chercher » ne paraît qu'avec les filtres ouverts
         self.assertIn('<details class="filtres-det" id="filtres-det" open>', self.get("/archives?type=taille_haie"))
         self.assertIn('<details class="filtres-det" id="filtres-det" open>', self.get("/archives?resultat=tout"))
         self.assertIn('<details class="filtres-det" id="filtres-det" open>', self.get("/archives?par_client=1"))
@@ -531,7 +532,7 @@ class TestAcces(BaseComptes):
         self.assertNotIn("Chercher dans tout l'historique", self.get("/chantiers", cookie=self.alice))
         page = self.get("/archives", cookie=self.admin)
         self.assertIn('.nav-bureau a[href="/archives"]{', page)                                                 # l'onglet courant est surligné
-        self.assertIn('<span class="tag-badge">Archives</span>', page)
+        self.assertNotIn('<span class="tag-badge">Archives</span>', page)              # le surtitre répéterait le titre « Archives »
 
     def test_pas_d_archives_dans_la_barre_du_telephone(self):
         telephone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148 Safari/604.1"
