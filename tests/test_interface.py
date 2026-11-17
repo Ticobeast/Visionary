@@ -130,7 +130,7 @@ class TestPages(BaseInterface):
     def test_pages_de_detail_et_introuvable(self):
         statut, page = self.get("/chantier/1")
         self.assertIn("123 Rue des Érables, Saint-Jérôme, QC J7Z 1A1", page)
-        self.assertIn("google.com/maps/search", page)
+        self.assertIn("google.com/maps/dir/", page)                  # bouton Itinéraire de la carte de contact
         self.assertIn("551,88 $", page)
         self.assertTrue(self.get("/chantier/999")[0].startswith("404"))
         self.assertTrue(self.get("/nimporte")[0].startswith("404"))

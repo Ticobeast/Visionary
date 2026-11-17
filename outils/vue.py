@@ -219,7 +219,7 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
 .barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.texto-jour,.note-heures,.resume-jour,.total-jour{display:none}
 .carte.contact{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
-.contact-infos p{margin:0 0 4px}.contact-adresse{font-weight:600}.contact-liens{font-size:.85rem;margin-top:8px!important}.contact-liens a{color:var(--doux)}
+.contact-infos p{margin:0 0 2px}.contact-adresse{font-weight:600}.contact-liens{font-size:.85rem;margin-top:6px!important}.contact-liens a{color:var(--doux)}
 .contact-actions{display:flex;gap:18px}.contact-note{flex-basis:100%;margin:0;font-size:.85rem}
 a.rond{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--texte);text-decoration:none}
 .rond-icone{display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;background:#fff;border:1px solid var(--trait)}

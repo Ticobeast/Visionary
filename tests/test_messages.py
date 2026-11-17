@@ -129,7 +129,10 @@ class TestMessages(BaseTableau):
         self.assertEqual(ronds["Appeler"], "tel:" + TEL)
         self.assertTrue(ronds["Texto"].startswith(f"sms:{TEL}?&body=Bonjour%2C%20ici%20Sylvainculteur."))
         self.assertTrue(ronds["Itinéraire"].startswith("https://www.google.com/maps/dir/?api=1&destination=2%20Rue%20Demain"))
-        self.assertIn("Message déjà écrit : rappel de la visite.", carte)
+        self.assertIn(">2 Rue Demain, Mirabel", carte)                   # l'adresse et le numéro se LISENT : ce ne sont plus des liens
+        self.assertNotIn("maps/search", carte)
+        self.assertNotIn('class="tel"', carte)
+        self.assertIn("450-555-0101", carte)
         self.assertNotIn("Message au client", carte)                    # l'ancienne carte séparée n'existe plus
         self.client_de("Demain", courriel="demain@example.com")
         ronds, _ = self.ronds("Demain")
@@ -140,7 +143,7 @@ class TestMessages(BaseTableau):
         """Chantier à planifier : rien à proposer, mais on peut toujours appeler, écrire (texto vide) et s'y rendre."""
         ronds, carte = self.ronds("Urgent")
         self.assertEqual(ronds["Texto"], "sms:+14505550100")
-        self.assertNotIn("Message déjà écrit", carte)
+        self.assertNotIn("body=", ronds["Texto"])
 
     def test_textos_refuses_par_le_client(self):
         self.client_de("Demain", telephone=TEL, sms_ok=0)
@@ -150,7 +153,6 @@ class TestMessages(BaseTableau):
         ronds, carte = self.ronds("Demain")
         self.assertEqual(list(ronds), ["Appeler", "Itinéraire"])
         self.assertIn("Pas de textos : refusés par le client.", carte)
-        self.assertNotIn("Message déjà écrit", carte)
 
     def test_sans_telephone_ni_courriel(self):
         ronds, _ = self.ronds("Demain")
@@ -159,7 +161,6 @@ class TestMessages(BaseTableau):
     def test_rappel_de_paiement_sur_la_fiche(self):
         self.client_de("Fait", telephone=TEL)
         ronds, carte = self.ronds("Fait")                                # sans contrôle d'accès : administrateur
-        self.assertIn("Message déjà écrit : rappel de paiement.", carte)
         self.assertIn("solde%20de%20919%2C80", ronds["Texto"])
 
     def test_la_fiche_se_lit_d_abord(self):
@@ -189,11 +190,11 @@ class TestDroitsMessages(BaseAuth):
         self.comptes()
         admin = self.ouvrir("Admin", "motdepasse-admin")
         soum = self.ouvrir("Soumission", "motdepasse-soum")
-        self.assertIn("Message déjà écrit : rappel de paiement.", self.req("GET", "/chantier/2", cookie=admin)[2])
+        self.assertIn("solde%20de%201%20437%2C19", self.req("GET", "/chantier/2", cookie=admin)[2])
         statut, _, page = self.req("GET", "/chantier/2", cookie=soum)
         self.assertTrue(statut.startswith("200"))
-        self.assertNotIn("rappel de paiement", page)
-        self.assertNotIn("Message déjà écrit", page)
+        self.assertNotIn("solde%20de", page)
+        self.assertNotIn("body=", page)
 
 
 if __name__ == "__main__":

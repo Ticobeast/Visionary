@@ -198,15 +198,15 @@ def _rond(icone, texte, href, titre, externe=False):
 
 
 def carte_contact(conn, client_id, chantier_id, retour=""):
-    """Le client d'une fiche, en haut : adresse, téléphone, accès, et les gestes du terrain en boutons ronds : Appeler, Texto,
-    Courriel, Itinéraire. Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la
+    """Le client d'une fiche, en haut : adresse, téléphone, accès (du texte à LIRE, sans lien), et les gestes du terrain en
+    boutons ronds, seule façon d'agir : Appeler, Texto, Courriel, Itinéraire. Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la
     visite, suivi de la soumission, rappel de paiement : outils/messages.py). Rien ne se modifie ici : les liens mènent à la fiche du client."""
     r = conn.execute("SELECT telephone, telephone_2, courriel, sms_ok, adresse, ville, province, code_postal, notes_acces"
                      " FROM clients WHERE id = ?", (client_id,)).fetchone()
     tel, tel2, courriel, sms_ok, adresse, ville, prov, cp, acces = r
     adresse_texte, adresse_maps = adresses(adresse, ville, prov, cp)
     tel = tel if tel and len(tel) == 12 else None
-    tels = " · ".join(lien_tel(t) for t in (tel, tel2) if t and len(t) == 12)
+    tels = " · ".join(f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12)       # à lire ; pour appeler : le bouton
     m = messages.message(conn, chantier_id, finances=est_admin())
     ronds, note = "", ""
     if tel:
@@ -222,12 +222,10 @@ def carte_contact(conn, client_id, chantier_id, retour=""):
     if adresse_maps:
         ronds += _rond("route", "Itinéraire", "https://www.google.com/maps/dir/?api=1&destination=" + quote(adresse_maps),
                        "Itinéraire dans Google Maps", externe=True)
-    if m and ((tel and sms_ok) or courriel):
-        note = f"Message déjà écrit : {m['titre'][0].lower() + m['titre'][1:]}." + (" " + note if note else "")
     suite = "?retour=" + quote(retour, safe="") if retour else ""
     return (f'<div class="carte contact"><div class="contact-infos">'
-            f'<p class="contact-adresse">{lien_maps(adresse_maps, adresse_texte)}</p>'
-            + (f'<p>{tels}{"<span class=contact-sep> · </span>" if courriel and tels else ""}'
+            f'<p class="contact-adresse">{esc(adresse_texte) if adresse_texte else "<span class=doux>adresse à saisir</span>"}</p>'
+            + (f'<p class="doux">{esc(tels)}{"<span class=contact-sep> · </span>" if courriel and tels else ""}'
                f'{"<span class=contact-courriel>" + esc(courriel) + "</span>" if courriel else ""}</p>' if tels or courriel else "")
             + (f'<p><b>Accès :</b> {esc(acces)}</p>' if acces else "")
             + f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a> · <a href="/client/{client_id}/modifier{suite}">Modifier le client</a></p></div>'
