@@ -194,6 +194,17 @@ def deplacer(conn, page, raccourci_id, sens):
     return []
 
 
+def ordonner(conn, page, ids):
+    """Glisser-déposer : `ids` = les raccourcis de cette personne pour cette page, dans le nouvel ordre."""
+    actuels = [r[0] for r in conn.execute("SELECT id FROM raccourcis WHERE page = ? AND utilisateur_id IS ? AND filtre <> ? ORDER BY ordre, id",
+                                          (page, _uid(), VIDE))]
+    if not actuels or sorted(ids) != sorted(actuels) or len(set(ids)) != len(ids):
+        return ["les raccourcis ont changé entre-temps : recharge la page, puis recommence"]
+    for rang, x in enumerate(ids, 1):
+        conn.execute("UPDATE raccourcis SET ordre = ? WHERE id = ?", (rang * 10, x))
+    return []
+
+
 def reinitialiser(conn, page):
     conn.execute("DELETE FROM raccourcis WHERE page = ? AND utilisateur_id IS ?", (page, _uid()))
     return []
@@ -211,11 +222,13 @@ def page_raccourcis(conn, query, erreurs=(), saisie=None):
             return (f'<form class="mini" method="post" action="/raccourcis/{id_}/deplacer"><input type="hidden" name="page" value="{page}">'
                     f'<input type="hidden" name="sens" value="{sens}"><button type="submit" class="secondaire fleche" title="{titre}" aria-label="{titre}"'
                     f'{" disabled" if inactif else ""}>{symbole}</button></form>')
-        lignes += (f'<tr><td class="col-ordre"><div class="fleches">{fleche("haut", "&#9650;", "Monter", rang == 0)}{fleche("bas", "&#9660;", "Descendre", rang == len(actuels) - 1)}</div></td>'
+        lignes += (f'<tr data-id="{id_}"><td class="col-ordre"><span class="poignee" title="Maintiens puis déplace pour changer l\'ordre"></span><div class="fleches">{fleche("haut", "&#9650;", "Monter", rang == 0)}{fleche("bas", "&#9660;", "Descendre", rang == len(actuels) - 1)}</div></td>'
                    f'<td><b>{esc(nom)}</b><div class="doux">{esc(decrire(page, filtre, secteurs))}</div></td>'
                    f'<td class="droite"><form class="mini" method="post" action="/raccourcis/{id_}/retirer"><input type="hidden" name="page" value="{page}">'
                    f'<button type="submit" class="secondaire">Retirer</button></form></td></tr>')
-    tableau = (f'<div class="liste-defile"><table class="gerer"><thead><tr><th>Ordre</th><th>Raccourci</th><th></th></tr></thead><tbody>{lignes}</tbody></table></div>'
+    tableau = (f'<div class="liste-defile"><table class="gerer"><thead><tr><th>Ordre</th><th>Raccourci</th><th></th></tr></thead><tbody{" data-glisser=ordre-raccourcis" if len(actuels) > 1 else ""}>{lignes}</tbody></table></div>'
+               f'<form id="ordre-raccourcis" method="post" action="/raccourcis/ordonner" hidden><input type="hidden" name="page" value="{page}">'
+               '<input type="hidden" name="ordre" value=""></form>'
                if lignes else '<p class="doux">Aucun raccourci : ajoutes-en ci-dessous.</p>')
     presents = {f for _, _, f in actuels}
     propositions = ""
@@ -293,6 +306,16 @@ def post_deplacer(conn, raccourci_id, form):
     return _retour(page, erreurs, "") if erreurs else redirection(f"/raccourcis?page={page}")
 
 
+def post_ordonner(conn, form):
+    page = _page(form)
+    morceaux = [m for m in form.get("ordre", "").split(",") if m]
+    if not morceaux or not all(m.isdigit() and len(m) < 12 for m in morceaux):
+        return _retour(page, ["ordre illisible"], "")
+    with transaction(conn):
+        erreurs = ordonner(conn, page, [int(m) for m in morceaux])
+    return _retour(page, erreurs, "") if erreurs else redirection(f"/raccourcis?page={page}")
+
+
 def post_reinitialiser(conn, form):
     page = _page(form)
     with transaction(conn):
@@ -306,4 +329,5 @@ ROUTES_RACCOURCIS = [
     ("POST", r"^/raccourcis/reinitialiser$", lambda c, q, f, *g: post_reinitialiser(c, f)),
     ("POST", r"^/raccourcis/(\d+)/retirer$", lambda c, q, f, i: post_retirer(c, int(i), f)),
     ("POST", r"^/raccourcis/(\d+)/deplacer$", lambda c, q, f, i: post_deplacer(c, int(i), f)),
+    ("POST", r"^/raccourcis/ordonner$", lambda c, q, f, *g: post_ordonner(c, f)),
 ]

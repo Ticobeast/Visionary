@@ -257,6 +257,10 @@ button:active,.bouton:active{transform:scale(.97);transition-duration:.1s}
 .rond-icone{transition:transform .1s,background-color .15s,border-color .15s}a.rond:active .rond-icone{transform:scale(.92)}
 .menu-rapide>summary{transition:background-color .15s}
 table.soumissions tbody tr,table.chantiers tbody tr,table.clients tbody tr{transition:background-color .12s}
+.poignee{display:none}.glisser-pret .fleches{display:none!important}
+.glisser-pret .poignee{display:inline-block;width:22px;height:22px;vertical-align:middle;opacity:.55;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230e341d'%3E%3Ccircle cx='9' cy='6' r='1.7'/%3E%3Ccircle cx='15' cy='6' r='1.7'/%3E%3Ccircle cx='9' cy='12' r='1.7'/%3E%3Ccircle cx='15' cy='12' r='1.7'/%3E%3Ccircle cx='9' cy='18' r='1.7'/%3E%3Ccircle cx='15' cy='18' r='1.7'/%3E%3C/svg%3E") center/20px no-repeat}
+body.glisse,body.glisse *{overflow-anchor:none}.glisser-pret>[data-id]{cursor:grab;position:relative}.glisser-pret>[data-id].leve{z-index:30;cursor:grabbing;outline:2px solid var(--vert);outline-offset:-1px;box-shadow:0 16px 36px rgba(14,52,29,.28)}
+@media (min-width:701px){.glisser-pret>tr.leve>td{background:#fff}}body.glisse{cursor:grabbing;user-select:none;-webkit-user-select:none}
 @view-transition{navigation:auto}::view-transition-old(root),::view-transition-new(root){animation-duration:.16s}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}@view-transition{navigation:none}}
 .no-fiche{font-weight:700;color:var(--doux);font-size:.9rem}
@@ -454,7 +458,7 @@ def gabarit(titre, contenu, message=None, erreur=None, large=False, public=False
     return (f'<!doctype html><html lang="fr-CA"><head>{entete}{tete}{_navigation(section)}{bandeau}'
             f'<main class="conteneur{classe_large}">{msg}{contenu}</main>'
             '<footer class="pied"><b>Sylvainculteur</b> · Depuis 2008 · Gestion interne</footer>'
-            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}</body></html>')
+            f'{_barre_mobile(section)}{SCRIPT_POSITION}{SCRIPT_RETOUR}{SCRIPT_MENU}{SCRIPT_GLISSER}</body></html>')
 
 
 # Changer de jour, de mois ou de filtre sur la même page : on reste à la même hauteur au lieu de remonter en haut.
@@ -469,6 +473,65 @@ SCRIPT_POSITION = (
 
 # « Annuler » et « Fermer » ramènent à la page d'où l'on vient (pas à une page fixe) : le navigateur garde la pile des pages visitées pendant la session.
 # Un formulaire (liens a.annuler) ne se met pas dans la pile ; une page normale s'y met (revenir en arrière la dépile) ; « Fermer » (a.fermer) va à la page d'avant.
+# Glisser-déposer pour réordonner (Journée, Raccourcis) : on maintient le doigt sur une tuile (0,35 s), elle se soulève, on la
+# déplace, on relâche ; avec une souris : on clique et on tire. Les voisines s'écartent en douceur. Au relâchement, l'ordre complet
+# est envoyé (formulaire caché `data-glisser="<id du formulaire>"` sur le conteneur ; chaque tuile porte `data-id`).
+# Sans JavaScript, les flèches ▲ ▼ restent : la classe « glisser-pret », posée ici, les remplace par une poignée.
+SCRIPT_GLISSER = r"""<script>(function(){
+Array.prototype.forEach.call(document.querySelectorAll('[data-glisser]'),function(c){
+var form=document.getElementById(c.getAttribute('data-glisser'));if(!form)return;
+c.classList.add('glisser-pret');
+var el=null,actif=false,minuteur=null,depart='',startY=0,x0=0,y0=0,dernier=0,tactile=0,vient=false,boucle=0;
+function items(){return Array.prototype.filter.call(c.children,function(x){return x.hasAttribute('data-id');});}
+function ordre(){return items().map(function(x){return x.getAttribute('data-id');}).join(',');}
+function fige(t){return t.closest&&t.closest('button,input,select,textarea,summary,label,.menu-rapide');}
+function milieu(x){return x.offsetTop+x.offsetHeight/2;}
+function lever(){if(!el)return;actif=true;el.classList.add('leve');document.body.classList.add('glisse');
+if(navigator.vibrate){try{navigator.vibrate(8);}catch(e){}}boucle=requestAnimationFrame(defile);}
+function voisin(v,avant){var a=el.offsetTop,b=v.offsetTop;
+if(avant){c.insertBefore(el,v);}else{c.insertBefore(el,v.nextSibling);}
+startY+=el.offsetTop-a;
+v.style.transition='none';v.style.transform='translateY('+(b-v.offsetTop)+'px)';v.offsetHeight;
+v.style.transition='transform .16s ease-out';v.style.transform='';}
+function placer(clientY){dernier=clientY;var y=clientY+window.pageYOffset,li,i,m;
+for(;;){li=items();i=li.indexOf(el);
+var d=y-startY,haut=li[0].offsetTop-el.offsetTop,bas=li[li.length-1].offsetTop+li[li.length-1].offsetHeight-el.offsetTop-el.offsetHeight;
+d=Math.max(haut,Math.min(bas,d));el.style.transform='translateY('+d+'px)';m=el.offsetTop+d;
+if(i>0&&m<milieu(li[i-1])){voisin(li[i-1],true);}
+else if(i<li.length-1&&m+el.offsetHeight>milieu(li[i+1])){voisin(li[i+1],false);}
+else break;}}
+function defile(){if(!actif)return;var h=window.innerHeight,v=0;
+if(dernier<90)v=-Math.ceil((90-dernier)/6);else if(dernier>h-150)v=Math.ceil((dernier-(h-150))/6);
+if(v){window.scrollBy(0,v);placer(dernier);}boucle=requestAnimationFrame(defile);}
+function fin(annule){clearTimeout(minuteur);if(!el)return;var e=el,a=actif;el=null;actif=false;cancelAnimationFrame(boucle);
+if(!a)return;vient=true;setTimeout(function(){vient=false;},400);
+e.style.transition='transform .16s ease-out';e.style.transform='';document.body.classList.remove('glisse');
+setTimeout(function(){e.classList.remove('leve');e.style.transition='';},170);
+var o=ordre();if(o===depart)return;
+if(annule){location.reload();return;}
+form.elements.ordre.value=o;setTimeout(function(){form.submit();},170);}
+c.addEventListener('touchstart',function(e){if(el||e.touches.length!==1||fige(e.target))return;
+var x=e.target.closest('[data-id]');if(!x||x.parentNode!==c)return;tactile=Date.now();
+var t=e.touches[0];el=x;x0=t.clientX;y0=t.clientY;dernier=t.clientY;startY=t.clientY+window.pageYOffset;depart=ordre();
+minuteur=setTimeout(lever,350);},{passive:true});
+c.addEventListener('touchmove',function(e){if(!el)return;var t=e.touches[0];
+if(!actif){if(Math.abs(t.clientX-x0)>10||Math.abs(t.clientY-y0)>10){clearTimeout(minuteur);el=null;}return;}
+e.preventDefault();placer(t.clientY);},{passive:false});
+c.addEventListener('touchend',function(){tactile=Date.now();fin(false);});
+c.addEventListener('touchcancel',function(){fin(true);});
+c.addEventListener('contextmenu',function(e){if(el)e.preventDefault();});
+c.addEventListener('dragstart',function(e){e.preventDefault();});
+c.addEventListener('mousedown',function(e){if(el||e.button!==0||Date.now()-tactile<800||fige(e.target))return;
+var x=e.target.closest('[data-id]');if(!x||x.parentNode!==c)return;
+el=x;x0=e.clientX;y0=e.clientY;dernier=e.clientY;startY=e.clientY+window.pageYOffset;depart=ordre();});
+document.addEventListener('mousemove',function(e){if(!el||Date.now()-tactile<800)return;
+if(!actif){if(Math.abs(e.clientY-y0)<6&&Math.abs(e.clientX-x0)<6)return;lever();}
+e.preventDefault();if(window.getSelection)window.getSelection().removeAllRanges();placer(e.clientY);});
+document.addEventListener('mouseup',function(){if(el&&Date.now()-tactile>=800)fin(false);});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&el)fin(true);});
+c.addEventListener('click',function(e){if(vient){e.preventDefault();e.stopPropagation();vient=false;}},true);
+});})();</script>"""
+
 # Un seul menu « ··· » ouvert à la fois ; un toucher ailleurs le ferme.
 SCRIPT_MENU = ('<script>document.addEventListener("click",function(e){document.querySelectorAll("details.menu-rapide[open]").forEach('
                'function(d){if(!d.contains(e.target))d.removeAttribute("open");});});</script>')

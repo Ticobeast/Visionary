@@ -126,7 +126,7 @@ en plus :
 
 | Action | Ce qu'elle fait |
 |---|---|
-| **Flèche vers le haut / vers le bas** | déplace un chantier dans l'ordre de passage (une flèche seulement, sans texte) ; toutes les heures sont recalculées aussitôt |
+| **Maintenir puis déplacer** (poignée à six points) | change l'ordre de passage : on maintient une tuile, elle se soulève, on la déplace, on relâche (téléphone et ordinateur) ; toutes les heures sont recalculées aussitôt |
 | **Terminer** | ouvre la fenêtre de confirmation (payé ou pas) |
 | **Retirer** | remet le chantier dans « À planifier » |
 
@@ -291,7 +291,7 @@ Un clic **applique le filtre** ; un second clic sur la pastille active le **reti
 
 Le lien **Modifier les raccourcis** (à côté des pastilles) ouvre la page de réglage :
 
-- **Mes raccourcis** : la liste, avec les flèches pour **monter / descendre** et le bouton **Retirer** (on peut tout retirer : les raccourcis de départ ne
+- **Mes raccourcis** : la liste, dont l'ordre se change en **maintenant puis en déplaçant** une ligne, et le bouton **Retirer** (on peut tout retirer : les raccourcis de départ ne
   reviennent pas tout seuls) ;
 - **Ajouter un raccourci proposé** : « En attente », « Terminés », « Payés en partie », « Prix manquants », « À planifier depuis 7 jours et plus »... ;
 - **Créer un raccourci personnalisé** : on combine un **statut**, un **paiement**, un **secteur**, un **délai d'attente** et un **texte contenu**, avec un nom

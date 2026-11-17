@@ -53,7 +53,8 @@ def panneau_jour(conn, jour, retour, gestion=False):
     Ni statut ni paiement ici : le statut est automatique (jamais choisi à la main) et le paiement se règle dans la
     fenêtre « Terminer » ou sur la page du chantier.
     gestion=False (tableau de bord) : lecture seule ; seul le bouton Terminer, en bas de chaque chantier.
-    gestion=True (page Journée) : boutons Terminer et Retirer, et une flèche vers le haut / vers le bas pour l'ordre.
+    gestion=True (page Journée) : boutons Terminer et Retirer ; l'ordre se change en maintenant une tuile puis en la déplaçant
+    (glisser-déposer ; les flèches ▲ ▼ restent si JavaScript est coupé).
     """
     d = datetime.date.fromisoformat(jour)
     ids = ids_de_la_journee(conn, jour)
@@ -124,13 +125,18 @@ def panneau_jour(conn, jour, retour, gestion=False):
                   f'<button type="submit" class="secondaire fleche" title="%s" aria-label="%s" %s>%s</button></form>')
         fleches = (fleche % ("haut", "Monter", "Monter", "disabled" if rang == 0 else "", "&#9650;")
                    + fleche % ("bas", "Descendre", "Descendre", "disabled" if rang == len(chantiers) - 1 else "", "&#9660;"))
-        corps += (f'<tr><td class="col-ordre"><div class="fleches">{fleches}</div><div class="doux">n° {rang + 1}</div></td>{base}'
+        corps += (f'<tr data-id="{l["chantier_id"]}"><td class="col-ordre"><span class="poignee" title="Maintiens puis déplace pour changer l\'ordre"></span>'
+                  f'<div class="fleches">{fleches}</div><div class="doux">n° {rang + 1}</div></td>{base}'
                   f'<td class="col-actions"><div class="actions-ligne">{actions}</div></td><td class="c-montant">{cellule_montant(l)}</td></tr>')
     if gestion:
         entetes = '<th>Ordre</th><th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th></th><th class="droite">Montant</th>'
     else:
         entetes = '<th>Heures</th><th>Client</th><th>Adresse</th><th>Travaux · durée</th><th class="droite">Montant</th>'
-    table = (f'<div class="liste-defile"><table class="tableau jour{" gestion" if gestion else ""}"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
+    glisser = ' data-glisser="ordre-jour"' if gestion and len(chantiers) > 1 else ""
+    table = (f'<div class="liste-defile"><table class="tableau jour{" gestion" if gestion else ""}"><thead><tr>{entetes}</tr></thead><tbody{glisser}>{corps}</tbody></table></div>')
+    if glisser:      # glisser-déposer : l'ordre complet part d'un coup (voir vue.SCRIPT_GLISSER)
+        table += (f'<form id="ordre-jour" method="post" action="/action/ordonner" hidden><input type="hidden" name="date" value="{jour}">'
+                  f'<input type="hidden" name="retour" value="{esc(retour)}"><input type="hidden" name="ordre" value=""></form>')
     lien_pdf = (f'<a class="bouton" href="/journee.pdf?date={jour}" download title="Toute la journée, avec les détails de chaque chantier">'
                 f'Télécharger la journée<span class="pc-seul"> (PDF)</span></a>')
     # Itinéraire : les chantiers qu'il reste à faire (planifiés), dans l'ordre de passage ; rien si tout est terminé

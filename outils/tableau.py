@@ -13,7 +13,7 @@ from pathlib import Path
 from calendrier import panneau_jour
 from composants import (FILTRES_ATTENTE, JOURNEE_H, TRIS, avec_params, cellule_adresse, cellule_client, cellule_montant,
                         lignes_vue, nom_client, retour_valide)
-from noyau import (annuler_chantier, changer_statut, cle, deplacer, jours_attente, planifier_lot, priorite, rouvrir_chantier,
+from noyau import (annuler_chantier, changer_statut, cle, deplacer, jours_attente, ordonner_journee, planifier_lot, priorite, rouvrir_chantier,
                    terminer_chantier, transaction)
 from pdf import journee_pdf
 from vue import _BASE, badge_attente, esc, gabarit, heures, le_date, redirection
@@ -70,6 +70,20 @@ def action_retirer(conn, form):
 
 def action_deplacer(conn, form):
     return _terminer(conn, form, "deplace", lambda: deplacer(conn, _id(form), form.get("sens", "")))
+
+
+def _liste_d_ids(texte):
+    """« 3,8,12 » -> [3, 8, 12] ; None si ce n'est pas une liste de numéros."""
+    morceaux = [m for m in (texte or "").split(",") if m]
+    return [int(m) for m in morceaux] if morceaux and all(m.isdigit() and len(m) < 12 for m in morceaux) else None
+
+
+def action_ordonner(conn, form):
+    """Glisser-déposer dans la Journée : l'ordre complet arrive d'un coup (champ `ordre`), pour la date `date`."""
+    jour, ids = _jour_valide(form.get("date", "")), _liste_d_ids(form.get("ordre", ""))
+    if jour is None or ids is None:
+        return _terminer(conn, form, "deplace", lambda: ["ordre de passage illisible"])
+    return _terminer(conn, form, "deplace", lambda: ordonner_journee(conn, jour, ids))
 
 
 # ---------------------------------------------------------------------------
@@ -215,4 +229,5 @@ ROUTES_TABLEAU = [
     ("POST", r"^/action/rouvrir$", lambda c, q, f, *g: action_rouvrir(c, f)),
     ("POST", r"^/action/retirer$", lambda c, q, f, *g: action_retirer(c, f)),
     ("POST", r"^/action/deplacer$", lambda c, q, f, *g: action_deplacer(c, f)),
+    ("POST", r"^/action/ordonner$", lambda c, q, f, *g: action_ordonner(c, f)),
 ]

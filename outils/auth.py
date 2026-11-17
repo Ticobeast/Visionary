@@ -306,7 +306,7 @@ PERMIS_SOUMISSION = (
     ("GET", r"^/chantier/(\d+)/dupliquer$"), ("POST", r"^/chantier/(\d+)/dupliquer$"),
     # raccourcis de la barre des listes
     ("GET", r"^/raccourcis$"), ("POST", r"^/raccourcis/ajouter$"), ("POST", r"^/raccourcis/reinitialiser$"),
-    ("POST", r"^/raccourcis/(\d+)/retirer$"), ("POST", r"^/raccourcis/(\d+)/deplacer$"),
+    ("POST", r"^/raccourcis/(\d+)/retirer$"), ("POST", r"^/raccourcis/(\d+)/deplacer$"), ("POST", r"^/raccourcis/ordonner$"),
     # photos : voir et ajouter, mais pas supprimer (réservé à l'administrateur)
     ("GET", r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)$"), ("POST", r"^/(?:soumission|chantier)/(\d+)/photos$"),
     ("POST", r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/vignette$"),
@@ -323,7 +323,7 @@ RESERVE_ADMIN = (
     # journée, tournée, suivi et actions sur les chantiers planifiés
     ("GET", r"^/journee\.pdf$"), ("GET", r"^/journee$"), ("POST", r"^/journee/planifier$"), ("GET", r"^/tournee$"), ("GET", r"^/suivi$"),
     ("POST", r"^/action/terminer$"), ("POST", r"^/action/annuler$"), ("POST", r"^/action/rouvrir$"), ("POST", r"^/action/retirer$"),
-    ("POST", r"^/action/deplacer$"),
+    ("POST", r"^/action/deplacer$"), ("POST", r"^/action/ordonner$"),
     # suppressions et finances
     ("POST", r"^/client/(\d+)/supprimer$"), ("GET", r"^/client/(\d+)/fusionner$"), ("POST", r"^/client/(\d+)/fusionner$"),
     ("POST", r"^/soumission/(\d+)/supprimer$"), ("POST", r"^/chantier/(\d+)/supprimer$"),

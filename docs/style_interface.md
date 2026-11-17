@@ -8,7 +8,7 @@ et pareille partout. Si une règle ne convient plus, on la change ici d'abord, p
 - Celles du site de l'entreprise : vert principal #4a7a28, vert foncé #0e341d, fond #fbfbf9, bordures #dbe2d6 et #ecefe9.
 - Cartes blanches arrondies, à fine bordure.
 - Bouton principal : vert plein. Boutons secondaires : blancs à bordure grise (jamais vert pâle).
-- Aucun emoji. Seules exceptions : les flèches ▲ ▼ pour l'ordre de la journée.
+- Aucun emoji. Seules exceptions : les flèches ▲ ▼ pour l'ordre (elles ne paraissent que si le glisser-déposer n'est pas disponible).
 
 ## Une page
 
@@ -57,6 +57,18 @@ Toujours dans cet ordre :
 - Prix : le total en gros, puis « 470,00 $ + tx » en petit. Le détail des taxes est sur le PDF.
 - Téléphone : « 819-555-0107 ». Adresse : « 1650 Rue des Érables, Bécancour ».
 - Tutoiement dans l'interface ; vouvoiement dans ce qui part au client (textos, courriels, PDF).
+
+## Changer un ordre
+
+- **On maintient une tuile, elle se soulève, on la déplace, on relâche** (iPhone : doigt maintenu un tiers de seconde ; PC : on
+  clique et on tire). Les voisines s'écartent. L'ordre est enregistré au relâchement. Partout où un ordre se change :
+  la Journée, les Raccourcis. Une petite poignée (six points) le signale.
+- Un geste rapide du doigt fait défiler la page comme d'habitude ; un toucher bref ouvre la fiche ou le bouton touché.
+
+## Retour au toucher
+
+- Une tuile de liste qu'on touche prend un contour vert, qui reste jusqu'à l'ouverture de la page : on voit que le toucher a été pris.
+- Sur iPhone, la journée choisie dans le calendrier du tableau de bord monte en douceur.
 
 ## Animations
 

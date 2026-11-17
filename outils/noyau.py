@@ -1195,6 +1195,22 @@ def deplacer(conn, chantier_id, sens):
     return []
 
 
+def ordonner_journee(conn, jour, ids):
+    """Enregistre l'ordre de passage COMPLET d'une journée (glisser-déposer) : `ids` = les chantiers du jour, dans le nouvel ordre.
+
+    La liste doit contenir exactement les chantiers planifiés ou terminés de ce jour-là : si la journée a changé entre-temps
+    (un chantier ajouté, retiré ou terminé ailleurs), rien n'est modifié et on le dit.
+    """
+    actuels = ids_de_la_journee(conn, jour)
+    if not actuels:
+        return ["aucun chantier dans cette journée"]
+    if sorted(ids) != sorted(actuels) or len(set(ids)) != len(ids):
+        return ["la journée a changé entre-temps : recharge la page, puis recommence"]
+    for rang, x in enumerate(ids, 1):
+        conn.execute("UPDATE chantiers SET ordre_jour = ? WHERE id = ? AND ordre_jour IS NOT ?", (rang, x, rang))
+    return []
+
+
 def calculer_horaire(durees_h):
     """Heures de passage d'une journée, d'après l'ordre et les durées estimées (en heures, None si inconnue).
 

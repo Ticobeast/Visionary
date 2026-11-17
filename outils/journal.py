@@ -74,11 +74,13 @@ LIBELLES = (
 NON_JOURNALISE = {
     r"^/action/deplacer$": "ordre de passage dans la journée : un clic par flèche, trop bavard et sans conséquence",
     r"^/raccourcis/(\d+)/deplacer$": "ordre des raccourcis d'une personne : préférence d'affichage, trop bavard",
+    r"^/action/ordonner$": "ordre de passage dans la journée (glisser-déposer) : comme les flèches, sans conséquence",
+    r"^/raccourcis/ordonner$": "ordre des raccourcis d'une personne (glisser-déposer) : préférence d'affichage",
     r"^/(?:soumission|chantier)/(\d+)/photos/([^/]+)/vignette$": "suite technique de l'ajout d'une photo, déjà journalisé",
 }
 
 # Réussites dont la redirection n'a pas `ok=` dans son adresse.
-SANS_PARAMETRE_OK = (r"^/deconnexion$", r"^/raccourcis/(\d+)/deplacer$")
+SANS_PARAMETRE_OK = (r"^/deconnexion$", r"^/raccourcis/(\d+)/deplacer$", r"^/raccourcis/ordonner$")
 
 _LIBELLES = {motif: (libelle, cible) for motif, libelle, cible in LIBELLES}
 _FICHE = re.compile(r"^/(soumission|chantier)/")
