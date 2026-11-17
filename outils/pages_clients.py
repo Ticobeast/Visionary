@@ -13,7 +13,7 @@ from noyau import (COLONNES, MSG_MODIFIE_ENTRE_TEMPS, empreinte, client_supprima
                    client_remplacant, doublons_fusionnes, erreurs_fusion, fiche_gardee, fusionner_clients, lister_secteurs, nouvelle_adresse_client, mettre_a_jour_client, renommer_secteur, supprimer_secteur, ajouter_secteur, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import appliquer_options, carte_contact
 from vue import (adresses, est_admin, avance, badge_statut, bloc_options_travaux, bloc_types, case_taxes, champ, champ_modalite, champ_secteur, client_avance,
-                 client_essentiel, date_lisible, esc, gabarit, rangee_actions, lien_maps, tel_texte, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
+                 client_essentiel, date_lisible, esc, gabarit, lien_tel, rangee_actions, lien_maps, tel_texte, redirection, select_secteur, url_fiche, utilisateur_courant, zone)
 
 
 def _types(conn):
@@ -78,7 +78,7 @@ def page_clients(conn, query):
     for cid, prenom, nom, entreprise, tel, adresse, ville, prov, cp, libelle_secteur, ancienne in lignes[:300]:
         maps = adresses(adresse, ville, prov, cp)[1]
         corps += (f'<tr><td class="c-client"><a href="/client/{cid}">{esc(_nom_client(dict(prenom=prenom, nom=nom, entreprise=entreprise)))}</a></td>'
-                  f'<td class="c-tel doux">{tel_texte(tel)}</td>'
+                  f'<td class="c-tel">{lien_tel(tel)}</td>'
                   f'<td class="c-adresse">{lien_maps(maps, adresse)}<div class="doux">{esc(libelle_secteur or ville)}{" · ancienne adresse" if ancienne else ""}</div></td></tr>')
     tableau = (f'<div class="liste-defile"><table class="clients"><thead><tr><th>Nom</th><th>Téléphone</th><th>Adresse</th></tr></thead>'
                f'<tbody>{corps}</tbody></table></div>'

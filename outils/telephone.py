@@ -94,7 +94,7 @@ table.stat th,table.stat td{font-size:13px;padding:6px 6px}
 /* chantiers */
 table.chantiers tr{position:relative;display:grid;grid-template-columns:1fr auto;gap:3px 10px}
 table.chantiers.sans-finis tr.fini{display:none}
-.menu-fiche{display:block}table.soumissions .menu-rapide{position:absolute;top:6px;right:6px}table.soumissions td.col-actions{margin:0!important}
+.menu-rapide.menu-fiche{display:block}table.soumissions .menu-rapide{position:absolute;top:6px;right:6px}table.soumissions td.col-actions{margin:0!important}
 .tel-bloc{display:block}.actions-sec{display:none!important}
 .menu-fiche>summary{width:46px;height:46px;border:1px solid var(--trait);border-radius:12px;background-color:#fff}
 .menu-fiche .menu-rapide-liste{top:52px}.menu-rapide-liste .bouton,.menu-rapide-liste button{min-height:42px}
@@ -173,7 +173,7 @@ table.tableau.jour tr.ligne-actions td{padding:0 16px}
 table.tableau.jour tr.ligne-actions .groupe-actions{display:flex;width:100%}table.tableau.jour tr.ligne-actions .bouton{flex:1}
 table.tableau.jour .facture-pc{display:none}
 table.tableau.jour tr.ligne-actions .groupe-actions{gap:8px}table.tableau.jour tr.ligne-actions .bouton.texto-jour{display:flex;flex:0 0 44px;width:44px;padding:0;font-size:0;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4z'/%3E%3C/svg%3E") center/20px no-repeat}
-.carte.contact{display:block}.contact-actions{justify-content:space-around;gap:0;margin-top:14px;padding-top:14px;border-top:1px solid var(--trait-leger)}
+.contact{margin:-2px 0 14px}.contact-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}a.rond{width:auto;padding:10px 2px 8px}
 .rond-icone{width:52px;height:52px}.contact-note{margin-top:10px}.contact-courriel{display:block}.contact-sep{display:none}
 table.tableau.jour.gestion td.col-ordre{grid-column:1;grid-row:1;display:flex;align-items:center;gap:6px;white-space:nowrap}
 table.tableau.jour.gestion .col-ordre .fleches{display:flex;gap:4px;margin:0}table.tableau.jour.gestion .col-ordre button.fleche{min-height:34px;width:34px;padding:0}table.tableau.jour.gestion .col-ordre .doux{display:none}

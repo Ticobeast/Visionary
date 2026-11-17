@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 727 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 728 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -89,7 +89,10 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   Chasse aux doublons : lien PDF en double retiré, pastille « Soumission » retirée, surtitres en double retirés (PC),
   filtres des Archives repliés aussi sur PC ; test automatique tests/test_doublons.py.
   Lot 4 fait (PC) : tableau de bord calendrier à gauche + journée à droite ; liste des soumissions avec « ··· » (Appeler compris) ;
-  lignes entières cliquables (Soumissions, Chantiers, Clients) ; numéros de téléphone des listes en texte gris (choix de l'utilisateur).
+  lignes entières cliquables (Soumissions, Chantiers, Clients).
+  Ensuite : en-tête des fiches à la façon de la fiche Contacts de l'iPhone (ligne grise adresse · téléphone, tuiles Appeler,
+  Texto, Courriel, Itinéraire, Client) placé AVANT le résumé du travail ; numéros des listes de nouveau cliquables (« Appeler »
+  retiré du menu « ··· ») ; tableau de bord du PC refait (calendrier compact comme l'iPhone, heures sous la date).
   La revue de l'interface (lots 1 à 4) est terminée ; reste de l'étape 3 de la revue : 13. itinéraire, 14. feuille de style en cache,
   15. HTTPS par Tailscale Serve. ; lot 4, PC (tableau de
   bord calendrier + journée côte à côte, filtres des Archives repliés, bandeau).

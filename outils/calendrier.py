@@ -177,7 +177,8 @@ def _grille(conn, premier, selection, aujourdhui):
                 classes.append("a-cloturer")
                 info += '<span class="cal-alerte">à clôturer</span>'
         mois_lien = f"{j.year}-{j.month:02d}"
-        cases += (f'<a class="{" ".join(classes)}" href="/?{urlencode({"date": iso, "mois": mois_lien})}" '
+        survol = f' title="{n} chantier{"s" if n > 1 else ""} · {heures(h) if h else "durée ?"} · {esc(argent_entier(montant))}"' if n else ""
+        cases += (f'<a class="{" ".join(classes)}" href="/?{urlencode({"date": iso, "mois": mois_lien})}"{survol} '
                   f'aria-label="{j.day} {MOIS[j.month - 1]}{f", {n} chantier(s)" if n else ""}"><span class="cal-n">{j.day}</span>{info}</a>')
     precedent = (premier - datetime.timedelta(days=1)).replace(day=1)
     suivant = (premier + datetime.timedelta(days=32)).replace(day=1)

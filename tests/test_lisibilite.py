@@ -71,7 +71,7 @@ class TestPrix(BaseTableau):
     def test_prix_plus_tx(self):
         """Le résumé d'une fiche : le total en gros, « 300,00 $ + tx » dessous ; le détail des taxes est sur le PDF."""
         _, page = self.get(f"/chantier/{self.ids['Demain']}")
-        resume = page[page.index('class="carte resume-chantier"'):page.index('class="carte contact"')]
+        resume = page[page.index('class="carte resume-chantier"'):page.index('class="actions-bloc"')]
         self.assertIn("<small>300,00 $ + tx</small>", resume)
         self.assertNotIn("TPS", resume)
         self.assertNotIn("reçu", resume)                                    # rien reçu : le solde serait le total, on ne le répète pas
@@ -81,7 +81,7 @@ class TestPrix(BaseTableau):
 
     def test_sans_taxes_pas_de_tx(self):
         _, page = self.get(f"/soumission/{self.ids['Devis']}")              # 500 $ sans taxes
-        resume = page[page.index('class="carte resume-chantier"'):page.index('class="carte contact"')]
+        resume = page[page.index('class="carte resume-chantier"'):page.index('class="actions-bloc"')]
         self.assertIn("500,00 $", resume)
         self.assertNotIn("+ tx", resume)
 
@@ -150,6 +150,14 @@ class TestActionsDesFiches(BaseTableau):
         bloc = self.actions(f"/chantier/{self.ids['Demain']}")
         self.assertTrue(bloc.index(">Terminer</a>") < bloc.index("menu-fiche") or "menu-fiche" not in bloc)
         self.assertIn(">Dupliquer<", bloc)
+
+    def test_le_menu_des_fiches_se_voit_sur_telephone(self):
+        """Le menu « ··· » d'une fiche est caché sur PC (boutons côte à côte) mais VISIBLE sur téléphone : la règle du téléphone
+        doit être au moins aussi précise que celle du PC (« .menu-rapide.menu-fiche »), sinon elle ne gagne pas."""
+        import telephone
+        import vue as v
+        self.assertIn(".menu-rapide.menu-fiche{display:none}", v.CSS)
+        self.assertIn(".menu-rapide.menu-fiche{display:block}", telephone.CSS_TELEPHONE)
 
     def test_un_seul_choix_pas_de_menu(self):
         """Chantier terminé : seulement « Dupliquer », visible."""

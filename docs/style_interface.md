@@ -33,22 +33,22 @@ et pareille partout. Si une règle ne convient plus, on la change ici d'abord, p
 
 Toujours dans cet ordre :
 
-1. Le résumé (chantier, soumission) : numéro, statut, travaux, date, prix.
-2. **La carte de contact**, la même partout :
-   - l'adresse courte (rue, ville), le téléphone et le courriel en gris, l'accès : du texte à lire, sans lien ;
-   - les boutons ronds **Appeler, Texto, Courriel, Itinéraire** : la seule façon d'agir. Un bouton qui n'a pas de sens
-     n'apparaît pas (pas de courriel, textos refusés, pas d'adresse) ;
-   - sur un chantier ou une soumission, un petit lien « Fiche client ».
+1. **L'en-tête, juste sous le nom**, comme la fiche Contacts de l'iPhone, le même partout :
+   - une ligne grise à lire : adresse courte (rue, ville) · téléphone · courriel ; l'accès dessous ;
+   - une rangée de tuiles égales : **Appeler, Texto, Courriel, Itinéraire**, et **Client** sur un chantier ou une soumission
+     (ouvre la fiche du client ; c'est là qu'on le modifie). Une tuile qui n'a pas de sens n'apparaît pas
+     (pas de courriel, textos refusés, pas d'adresse).
+2. Le résumé du travail (chantier, soumission) : numéro, statut, travaux, date, prix.
 3. L'action principale (et « ··· » sur iPhone), puis les sections (Documents, Photos, Paiements ; l'historique sur un client).
-   Sur la fiche d'un client, sur PC, « + Nouvelle soumission » est dans la carte de contact, à gauche d'Appeler.
+   Sur la fiche d'un client, sur PC, « + Nouvelle soumission » est à gauche de la tuile Appeler.
 4. « Modifier », replié.
 
 ## Une liste
 
 - **Toute la carte (ou la ligne, sur PC) s'ouvre d'un toucher.** Pas de boutons sur la carte.
-- **Les actions rapides** (Appeler, Accepter, En attente, Refuser, PDF) sont derrière le petit bouton **« ··· »** de la carte,
+- **Les actions rapides** (Accepter, En attente, Refuser, PDF) sont derrière le petit bouton **« ··· »** de la carte,
   sur iPhone comme sur PC : on agit sans quitter la liste.
-- **Le numéro de téléphone se lit, en gris** (pas de lien) : on appelle par « Appeler » (bouton rond de la fiche, ou menu « ··· »).
+- **Dans une liste, le numéro de téléphone se touche pour appeler** (vert). Sur une fiche, il se lit (gris) : on appelle par la tuile.
 - Par défaut, on montre ce qui est en cours. Le reste (terminés, archives) se voit avec une pastille ou une recherche.
 
 ## Les mots et les nombres
@@ -63,4 +63,5 @@ Toujours dans cet ordre :
 - Le style du téléphone est dans `outils/telephone.py`, dans un seul bloc. Une demande « pour le téléphone » ne change pas le PC.
 - Barre du bas de l'iPhone : Accueil, Soumissions, Chantiers, Clients, puis le menu (Journée, Archives, Utilisateurs).
 - Sur PC, les listes gardent leurs colonnes. Les fiches suivent les mêmes règles que sur le téléphone.
-- Tableau de bord sur PC : le calendrier à gauche, la journée choisie à droite ; sur iPhone, l'un sous l'autre.
+- Tableau de bord sur PC : un calendrier compact à gauche (comme celui de l'iPhone, avec les heures du jour sous la date ;
+  le détail au survol), la journée choisie à droite ; sur iPhone, l'un sous l'autre.

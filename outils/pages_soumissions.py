@@ -17,7 +17,7 @@ from noyau import (STATUTS_SOUMISSION, TYPES_AVEC_BOIS, accepter_soumission, app
                    refuser_soumission, rouvrir_chantier, transaction, travaux_depuis_formulaire, valeurs_client)
 from pages_chantier import (_formulaire_action, _genre_et_statut, _vers_la_bonne_page, boutons_soumission, lire_formulaire, modifier,
                             supprimer_chantier, types_triees, valeurs_chantier)
-from vue import (argent, badge_attente, bloc_options_travaux, bloc_types, case_taxes, champ, champ_secteur, date_lisible, esc, gabarit, heures, tel_texte, redirection,
+from vue import (argent, badge_attente, bloc_options_travaux, bloc_types, case_taxes, champ, champ_secteur, date_lisible, esc, gabarit, heures, lien_tel, redirection,
                  url_fiche, utilisateur_courant)
 
 LIMITE_REFUSEES = 50
@@ -42,7 +42,7 @@ def _table(conn, lignes, retour, refusees=False):
             demande += f'<div class="doux">par {esc(l["cree_par"])}</div>'
         manques = [] if refusees else manques_pour_accepter(conn, i)
         manque = f'<div class="manque">Il manque : {esc(", ".join(COURTS[c] for c in manques))}</div>' if manques else ""
-        tel = f'<div class="doux">{tel_texte(l["telephone"])}</div>' if l["telephone"] else ""
+        tel = f'<div class="doux">{lien_tel(l["telephone"])}</div>' if l["telephone"] else ""
         adresse = f'{esc(l["adresse"])}<div class="doux">{esc(l["secteur"] or l["ville"])}</div>' if l["adresse"] else '<span class="doux">—</span>'
         duree = f'<div class="doux">Durée {esc(heures(l["duree_estimee_h"]))}</div>' if l["duree_estimee_h"] else ""
         travaux = esc(l["type_libelle"]) if l["type_libelle"] else '<span class="doux">à préciser</span>'
@@ -52,9 +52,8 @@ def _table(conn, lignes, retour, refusees=False):
         else:
             boutons = boutons_soumission(i, retour)
         # PC et téléphone : les actions rapides derrière le petit bouton « ··· » de la ligne (on reste sur la liste)
-        appeler = f'<a class="bouton secondaire" href="tel:{esc(l["telephone"])}">Appeler</a>' if l["telephone"] else ""
         action = (f'<details class="menu-rapide"><summary aria-label="Actions" title="Actions"></summary>'
-                  f'<div class="menu-rapide-liste">{appeler}{boutons}</div></details>')
+                  f'<div class="menu-rapide-liste">{boutons}</div></details>')
         corps += (f'<tr><td>{demande}</td><td><a class="lien-carte" href="{url_fiche(i, "soumission")}">{esc(nom)}</a>{tel}{manque}</td><td>{adresse}</td>'
                   f'<td>{travaux}{duree}</td>{montant}<td class="col-actions">{action}</td></tr>')
     return ('<div class="liste-defile"><table class="tableau soumissions"><thead><tr><th>Demande</th><th>Client</th><th>Adresse</th><th>Travaux</th>'

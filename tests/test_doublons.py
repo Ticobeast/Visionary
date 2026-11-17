@@ -65,7 +65,7 @@ class TestPasDeDoublon(BaseTableau):
 
     def test_pas_de_pastille_qui_repete_le_numero(self):
         _, page = self.get(f"/soumission/{self.ids['Devis']}")
-        resume = page[page.index('class="carte resume-chantier"'):page.index('class="carte contact"')]
+        resume = page[page.index('class="carte resume-chantier"'):page.index('class="actions-bloc"')]
         self.assertIn("Soumission n° ", resume)
         self.assertNotIn("b-soumission", resume)                              # pas de pastille « SOUMISSION » à côté
 

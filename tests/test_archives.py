@@ -448,13 +448,12 @@ class TestPresentationTelephone(BaseArchives):
                 self.assertIn(classe, ligne, (chemin, classe))
         self.assertRegex(self.get("/archives?par_client=1&resultat=tout"), r'c-statut">\d+<span class="tel-seul"> chantiers?</span>')
 
-    def test_les_numeros_se_lisent_et_l_appel_se_fait_par_un_bouton(self):
-        """Dans les listes, le numéro est du texte gris (pas un lien) ; on appelle par le bouton rond de la fiche."""
+    def test_les_numeros_des_listes_lancent_l_appel(self):
+        """Dans les listes, le numéro se touche pour appeler ; sur une fiche, il se lit et on appelle par la tuile Appeler."""
         self.sql_exec("UPDATE clients SET telephone = '+18195550106' WHERE nom = 'Hamel'")
+        lien = '<a class="tel" href="tel:+18195550106">819-555-0106</a>'
         for chemin in ("/archives?resultat=tout", "/clients"):
-            page = self.get(chemin)
-            self.assertIn("819-555-0106", page, chemin)
-            self.assertNotIn('href="tel:', page, chemin)
+            self.assertIn(lien, self.get(chemin), chemin)
         fiche = self.get("/client/%d" % self.sql("SELECT id FROM clients WHERE nom = 'Hamel'")[0][0])
         self.assertIn('<a class="rond" href="tel:+18195550106"', fiche)          # fiche : le bouton rond Appeler (le numéro se lit)
 

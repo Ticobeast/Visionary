@@ -112,16 +112,29 @@ h2.groupe{margin:20px 0 8px;display:flex;gap:10px;align-items:baseline;flex-wrap
 .menu-rapide-liste .lien-pdf{position:static!important;padding:8px 12px!important;border:1px solid var(--trait)!important;background:#fff!important;font-size:14px!important;color:var(--texte)!important;text-decoration:none;text-align:center}
 table.soumissions tbody tr,table.chantiers tbody tr,table.clients tbody tr{position:relative}@media (hover:hover){table.soumissions tbody tr:hover,table.chantiers tbody tr:hover,table.clients tbody tr:hover{background:var(--vert-doux)}}
 table.chantiers td.c-client a::after,table.clients td.c-client a::after,table.soumissions a.lien-carte::after{content:"";position:absolute;inset:0;z-index:0}
-table.soumissions td.col-actions{text-align:right;width:56px}table.soumissions .menu-rapide{z-index:2}table.soumissions .menu-rapide[open]{z-index:7}
+table.soumissions a.tel,table.clients a.tel,table.chantiers a.tel{position:relative;z-index:1}table.soumissions td.col-actions{text-align:right;width:56px}table.soumissions .menu-rapide{z-index:2}table.soumissions .menu-rapide[open]{z-index:7}
 table.soumissions,.liste-defile:has(table.soumissions){overflow:visible}.menu-rapide-liste{text-align:center}
 .menu-rapide-liste .bouton,.menu-rapide-liste button{min-height:40px;padding:8px 12px;font-size:14px}
 .sel-total[hidden]{display:none}
 .choix-paye{display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:12px}.mode-paye{display:none;margin-bottom:12px}.modale-carte:has(input[value=oui]:checked) .mode-paye{display:block}.duree-reelle{margin-bottom:14px}.lien-facture-modale{margin:12px 0 0;font-size:.9rem}.modale-carte h2+.doux{margin-top:-4px}.sel-total .charge{color:#b42318}
 .sel-total{position:sticky;bottom:0;background:var(--carte);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;margin-top:12px}
 .cal-nav{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.cal-nav h2{margin:0;flex:1;text-align:center;font-size:20px;min-width:140px}
-@media (min-width:701px){.tableau-bord{display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:20px;align-items:start}
-.tableau-bord>.carte{margin-bottom:0}.tableau-bord .cal-jour{min-height:70px;padding:4px 6px}.tableau-bord .cal-info{font-size:11px}
-.tableau-bord .cal-nav .bouton{padding:6px 10px;font-size:13px}.tableau-bord .cal-nav h2{font-size:17px;min-width:110px}}
+@media (min-width:701px){.tableau-bord{display:grid;grid-template-columns:minmax(0,370px) minmax(0,1fr);gap:20px;align-items:start}
+.tableau-bord>.carte{margin-bottom:0}
+.tableau-bord .cal-nav{flex-wrap:nowrap;gap:6px}.tableau-bord .cal-nav h2{font-size:17px;min-width:0}
+.tableau-bord .cal-nav a[aria-label]{font-size:0;padding:0;width:36px;height:36px;min-height:0;position:relative;flex:0 0 36px}
+.tableau-bord .cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:9px;height:9px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
+.tableau-bord .cal-nav a[aria-label="Mois suivant"]::before{transform:translate(-70%,-50%) rotate(-135deg)}
+.tableau-bord .cal-nav a[href="/"]{order:3;padding:6px 10px;font-size:13px}
+.tableau-bord .cal-grille{gap:3px}.tableau-bord .cal-tete{font-size:12px}
+.tableau-bord .cal-jour{min-height:50px;padding:3px 0;align-items:center;gap:1px;border-color:transparent;background:none;border-radius:10px}
+.tableau-bord .cal-jour.weekend{background:var(--fond)}.tableau-bord .cal-jour:hover{border-color:var(--trait)}
+.tableau-bord .cal-jour .cal-n,.tableau-bord .cal-jour.aujourdhui .cal-n{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-weight:600;background:none;color:var(--texte);align-self:center}
+.tableau-bord .cal-jour.aujourdhui .cal-n{color:var(--vert);font-weight:800}
+.tableau-bord .cal-jour.selection{outline:0}.tableau-bord .cal-jour.selection .cal-n{background:var(--vert-fonce);color:#fff}
+.tableau-bord .cal-jour.occupe{background:var(--vert-doux);border-color:var(--vert-bord)}.tableau-bord .cal-jour.chargee{background:var(--alerte-fond);border-color:var(--alerte)}
+.tableau-bord .cal-info{font-size:11px;line-height:1.2;color:var(--vert-fonce);text-align:center}
+.tableau-bord .cal-info b,.tableau-bord .cal-info .nw,.tableau-bord .cal-alerte{display:none}}
 .cal-grille{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .cal-tete{font-size:13px;color:var(--doux);text-align:center;font-weight:600;padding:4px 0;text-transform:capitalize}
 .cal-jour{min-height:124px;padding:6px 8px;border:1px solid var(--trait);border-radius:8px;text-decoration:none;color:var(--texte);display:flex;flex-direction:column;gap:2px;background:var(--carte)}
@@ -238,13 +251,13 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
 .barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.texto-jour,.note-heures,.resume-jour,.total-jour{display:none}
-.carte.contact{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
-.contact-infos p{margin:0 0 2px}.contact-adresse{font-weight:600}.contact-liens{font-size:.85rem;margin-top:6px!important}.contact-liens a{color:var(--doux)}
-.contact-actions{display:flex;gap:18px;align-items:center}.nouvelle-pc{margin-right:10px}.contact-note{flex-basis:100%;margin:0;font-size:.85rem}
-a.rond{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--texte);text-decoration:none}
-.rond-icone{display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;background:#fff;border:1px solid var(--trait)}
-a.rond:hover .rond-icone{background:var(--vert-doux);border-color:var(--vert-bord)}
-.rond-icone svg{width:22px;height:22px;fill:none;stroke:var(--vert-fonce);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.contact{margin:-6px 0 16px}.contact-ligne{margin:0 0 3px;color:var(--doux);font-size:.95rem}.contact-ligne b{font-weight:600}
+.contact-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:stretch}.contact-note{margin:8px 0 0;font-size:.85rem}
+a.rond{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:92px;padding:9px 4px 8px;border-radius:14px;background:#fff;
+border:1px solid var(--trait-leger);box-shadow:var(--ombre-sm,none);font-size:12px;font-weight:600;color:var(--vert-fonce);text-decoration:none}
+a.rond:hover{background:var(--vert-doux);border-color:var(--vert-bord)}
+a.rond svg{width:22px;height:22px;fill:none;stroke:var(--vert);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.nouvelle-pc{display:flex;align-items:center;margin-right:6px}.nouvelle-pc .bouton{height:100%;display:flex;align-items:center}
 details.modifier-fiche>summary{font-weight:700}
 .no-fiche{font-weight:700;color:var(--doux);font-size:.9rem}
 
@@ -515,6 +528,15 @@ def case_taxes(nom, cochee):
     """« Ajouter TPS et TVQ » : sur sa propre ligne de la grille (le libellé est trop long pour une colonne)."""
     return (f'<div class="large"><label class="coche"><input type="checkbox" name="{nom}" value="1"{" checked" if cochee else ""}>'
             'Ajouter TPS 5 % et TVQ 9,975 %</label></div>')
+
+
+def lien_tel(t):
+    """Numéro cliquable des LISTES (Soumissions, Clients, Archives) : un toucher lance l'appel."""
+    if not t:
+        return ""
+    texte = f"{t[2:5]}-{t[5:8]}-{t[8:]}" if len(t) == 12 else t
+    chiffres = "+" * t.startswith("+") + "".join(c for c in t if c.isdigit())
+    return f'<a class="tel" href="tel:{esc(chiffres)}">{esc(texte)}</a>'
 
 
 def tel_texte(t):
