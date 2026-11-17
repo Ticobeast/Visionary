@@ -67,5 +67,24 @@ class TestPages(BaseTableau):
         self.assertEqual(self.sql("SELECT telephone FROM clients WHERE id = ?", (cid,)), [("+14505550100",)])
 
 
+class TestPrix(BaseTableau):
+    def test_prix_plus_tx(self):
+        """Le résumé d'une fiche : le total en gros, « 300,00 $ + tx » dessous ; le détail des taxes est sur le PDF."""
+        _, page = self.get(f"/chantier/{self.ids['Demain']}")
+        resume = page[page.index('class="carte resume-chantier"'):page.index('class="carte contact"')]
+        self.assertIn("<small>300,00 $ + tx</small>", resume)
+        self.assertNotIn("TPS", resume)
+        self.assertNotIn("reçu", resume)                                    # rien reçu : le solde serait le total, on ne le répète pas
+        self.post(f"/chantier/{self.ids['Demain']}/paiement", {"paiement_date": "2026-11-01", "paiement_montant": "100", "paiement_mode": "cheque"})
+        _, page = self.get(f"/chantier/{self.ids['Demain']}")
+        self.assertIn("reçu 100,00 $ · solde <b>", page)
+
+    def test_sans_taxes_pas_de_tx(self):
+        _, page = self.get(f"/soumission/{self.ids['Devis']}")              # 500 $ sans taxes
+        resume = page[page.index('class="carte resume-chantier"'):page.index('class="carte contact"')]
+        self.assertIn("500,00 $", resume)
+        self.assertNotIn("+ tx", resume)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -129,8 +129,8 @@ class TestPages(BaseInterface):
 
     def test_pages_de_detail_et_introuvable(self):
         statut, page = self.get("/chantier/1")
-        self.assertIn("123 Rue des Érables, Saint-Jérôme, QC J7Z 1A1", page)
-        self.assertIn("google.com/maps/dir/", page)                  # bouton Itinéraire de la carte de contact
+        self.assertIn(">123 Rue des Érables, Saint-Jérôme<", page)     # à lire : la rue et la ville
+        self.assertIn("destination=123%20Rue%20des%20%C3%89rables%2C%20Saint-J%C3%A9r%C3%B4me%2C%20QC%20J7Z%201A1", page)   # Itinéraire : l'adresse complète
         self.assertIn("551,88 $", page)
         self.assertTrue(self.get("/chantier/999")[0].startswith("404"))
         self.assertTrue(self.get("/nimporte")[0].startswith("404"))
@@ -471,7 +471,8 @@ class TestModification(BaseInterface):
             self.assertNotIn(f'name="{interdit}"', formulaire)
         self.assertIn('class="carte contact"', page)
         self.assertIn("850 Boulevard du Lac", page)                                   # mais le client est bien affiché
-        self.assertIn('href="/client/3/modifier?retour=%2Fchantier%2F3"', page)       # seul point d'entrée : la fiche client (puis retour ici)
+        self.assertIn('<a href="/client/3">Fiche client</a>', page)                 # seul point d'entrée : la fiche client, puis « Modifier le client »
+        self.assertNotIn('href="/client/3/modifier', page)
 
     def test_le_serveur_ignore_toute_modification_du_client_envoyee_au_chantier(self):
         avant = self.sql("SELECT * FROM clients ORDER BY id")

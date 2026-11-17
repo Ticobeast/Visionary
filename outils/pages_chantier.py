@@ -200,11 +200,13 @@ def _rond(icone, texte, href, titre, externe=False):
 def carte_contact(conn, client_id, chantier_id, retour=""):
     """Le client d'une fiche, en haut : adresse, téléphone, accès (du texte à LIRE, sans lien), et les gestes du terrain en
     boutons ronds, seule façon d'agir : Appeler, Texto, Courriel, Itinéraire. Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la
-    visite, suivi de la soumission, rappel de paiement : outils/messages.py). Rien ne se modifie ici : les liens mènent à la fiche du client."""
+    visite, suivi de la soumission, rappel de paiement : outils/messages.py). Rien ne se modifie ici : pour changer le client,
+    on passe par sa fiche (lien « Fiche client »), puis « Modifier le client »."""
     r = conn.execute("SELECT telephone, telephone_2, courriel, sms_ok, adresse, ville, province, code_postal, notes_acces"
                      " FROM clients WHERE id = ?", (client_id,)).fetchone()
     tel, tel2, courriel, sms_ok, adresse, ville, prov, cp, acces = r
-    adresse_texte, adresse_maps = adresses(adresse, ville, prov, cp)
+    _, adresse_maps = adresses(adresse, ville, prov, cp)                 # complète (province, code postal) : pour Google Maps seulement
+    adresse_texte = ", ".join(x for x in (adresse, ville) if x)           # à lire : la rue et la ville suffisent
     tel = tel if tel and len(tel) == 12 else None
     tels = " · ".join(f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12)       # à lire ; pour appeler : le bouton
     m = messages.message(conn, chantier_id, finances=est_admin())
@@ -222,13 +224,12 @@ def carte_contact(conn, client_id, chantier_id, retour=""):
     if adresse_maps:
         ronds += _rond("route", "Itinéraire", "https://www.google.com/maps/dir/?api=1&destination=" + quote(adresse_maps),
                        "Itinéraire dans Google Maps", externe=True)
-    suite = "?retour=" + quote(retour, safe="") if retour else ""
     return (f'<div class="carte contact"><div class="contact-infos">'
             f'<p class="contact-adresse">{esc(adresse_texte) if adresse_texte else "<span class=doux>adresse à saisir</span>"}</p>'
             + (f'<p class="doux">{esc(tels)}{"<span class=contact-sep> · </span>" if courriel and tels else ""}'
                f'{"<span class=contact-courriel>" + esc(courriel) + "</span>" if courriel else ""}</p>' if tels or courriel else "")
             + (f'<p><b>Accès :</b> {esc(acces)}</p>' if acces else "")
-            + f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a> · <a href="/client/{client_id}/modifier{suite}">Modifier le client</a></p></div>'
+            + f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a></p></div>'
             + (f'<div class="contact-actions">{ronds}</div>' if ronds else "")
             + (f'<p class="doux contact-note">{esc(note)}</p>' if note else "") + '</div>')
 
@@ -340,8 +341,9 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         (f"Ouverte par {cree_par}" if soumission and cree_par else ""),
         (f"En attente : {texte_attente(reprise)}" if statut == "en_attente" else "")) if x)
     montants = (f'<div class="montant">{argent(total) if total is not None and total else "prix à saisir"}'
-                + (f'<small>{argent(prix)} + TPS {argent(tps)} + TVQ {argent(tvq)}</small>' if total else "")
-                + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and est_admin() and not soumission else "") + "</div>")
+                + (f'<small>{argent(prix)} + tx</small>' if total and prix is not None and (tps or tvq) else "")       # le détail des taxes : sur le PDF
+                + (f'<small>reçu {argent(paye)} · solde <b>{argent(solde)}</b></small>' if total and paye and est_admin() and not soumission else "")
+                + "</div>")
     coin = (f'<a class="lien-pdf-coin" href="/soumission/{chantier_id}/pdf" target="_blank" rel="noopener" '
             'title="Ouvrir la soumission en PDF (nouvel onglet)">Soumission</a>') if soumission else ""      # téléphone : discret, en haut à droite
     resume = (f'<div class="carte resume-chantier">{coin}<div><div class="barre"><span class="no-fiche">{mot} n° {chantier_id}</span>{badges}</div>'
