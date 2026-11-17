@@ -115,17 +115,17 @@ class TestMessages(BaseTableau):
         c.close()
 
     def ronds(self, nom):
-        """Les tuiles de l'en-tête d'une fiche : {libellé: adresse du lien}."""
+        """Les boutons ronds de la carte de contact d'une fiche : {libellé: adresse du lien}."""
         _, page = self.get(f"/chantier/{self.ids[nom]}")
-        carte = page[page.index('<section class="contact">'):]
-        carte = carte[:carte.index('</section>')]
+        carte = page[page.index('<div class="carte contact">'):]
+        carte = carte[:carte.index('<div class="actions-bloc">')]
         return dict((t, html.unescape(h)) for h, t in re.findall(r'<a class="rond" href="([^"]*)".*?<span>([^<]+)</span></a>', carte)), carte
 
     def test_carte_de_contact(self):
         """En haut de la fiche : Appeler, Texto (déjà écrit), Itinéraire ; Courriel quand le client en a un."""
         self.client_de("Demain", telephone=TEL)
         ronds, carte = self.ronds("Demain")
-        self.assertEqual(list(ronds), ["Appeler", "Texto", "Itinéraire", "Client"])
+        self.assertEqual(list(ronds), ["Appeler", "Texto", "Itinéraire"])
         self.assertEqual(ronds["Appeler"], "tel:" + TEL)
         self.assertTrue(ronds["Texto"].startswith(f"sms:{TEL}?&body=Bonjour%2C%20ici%20Sylvainculteur."))
         self.assertTrue(ronds["Itinéraire"].startswith("https://www.google.com/maps/dir/?api=1&destination=2%20Rue%20Demain"))
@@ -136,7 +136,7 @@ class TestMessages(BaseTableau):
         self.assertNotIn("Message au client", carte)                    # l'ancienne carte séparée n'existe plus
         self.client_de("Demain", courriel="demain@example.com")
         ronds, _ = self.ronds("Demain")
-        self.assertEqual(list(ronds), ["Appeler", "Texto", "Courriel", "Itinéraire", "Client"])
+        self.assertEqual(list(ronds), ["Appeler", "Texto", "Courriel", "Itinéraire"])
         self.assertTrue(ronds["Courriel"].startswith("mailto:demain@example.com?subject=Rappel%20de%20notre%20visite"))
 
     def test_sans_message_les_boutons_restent(self):
@@ -151,12 +151,12 @@ class TestMessages(BaseTableau):
         self.assertFalse(messages.message(c, self.ids["Demain"])["texto_ok"])
         c.close()
         ronds, carte = self.ronds("Demain")
-        self.assertEqual(list(ronds), ["Appeler", "Itinéraire", "Client"])
+        self.assertEqual(list(ronds), ["Appeler", "Itinéraire"])
         self.assertIn("Pas de textos : refusés par le client.", carte)
 
     def test_sans_telephone_ni_courriel(self):
         ronds, _ = self.ronds("Demain")
-        self.assertEqual(list(ronds), ["Itinéraire", "Client"])
+        self.assertEqual(list(ronds), ["Itinéraire"])
 
     def test_rappel_de_paiement_sur_la_fiche(self):
         self.client_de("Fait", telephone=TEL)
@@ -167,8 +167,7 @@ class TestMessages(BaseTableau):
         """Le formulaire est replié sous « Modifier » ; ouvert seulement s'il manque de quoi accepter une soumission."""
         _, page = self.get(f"/chantier/{self.ids['Demain']}")
         self.assertIn('<details class="avance modifier-fiche" id="modifier"><summary>Modifier</summary>', page)
-        self.assertLess(page.index('<section class="contact">'), page.index('class="carte resume-chantier"'))     # sous le nom, avant le travail
-        self.assertLess(page.index('class="carte resume-chantier"'), page.index('class="actions-bloc"'))
+        self.assertLess(page.index('class="carte contact"'), page.index('class="actions-bloc"'))
         self.assertLess(page.index('class="actions-bloc"'), page.index('id="modifier"'))
         _, page = self.get(f"/soumission/{self.ids['Devis']}")           # il manque le téléphone, la durée...
         self.assertIn('<details class="avance modifier-fiche" id="modifier" open>', page)

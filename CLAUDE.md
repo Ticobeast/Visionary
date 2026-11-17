@@ -14,6 +14,8 @@ clients, soumissions, chantiers, journées, paiements, PDF, photos. Voir README.
   Bouton principal vert plein ; boutons secondaires BLANCS à bordure grise (jamais vert pâle) ; cartes blanches arrondies à fine bordure.
 - Règles d'interface communes (titre, flèche de retour, carte de contact, « Modifier » replié, listes et menu « ··· », dates, prix) :
   docs/style_interface.md. Toute nouvelle page les suit.
+- AVANT tout changement visible : suivre le skill .claude/skills/design-sylvainculteur (montrer avant / après et attendre
+  l'accord ; ne pas toucher aux écrans validés ; animations). Pour une revue : skill nielsen-usability-heuristics.
 
 ## Contraintes techniques
 - Python 3.9+ (le PC a 3.9.13), bibliothèque standard SEULEMENT (Pillow facultatif pour les photos du PDF). Pas de framework.

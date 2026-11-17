@@ -67,7 +67,7 @@ class TestFicheClient(BaseClients):
         self.assertTrue(tel.index("+ Nouvelle soumission") < tel.index('<details class="menu-rapide menu-fiche">'))   # téléphone : en premier plan
         menu = tel[tel.index('<details class="menu-rapide menu-fiche">'):]
         self.assertIn('href="/client/1/modifier"', menu)                                                         # le reste derrière « ··· »
-        carte = page[page.index('<section class="contact">'):page.index('</section>', page.index('<section class="contact">'))]
+        carte = page[page.index('<div class="carte contact">'):page.index('<div class="actions-bloc tel-bloc">')]
         self.assertLess(carte.index("+ Nouvelle soumission"), carte.index('href="tel:'))                        # PC : à gauche d'Appeler
         self.assertIn('href="/client/1/soumission/nouveau"', page)
         self.assertIn("+ Nouvelle soumission", page)

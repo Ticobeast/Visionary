@@ -188,33 +188,30 @@ _ICONES_CONTACT = {
     "texto": '<path d="M4 5h16v11H9l-5 4z"/>',
     "courriel": '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/>',
     "route": '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
-    "client": '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.8 3.6-5.8 7-5.8s6.2 2 7 5.8"/>',
 }
 
 
 def _rond(icone, texte, href, titre, externe=False):
-    """Une tuile de la rangée d'actions (icône au-dessus, nom dessous), comme sur la fiche Contacts de l'iPhone."""
     cible = ' target="_blank" rel="noopener"' if externe else ""
-    return (f'<a class="rond" href="{esc(href)}" title="{esc(titre)}"{cible}><svg viewBox="0 0 24 24" aria-hidden="true">'
-            f'{_ICONES_CONTACT[icone]}</svg><span>{texte}</span></a>')
+    return (f'<a class="rond" href="{esc(href)}" title="{esc(titre)}"{cible}><span class="rond-icone"><svg viewBox="0 0 24 24" aria-hidden="true">'
+            f'{_ICONES_CONTACT[icone]}</svg></span><span>{texte}</span></a>')
 
 
 def carte_contact(conn, client_id, chantier_id=None, retour="", extra="", avant_ronds=""):
-    """L'en-tête d'une fiche, juste sous le nom (comme la fiche Contacts de l'iPhone) : une ligne grise à LIRE (adresse,
-    téléphone, courriel ; l'accès dessous), puis une rangée de tuiles égales, seule façon d'agir : Appeler, Texto, Courriel,
-    Itinéraire, et Client (sur un chantier ou une soumission : ouvre la fiche du client ; pour le modifier, c'est là).
-    Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la visite, suivi de la
-    soumission, rappel de paiement : outils/messages.py). Une tuile qui n'a pas de sens n'apparaît pas.
-    Même en-tête sur la fiche du CLIENT (chantier_id=None : pas de message déjà écrit, pas de tuile Client) ;
+    """Le client d'une fiche, en haut : adresse, téléphone, accès (du texte à LIRE, sans lien), et les gestes du terrain en
+    boutons ronds, seule façon d'agir : Appeler, Texto, Courriel, Itinéraire. Le texto et le courriel s'ouvrent déjà écrits quand la fiche a un message à proposer (rappel de la
+    visite, suivi de la soumission, rappel de paiement : outils/messages.py). Rien ne se modifie ici : pour changer le client,
+    on passe par sa fiche (lien « Fiche client »), puis « Modifier ».
+    Même carte en haut de la fiche du CLIENT (chantier_id=None : pas de message déjà écrit, pas de lien « Fiche client ») ;
     `extra` : lignes ajoutées sous l'accès (notes du client, ancienne / nouvelle adresse) ; `avant_ronds` : un bouton placé à
-    gauche des tuiles (fiche client sur PC : « + Nouvelle soumission »)."""
+    gauche des boutons ronds (fiche client sur PC : « + Nouvelle soumission »)."""
     r = conn.execute("SELECT telephone, telephone_2, courriel, sms_ok, adresse, ville, province, code_postal, notes_acces"
                      " FROM clients WHERE id = ?", (client_id,)).fetchone()
     tel, tel2, courriel, sms_ok, adresse, ville, prov, cp, acces = r
     _, adresse_maps = adresses(adresse, ville, prov, cp)                 # complète (province, code postal) : pour Google Maps seulement
     adresse_texte = ", ".join(x for x in (adresse, ville) if x)           # à lire : la rue et la ville suffisent
     tel = tel if tel and len(tel) == 12 else None
-    tels = [f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12]
+    tels = " · ".join(f"{t[2:5]}-{t[5:8]}-{t[8:]}" for t in (tel, tel2) if t and len(t) == 12)       # à lire ; pour appeler : le bouton
     m = messages.message(conn, chantier_id, finances=est_admin()) if chantier_id else None
     ronds, note = "", ""
     if tel:
@@ -230,14 +227,14 @@ def carte_contact(conn, client_id, chantier_id=None, retour="", extra="", avant_
     if adresse_maps:
         ronds += _rond("route", "Itinéraire", "https://www.google.com/maps/dir/?api=1&destination=" + quote(adresse_maps),
                        "Itinéraire dans Google Maps", externe=True)
-    if chantier_id:
-        ronds += _rond("client", "Client", f"/client/{client_id}", "Fiche du client (pour le modifier aussi)")
-    morceaux = [esc(adresse_texte) if adresse_texte else "adresse à saisir"] + [esc(t) for t in tels] + ([esc(courriel)] if courriel else [])
-    ligne = " · ".join(f'<span class="nw">{x}</span>' if i else x for i, x in enumerate(morceaux))      # un numéro ne se coupe pas en deux
-    return (f'<section class="contact"><p class="contact-ligne">{ligne}</p>'
-            + (f'<p class="contact-ligne"><b>Accès :</b> {esc(acces)}</p>' if acces else "") + extra
+    return (f'<div class="carte contact"><div class="contact-infos">'
+            f'<p class="contact-adresse">{esc(adresse_texte) if adresse_texte else "<span class=doux>adresse à saisir</span>"}</p>'
+            + (f'<p class="doux">{esc(tels)}{"<span class=contact-sep> · </span>" if courriel and tels else ""}'
+               f'{"<span class=contact-courriel>" + esc(courriel) + "</span>" if courriel else ""}</p>' if tels or courriel else "")
+            + (f'<p><b>Accès :</b> {esc(acces)}</p>' if acces else "") + extra
+            + (f'<p class="contact-liens"><a href="/client/{client_id}">Fiche client</a></p>' if chantier_id else "") + '</div>'
             + (f'<div class="contact-actions">{avant_ronds}{ronds}</div>' if ronds or avant_ronds else "")
-            + (f'<p class="doux contact-note">{esc(note)}</p>' if note else "") + '</section>')
+            + (f'<p class="doux contact-note">{esc(note)}</p>' if note else "") + '</div>')
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +340,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     infos = " · ".join(x for x in (
         (f"Demande : {le_date(demande)}" if soumission and demande else ""),
         (f"Prévu {le_date(date_prevue)}" if date_prevue and not termine else (f"Fait {le_date(date_prevue)}" if date_prevue else "")),
-        (f"Durée {heures(duree)}".replace(" ", "\u00a0") if duree else ""),
+        (f"Durée {heures(duree)}" if duree else ""),
         (f"Ouverte par {cree_par}" if soumission and cree_par else ""),
         (f"En attente : {texte_attente(reprise)}" if statut == "en_attente" else "")) if x)
     montants = (f'<div class="montant">{argent(total) if total is not None and total else "prix à saisir"}'
@@ -414,13 +411,13 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
     if termine:
         verrou = ('<div class="verrou-termine"><b>Chantier terminé : verrouillé en lecture seule.</b> Restent possibles : les paiements et Dupliquer.'
                   + (' Il est <b>archivé</b> (terminé et payé).' if archive else '') + '</div>')
-        contenu = (f'<h1>{esc(nom)}</h1>{corps}{resume}{verrou}{actions}{documents_client}{paiements}'
+        contenu = (f'<h1>{esc(nom)}</h1>{resume}{corps}{verrou}{actions}{documents_client}{paiements}'
                    f'{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres)}')
     elif refusee:
         suppression = (f'<div class="carte"><h2>Supprimer</h2><form method="post" action="/soumission/{chantier_id}/supprimer" '
                        f'onsubmit="return confirm({esc(repr(msg_suppr))})"><button class="danger" type="submit">Supprimer cette soumission</button></form></div>'
                        if est_admin() else "")
-        contenu = f'<h1>{esc(nom)}</h1>{corps}{resume}{bandeau}{actions}{documents_client}{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres + suppression)}'
+        contenu = f'<h1>{esc(nom)}</h1>{resume}{corps}{bandeau}{actions}{documents_client}{avance(_bloc_lecture(conn, chantier_id, depuis_base) + autres + suppression)}'
     else:
         essentiel, avance_chantier = cartes_chantier(conn, valeurs if valeurs is not None else depuis_base, creation=False, soumission=soumission)
         annuler = ('<button class="danger" type="submit" form="annuler-chantier" onclick="return confirm(\'Annuler ce chantier ? Il disparaît de sa journée '
@@ -440,7 +437,7 @@ def page_chantier(conn, chantier_id, query, valeurs=None, erreurs=(), erreur_pai
         # encore de quoi accepter la soumission : c'est alors la chose à faire)
         ouvert = bool(erreurs) or bool(manque)
         modifier = f'<details class="avance modifier-fiche" id="modifier"{" open" if ouvert else ""}><summary>Modifier</summary>{formulaire}</details>'
-        contenu = f'<h1>{esc(nom)}</h1>{corps}{resume}{bandeau}{actions}{documents_client}{paiements}{modifier}'
+        contenu = f'<h1>{esc(nom)}</h1>{resume}{corps}{bandeau}{actions}{documents_client}{paiements}{modifier}'
     return gabarit(nom or f"{mot} {chantier_id}", contenu, query.get("ok") if query else None, erreur_globale or (query.get("err") if query else None),
                    retour="/soumissions" if soumission else "/chantiers")
 

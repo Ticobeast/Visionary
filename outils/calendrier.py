@@ -171,14 +171,13 @@ def _grille(conn, premier, selection, aujourdhui):
             if h > JOURNEE_H:
                 classes.append("chargee")
             info = (f'<span class="cal-info"><b>{n} chantier{"s" if n > 1 else ""}</b>'
-                    f'<span class="cal-ligne">{heures(h) if h else "durée ?"}</span>'
-                    f'<span class="cal-ligne nw">{esc(argent_entier(montant))}</span></span>')
+                    f'<span class="cal-ligne">Temps total : {heures(h) if h else "?"}</span>'
+                    f'<span class="cal-ligne">Montant total : <span class="nw">{esc(argent_entier(montant))}</span></span></span>')
             if planifies and j < aujourdhui:
                 classes.append("a-cloturer")
                 info += '<span class="cal-alerte">à clôturer</span>'
         mois_lien = f"{j.year}-{j.month:02d}"
-        survol = f' title="{n} chantier{"s" if n > 1 else ""} · {heures(h) if h else "durée ?"} · {esc(argent_entier(montant))}"' if n else ""
-        cases += (f'<a class="{" ".join(classes)}" href="/?{urlencode({"date": iso, "mois": mois_lien})}"{survol} '
+        cases += (f'<a class="{" ".join(classes)}" href="/?{urlencode({"date": iso, "mois": mois_lien})}" '
                   f'aria-label="{j.day} {MOIS[j.month - 1]}{f", {n} chantier(s)" if n else ""}"><span class="cal-n">{j.day}</span>{info}</a>')
     precedent = (premier - datetime.timedelta(days=1)).replace(day=1)
     suivant = (premier + datetime.timedelta(days=32)).replace(day=1)
@@ -199,7 +198,6 @@ def page_calendrier(conn, query):
     premier = _mois_valide(query.get("mois")) or d.replace(day=1)
     mois_code = f"{premier.year}-{premier.month:02d}"
     retour = "/?" + urlencode({"date": jour, "mois": mois_code})
-    # PC : le calendrier à gauche, la journée choisie à droite (plus besoin de descendre) ; téléphone : l'un sous l'autre
-    contenu = (f'<h1>Tableau de bord</h1><div class="tableau-bord">{_grille(conn, premier, jour, aujourdhui)}'
-               f'{panneau_jour(conn, jour, retour)}</div>')
+    contenu = (f'<h1>Tableau de bord</h1>{_grille(conn, premier, jour, aujourdhui)}'
+               f'{panneau_jour(conn, jour, retour)}')
     return gabarit("Tableau de bord", contenu, query.get("ok"), query.get("err"), large=True)

@@ -88,11 +88,13 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   Fiche client sur PC : « + Nouvelle soumission » à gauche d'Appeler.
   Chasse aux doublons : lien PDF en double retiré, pastille « Soumission » retirée, surtitres en double retirés (PC),
   filtres des Archives repliés aussi sur PC ; test automatique tests/test_doublons.py.
-  Lot 4 fait (PC) : tableau de bord calendrier à gauche + journée à droite ; liste des soumissions avec « ··· » (Appeler compris) ;
-  lignes entières cliquables (Soumissions, Chantiers, Clients).
-  Ensuite : en-tête des fiches à la façon de la fiche Contacts de l'iPhone (ligne grise adresse · téléphone, tuiles Appeler,
-  Texto, Courriel, Itinéraire, Client) placé AVANT le résumé du travail ; numéros des listes de nouveau cliquables (« Appeler »
-  retiré du menu « ··· ») ; tableau de bord du PC refait (calendrier compact comme l'iPhone, heures sous la date).
+  Lot 4 fait (PC) : liste des soumissions avec « ··· » ; lignes entières cliquables (Soumissions, Chantiers, Clients) ;
+  numéros des listes cliquables.
+  ESSAIS REFUSÉS par l'utilisateur (retirés) : tableau de bord du PC avec calendrier compact à gauche et journée à droite
+  (« le calendrier original utilisait mieux l'espace ») ; en-tête des fiches façon Contacts (tuiles) avant le résumé.
+  Validés et à garder : le grand calendrier du PC ; la fiche avec le résumé, puis la carte de contact et ses boutons ronds.
+  Règle de travail depuis : skill .claude/skills/design-sylvainculteur (montrer avant de livrer, ne pas toucher à ce qui
+  est validé, animations) ; skill nielsen-usability-heuristics (les 10 règles de Nielsen, licence MIT) ajouté au projet.
   La revue de l'interface (lots 1 à 4) est terminée ; reste de l'étape 3 de la revue : 13. itinéraire, 14. feuille de style en cache,
   15. HTTPS par Tailscale Serve. ; lot 4, PC (tableau de
   bord calendrier + journée côte à côte, filtres des Archives repliés, bandeau).

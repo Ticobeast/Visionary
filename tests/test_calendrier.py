@@ -282,8 +282,8 @@ class TestCalendrier(BaseJour):
         self.assertIsNotNone(lien)
         self.assertIn("occupe", lien.group(1))
         self.assertIn("<b>3 chantiers</b>", lien.group(3))                       # directement dans la case : nombre, temps, montant
-        self.assertIn('<span class="cal-ligne">6 h 30</span>', lien.group(3))
-        self.assertIn('<span class="cal-ligne nw">900 $</span>', lien.group(3))                # arrondi au dollar : tient dans la case
+        self.assertIn("Temps total : 6 h 30", lien.group(3))
+        self.assertIn("Montant total : <span class=\"nw\">900 $</span>", lien.group(3))                # arrondi au dollar : tient dans la case
 
     def test_cliquer_une_date_affiche_le_deroulement(self):
         page = self.get("/", {"date": dans(1)})[1]

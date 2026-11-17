@@ -129,7 +129,7 @@ class TestPages(BaseInterface):
 
     def test_pages_de_detail_et_introuvable(self):
         statut, page = self.get("/chantier/1")
-        self.assertIn('<p class="contact-ligne">123 Rue des Érables, Saint-Jérôme · ', page)     # à lire : la rue et la ville
+        self.assertIn(">123 Rue des Érables, Saint-Jérôme<", page)     # à lire : la rue et la ville
         self.assertIn("destination=123%20Rue%20des%20%C3%89rables%2C%20Saint-J%C3%A9r%C3%B4me%2C%20QC%20J7Z%201A1", page)   # Itinéraire : l'adresse complète
         self.assertIn("551,88 $", page)
         self.assertTrue(self.get("/chantier/999")[0].startswith("404"))
@@ -469,9 +469,9 @@ class TestModification(BaseInterface):
         formulaire = page[page.index('<form method="post" action="/chantier/3">'):page.index("</form>", page.index('<form method="post" action="/chantier/3">'))]
         for interdit in ("client_nom", "client_prenom", "client_telephone", "client_courriel", "adresse", "ville", "client_secteur", "code_postal", "client_sms_ok"):
             self.assertNotIn(f'name="{interdit}"', formulaire)
-        self.assertIn('<section class="contact">', page)
+        self.assertIn('class="carte contact"', page)
         self.assertIn("850 Boulevard du Lac", page)                                   # mais le client est bien affiché
-        self.assertIn('<a class="rond" href="/client/3" title="Fiche du client', page)  # seul point d'entrée : la tuile Client, puis « Modifier le client »
+        self.assertIn('<a href="/client/3">Fiche client</a>', page)                 # seul point d'entrée : la fiche client, puis « Modifier le client »
         self.assertNotIn('href="/client/3/modifier', page)
 
     def test_le_serveur_ignore_toute_modification_du_client_envoyee_au_chantier(self):
@@ -485,7 +485,7 @@ class TestModification(BaseInterface):
     def test_le_recap_apres_enregistrement_montre_le_client_verrouille(self):
         self.post("/nouveau", fiche())
         page = self.get("/soumission/4")[1]
-        self.assertIn('<section class="contact">', page)
+        self.assertIn('class="carte contact"', page)
         self.assertNotIn('name="client_nom"', page)
         self.assertIn("Sylvie Roy", page)
         self.assertIn("22 Rue des Pins", page)

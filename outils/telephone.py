@@ -141,7 +141,7 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 .cal-nav a[aria-label]{font-size:0;padding:0;width:40px;position:relative}.cal-nav a[aria-label]::before{content:"";position:absolute;top:50%;left:50%;width:10px;height:10px;border:solid var(--vert-fonce);border-width:0 0 2.5px 2.5px;transform:translate(-30%,-50%) rotate(45deg)}
 .cal-nav a[aria-label="Mois suivant"]::before{transform:translate(-70%,-50%) rotate(-135deg)}.cal-nav a[href="/"]{order:3}
 .cal-tete{font-size:11px}.cal-grille{gap:0}
-.tableau-bord{display:block}.tableau-bord>.carte{margin-bottom:16px}
+
 .cal-jour{min-height:50px;border:0!important;background:none!important;box-shadow:none;border-radius:0;align-items:center;gap:3px;padding:4px 0}
 .cal-jour.weekend{background:var(--vert-doux)!important}
 .cal-jour .cal-n,.cal-jour.aujourdhui .cal-n{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;padding:0;font-size:1.05rem;font-weight:500;background:none;color:var(--texte);align-self:center}
@@ -173,7 +173,7 @@ table.tableau.jour tr.ligne-actions td{padding:0 16px}
 table.tableau.jour tr.ligne-actions .groupe-actions{display:flex;width:100%}table.tableau.jour tr.ligne-actions .bouton{flex:1}
 table.tableau.jour .facture-pc{display:none}
 table.tableau.jour tr.ligne-actions .groupe-actions{gap:8px}table.tableau.jour tr.ligne-actions .bouton.texto-jour{display:flex;flex:0 0 44px;width:44px;padding:0;font-size:0;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M4 5h16v11H9l-5 4z'/%3E%3C/svg%3E") center/20px no-repeat}
-.contact{margin:-2px 0 14px}.contact-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}a.rond{width:auto;padding:10px 2px 8px}
+.carte.contact{display:block}.contact-actions{justify-content:space-around;gap:0;margin-top:14px;padding-top:14px;border-top:1px solid var(--trait-leger)}
 .rond-icone{width:52px;height:52px}.contact-note{margin-top:10px}.contact-courriel{display:block}.contact-sep{display:none}
 table.tableau.jour.gestion td.col-ordre{grid-column:1;grid-row:1;display:flex;align-items:center;gap:6px;white-space:nowrap}
 table.tableau.jour.gestion .col-ordre .fleches{display:flex;gap:4px;margin:0}table.tableau.jour.gestion .col-ordre button.fleche{min-height:34px;width:34px;padding:0}table.tableau.jour.gestion .col-ordre .doux{display:none}
