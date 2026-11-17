@@ -71,5 +71,7 @@ Toujours dans cet ordre :
 - Le style du téléphone est dans `outils/telephone.py`, dans un seul bloc. Une demande « pour le téléphone » ne change pas le PC.
 - Barre du bas de l'iPhone : Accueil, Soumissions, Chantiers, Clients, puis le menu (Journée, Archives, Utilisateurs).
 - Sur PC, les listes gardent leurs colonnes. Les fiches suivent les mêmes règles que sur le téléphone.
+- Itinéraire de la journée : bouton blanc « Itinéraire » au bas de la journée du tableau de bord (Google Maps, les arrêts qu'il
+  reste à faire, dans l'ordre de passage). Même mot que le bouton rond des fiches.
 - Tableau de bord sur PC : le grand calendrier (nombre de chantiers, temps total, montant total dans chaque case), puis la
   journée choisie dessous. Validé par l'utilisateur : ne pas le changer sans son accord.

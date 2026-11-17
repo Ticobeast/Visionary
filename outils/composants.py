@@ -1,7 +1,7 @@
 """Composants partagés par le tableau de bord (calendrier) et la page Journée : lecture des chantiers, cellules de tableau,
 formulaires rapides (statut, facturation, encaissement) et fenêtre de confirmation « Terminé »."""
 import datetime
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from noyau import (MODES, SEUIL_SURVEILLER, SEUIL_URGENT, STATUTS, cle, jours_attente)
 from vue import (LIBELLES_MODE, LIBELLES_PAIEMENT, LIBELLES_STATUT, argent, badge, esc, heures, lien_maps, puces_options)
@@ -63,6 +63,22 @@ def avec_params(url, **params):
 # ---------------------------------------------------------------------------
 # Composants
 # ---------------------------------------------------------------------------
+ARRETS_MAX = 10      # Google Maps accepte une destination et 9 étapes au plus dans une adresse d'itinéraire
+
+
+def url_itineraire(adresses_maps):
+    """Adresse Google Maps de l'itinéraire qui passe par ces adresses, DANS L'ORDRE donné (le départ : là où l'on se trouve).
+    Les adresses vides sont sautées. Vide s'il n'y a aucune adresse. Au-delà de ARRETS_MAX arrêts : les premiers seulement.
+    Aucun service à payer, aucune clé : un simple lien qui ouvre Google Maps."""
+    arrets = [a for a in adresses_maps if a][:ARRETS_MAX]
+    if not arrets:
+        return ""
+    url = "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + quote(arrets[-1], safe="")
+    if len(arrets) > 1:
+        url += "&waypoints=" + quote("|".join(arrets[:-1]), safe="")
+    return url
+
+
 def mode_conseille(modalite):
     """Mode de règlement prévu du chantier (choix unique) ; Interac à défaut."""
     return modalite if modalite in MODES else "interac"

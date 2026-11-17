@@ -53,7 +53,7 @@ outils/raccourcis.py                    pastilles de raccourcis en haut de Chant
 outils/listes.py                        sélections des listes Chantiers et Soumissions (filtres, recherche, délais)
 outils/calendrier.py                    accueil : calendrier du mois + déroulement de la journée choisie (lecture seule)
 outils/tableau.py                       page Journée (créer / gérer une journée) et actions rapides (terminer, retirer, annuler, ordre)
-outils/composants.py                    cellules (client, adresse, travaux, montant) partagées, bouton Terminer et sa fenêtre de confirmation
+outils/composants.py                    cellules (client, adresse, travaux, montant) partagées, bouton Terminer et sa fenêtre de confirmation, lien d'itinéraire de la journée
 outils/pages_clients.py                 liste des clients, fiche client, secteurs desservis, nouvelle soumission pour un client
 outils/pages_chantier.py                page d'une soumission ou d'un chantier (client en lecture seule, verrou « Terminé », paiements, duplication)
 outils/pdf.py                           moteur PDF maison (sans rien installer) + PDF de la journée (feuilles de route)

@@ -10,8 +10,8 @@ import calendar
 import datetime
 from urllib.parse import urlencode
 
-from composants import (JOURNEE_H, JOURS, MOIS, bouton_terminer, cellule_adresse, cellule_client, cellule_montant, cellule_travaux,
-                        lignes_vue)
+from composants import (ARRETS_MAX, JOURNEE_H, JOURS, MOIS, bouton_terminer, cellule_adresse, cellule_client, cellule_montant, cellule_travaux,
+                        lignes_vue, url_itineraire)
 from noyau import DEBUT_JOURNEE, DINER_DEBUT, DINER_FIN, calculer_horaire, heure_texte, ids_de_la_journee
 from vue import argent, argent_entier, esc, gabarit, heures
 import messages
@@ -133,7 +133,13 @@ def panneau_jour(conn, jour, retour, gestion=False):
     table = (f'<div class="liste-defile"><table class="tableau jour{" gestion" if gestion else ""}"><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>')
     lien_pdf = (f'<a class="bouton" href="/journee.pdf?date={jour}" download title="Toute la journée, avec les détails de chaque chantier">'
                 f'Télécharger la journée<span class="pc-seul"> (PDF)</span></a>')
-    pied = "" if gestion else f'<div class="barre pied-jour" style="margin-top:12px">{lien_gerer}{lien_pdf}</div>'
+    # Itinéraire : les chantiers qu'il reste à faire (planifiés), dans l'ordre de passage ; rien si tout est terminé
+    restants = [l["adresse_maps"] for l in chantiers if l["statut"] == "planifie" and l["adresse_maps"]]
+    route = url_itineraire(restants)
+    plus = f" Les {ARRETS_MAX} premiers arrêts seulement." if len(restants) > ARRETS_MAX else ""
+    lien_route = (f'<a class="bouton secondaire" href="{esc(route)}" target="_blank" rel="noopener" '
+                  f'title="Ouvre Google Maps avec les arrêts qu\'il reste à faire, dans l\'ordre de passage.{plus}">Itinéraire</a>') if route else ""
+    pied = "" if gestion else f'<div class="barre pied-jour" style="margin-top:12px">{lien_gerer}{lien_route}{lien_pdf}</div>'
     return f'<div class="carte carte-jour"><h2>{esc(titre)}</h2>{resume}{table}{pied}</div>'
 
 

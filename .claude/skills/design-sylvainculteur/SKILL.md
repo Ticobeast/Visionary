@@ -14,9 +14,11 @@ L'œil de l'utilisateur est la référence. Les règles ci-dessous aident à pro
 ## 1. Façon de travailler (obligatoire)
 
 1. **Ce qui est validé ne bouge pas sans accord.** Liste plus bas. Pour y toucher : proposer d'abord, en image.
-2. **Montrer avant de livrer.** Tout changement visible : captures AVANT / APRÈS (iPhone 390 px, et PC si touché), envoyées à
-   l'utilisateur ; on attend son accord avant de pousser sur la branche. Exception : une petite correction qu'il a demandée
-   mot pour mot (on montre quand même après).
+2. **Montrer, et faire valider.** Tout changement visible : captures AVANT / APRÈS (iPhone 390 px, et PC si touché), envoyées à
+   l'utilisateur, avec la mention « à valider ». L'espace de travail est temporaire : le travail doit être enregistré et poussé
+   sur la branche de travail à la fin de chaque tour, sinon il peut être perdu. Donc : on pousse, mais un changement visible
+   reste « à valider » tant que l'utilisateur n'a pas dit oui ; on ne bâtit rien par-dessus, et s'il refuse, on le retire tout
+   de suite (un commit par changement visible, pour pouvoir le retirer proprement). Rien ne va dans `main` sans son accord.
 3. **Quand il dit « ça me gosse » sans savoir quoi** : nommer 2 ou 3 causes possibles, et proposer 2 ou 3 variantes en image.
    Il choisit. Ne pas tout refaire d'un coup selon une seule idée.
 4. **Une chose à la fois.** Un changement visible par proposition ; pas de refonte de plusieurs écrans en même temps.

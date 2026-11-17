@@ -147,6 +147,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 103 | Sur **téléphone** et sur **ordinateur**, ouvrir une soumission en cours, puis les pages Tableau de bord, Chantiers, Soumissions, Clients et Archives ; dans Archives, ouvrir et fermer **Filtres** | aucun lien « Soumission » en haut à droite de la fiche (le PDF est seulement dans « Documents pour le client ») ; pas de pastille « SOUMISSION » à côté de « Soumission n° 3 » ; sur ordinateur, plus de petit surtitre qui répète le titre (« TABLEAU DE BORD » au-dessus de « Tableau de bord ») ; Archives : les filtres sont repliés (ouverts s'il y en a d'actifs), un seul bouton « Chercher » quand ils sont fermés, un 2e sous les filtres quand ils sont ouverts |
 | 104 | Sur **ordinateur** : ouvrir Soumissions, toucher « ··· » sur une ligne, puis ailleurs ; cliquer n'importe où sur une ligne de Soumissions, de Chantiers et de Clients. Sur **téléphone** et **ordinateur** : toucher un numéro dans Soumissions, Clients et Archives | les lignes de Soumissions n'ont plus de boutons, seulement « ··· » au bout (Accepter, En attente, Refuser, Soumission) ; le menu passe par-dessus les lignes du dessous ; une ligne entière ouvre sa fiche (vert pâle sous la souris) ; dans les listes, toucher un numéro lance l'appel ; le tableau de bord du PC garde son grand calendrier, la journée dessous |
 | 105 | Sur **téléphone** puis sur **ordinateur** : ouvrir un menu « ··· » ; ouvrir la fenêtre **Terminer** ; déplier **Modifier** ; enregistrer une modification ; passer d'une page à l'autre ; sur téléphone, ouvrir le menu du bas et toucher un bouton ; puis activer **Réduire les animations** (Réglages de l'iPhone, Accessibilité, Mouvement) et refaire les mêmes gestes | le menu apparaît en douceur, la fenêtre Terminer monte du bas (téléphone) ou apparaît (ordinateur), « Modifier » se déplie, le message vert glisse à l'arrivée, un bouton s'enfonce un peu sous le doigt, les pages s'enchaînent par un fondu très court ; rien ne dure plus d'un tiers de seconde et rien ne bouge tout seul ; avec « Réduire les animations », tout s'affiche d'un coup, sans mouvement |
+| 106 | Dans le **tableau de bord**, choisir une journée de plusieurs chantiers ; toucher **Itinéraire** (téléphone, puis ordinateur) ; terminer le premier chantier et toucher de nouveau **Itinéraire** ; regarder une journée vide et une journée où tout est terminé | Google Maps s'ouvre avec tous les arrêts dans l'ordre de passage, au départ de l'endroit où l'on se trouve ; un chantier terminé n'est plus dans l'itinéraire ; pas de bouton si la journée est vide ou toute terminée ; sur téléphone, « Gérer cette journée » et « Itinéraire » sont côte à côte, « Télécharger la journée » dessous sur toute la largeur ; au-delà de 10 arrêts, seuls les 10 premiers sont dans l'itinéraire |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -161,7 +162,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 105 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 106 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

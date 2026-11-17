@@ -155,7 +155,7 @@ table.soumissions .lien-pdf,.lien-pdf-coin{position:absolute;top:12px;right:14px
 .carte-jour h2{padding-right:44px}.info-btn{right:10px;top:10px}.info-pop{top:52px;right:10px;left:10px;width:auto}
 .bouton.lien-dl{width:44px;padding:0;font-size:0;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 11l5 5 5-5M5 20h14'/%3E%3C/svg%3E") center/20px no-repeat}
 .ligne-document .actions-page{display:grid;grid-template-columns:1fr 44px;gap:6px}.ligne-document .actions-page .lien-dl{display:flex;width:44px}
-.pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;text-align:center}
+.pied-jour{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pied-jour .bouton:nth-child(3):last-child{grid-column:1/-1}.pied-jour .bouton{width:100%;padding:8px 6px;font-size:14px;text-align:center}
 .lien-pdf-coin{top:12px;right:14px}
 table.tableau.jour tr.sans-bas,table.tableau.jour.gestion tr:not(.diner):not(.ligne-actions){position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;background:var(--fond);border:1px solid var(--trait-leger);border-bottom:0;box-shadow:none}
 .carte table.tableau.jour tr{background:var(--fond);box-shadow:none}
