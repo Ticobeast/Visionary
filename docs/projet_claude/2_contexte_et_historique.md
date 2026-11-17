@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 711 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 714 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -28,7 +28,7 @@ Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), br
   Reprises dans le PDF de la journée. Rien dans la base.
 - **Raccourcis** : pastilles personnalisables en haut de Chantiers et Soumissions ; bulle « Modifier » au bout de la rangée.
 - **Archives** : historique, recherche, statistiques, regroupement par client (qui relancer), export Excel (PC seulement).
-- **Messages au client** (étape 3 de la revue) : carte « Message au client » sur la fiche ; boutons Texto et Courriel qui
+- **Messages au client** (étape 3 de la revue) : boutons Texto et Courriel de la carte de contact, en haut de la fiche, qui
   ouvrent l'application du téléphone avec le texte déjà écrit (suivi de soumission, rappel de la visite avec le jour et
   avant-midi / après-midi, rappel de paiement pour l'administrateur). Bulle de texto à côté de Terminer dans le tableau de
   bord (téléphone). Respecte « Rappels par texto acceptés ». Rien ne part tout seul.
@@ -73,9 +73,10 @@ entreprise.py, pages_documents.py · auth.py, reseau.py · donnees_test.py. Sch�
   ce qui leur reste interdit (probablement : comptes, journal, suppressions, Archives et export).
 - **Revue de l'interface (novembre 2026)**, iPhone et PC, en quatre lots. Lot 1 fait : dates lisibles (« ven. 4 déc. »,
   « prévu demain »), titre des fiches au nom du client, plus de pastille « À venir », textes d'aide retirés, téléphone
-  lisible dans les champs. À venir : lot 2, nouvelle fiche chantier / soumission (lecture d'abord ; boutons appeler,
-  texto, itinéraire en haut ; « Modifier » ouvre le formulaire) ; lot 3, iPhone (barre du bas à 4 onglets SI elle reste
-  assez grosse, à décider sur capture ; listes allégées ; barre de la Journée ; fenêtre Terminer) ; lot 4, PC (tableau de
+  lisible dans les champs. Lot 2 fait : fiche chantier / soumission qui se lit d'abord (carte de contact avec
+  boutons ronds Appeler, Texto, Courriel, Itinéraire ; texto et courriel déjà écrits quand il y a un message à proposer ;
+  formulaire replié sous « Modifier ») ; barre du bas de l'iPhone à 4 onglets (Accueil, Soumissions, Chantiers, Clients).
+  À venir : lot 3, iPhone (listes allégées ; barre de la Journée ; fenêtre Terminer) ; lot 4, PC (tableau de
   bord calendrier + journée côte à côte, filtres des Archives repliés, bandeau).
 - Feuille de route de la revue : étapes 1 et 2 faites ; étape 3 commencée (12. textos et courriels faits ;
   restent 13. itinéraire Google Maps, 14. feuille de style en cache, 15. HTTPS par Tailscale Serve).

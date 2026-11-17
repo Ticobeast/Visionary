@@ -1009,29 +1009,32 @@ class TestComptesEtSoumissions(BaseComptes):
         self.assertNotIn('href="/"', barre)                                           # le tableau de bord est réservé à l'administrateur
         admin = self.get("/soumissions", cookie=self.admin, agent=telephone)
         barre = admin[admin.index('class="barre-mobile"'):]
-        self.assertRegex(barre, r'<a href="/" class="">.*?<span>Tableau de bord</span></a>')
-        self.assertLess(barre.index("Tableau de bord"), barre.index('href="/chantiers"'))
+        self.assertRegex(barre, r'<a href="/" class="">.*?<span>Accueil</span></a>')
+        self.assertLess(barre.index("Accueil"), barre.index('href="/soumissions"'))
         accueil = self.get("/", cookie=self.admin, agent=telephone)
-        self.assertRegex(accueil[accueil.index('class="barre-mobile"'):], r'<a href="/" class="actif">.*?<span>Tableau de bord</span>')
-        self.assertLess(barre.index('href="/chantiers"'), barre.index('href="/soumissions"'))
+        self.assertRegex(accueil[accueil.index('class="barre-mobile"'):], r'<a href="/" class="actif">.*?<span>Accueil</span>')
+        self.assertLess(barre.index('href="/soumissions"'), barre.index('href="/chantiers"'))            # dans l'ordre du travail
+        self.assertLess(barre.index('href="/chantiers"'), barre.index('href="/clients"'))
 
 
 class TestMenuTelephone(BaseComptes):
     def test_le_menu_garde_le_reste_et_la_barre_le_plus_important(self):
         page = self.get("/chantiers", cookie=self.admin)
         bas = page[page.index('<nav class="barre-mobile">'):page.index("</nav>", page.index('<nav class="barre-mobile">'))]
-        for texte in ("Tableau de bord", "Clients", 'aria-label="Menu"'):
-            self.assertIn(texte, bas)
-        for texte in ("Chantiers", "Soumissions", "Journée", "Archives"):
+        for texte in ("Accueil", "Soumissions", "Chantiers", "Clients", 'aria-label="Menu"'):
+            self.assertIn(texte, bas)                                                 # quatre onglets : le travail de tous les jours
+        for texte in ("Tableau de bord", "Journée", "Archives"):
             self.assertNotIn(texte, bas)                                              # pas tout en bas : le reste est dans le menu
         feuille = page[page.index('class="menu-feuille"'):]
-        for texte in ("Chantiers", "Soumissions", "Journée", "Archives", "Utilisateurs", "Se déconnecter"):
+        for texte in ("Journée", "Archives", "Utilisateurs", "Se déconnecter"):
             self.assertIn(texte, feuille)
+        for texte in ("Chantiers", "Soumissions"):
+            self.assertNotIn(texte, feuille)                                          # déjà en bas : pas répété dans le menu
         self.assertIn("menu-ouvert", page)
         # compte « soumission » : ses trois onglets en bas, un menu réduit (pas de journée ni d'archives)
         page = self.get("/soumissions", cookie=self.alice)
         feuille = page[page.index('class="menu-feuille"'):]
-        self.assertIn("Chantiers", feuille)
+        self.assertNotIn("Chantiers", feuille)                                       # Chantiers est en bas, avec Soumissions et Clients
         self.assertNotIn("Nouvelle soumission", feuille)
         self.assertIn("Se déconnecter", feuille)
         for interdit in ("Journée", "Archives", "Utilisateurs"):

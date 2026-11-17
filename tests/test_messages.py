@@ -1,5 +1,7 @@
 """Tests des textos et courriels préremplis (outils/messages.py) : contenu, liens, droits, affichage."""
 import datetime
+import html
+import re
 import sys
 import unittest
 import urllib.parse
@@ -110,40 +112,64 @@ class TestMessages(BaseTableau):
             self.assertIsNone(messages.message(c, self.ids[nom], finances=True), nom)
         c.execute("UPDATE chantiers SET date_prevue = ? WHERE id = ?", ((AUJOURDHUI - datetime.timedelta(days=2)).isoformat(), self.ids["Demain"]))
         self.assertIsNone(messages.message(c, self.ids["Demain"]))      # visite déjà passée (pas encore terminée) : plus de rappel
-        self.assertEqual(messages.carte(c, self.ids["Urgent"]), "")
         c.close()
+
+    def ronds(self, nom):
+        """Les boutons ronds de la carte de contact d'une fiche : {libellé: adresse du lien}."""
+        _, page = self.get(f"/chantier/{self.ids[nom]}")
+        carte = page[page.index('<div class="carte contact">'):]
+        carte = carte[:carte.index('<div class="actions-bloc">')]
+        return dict((t, html.unescape(h)) for h, t in re.findall(r'<a class="rond" href="([^"]*)".*?<span>([^<]+)</span></a>', carte)), carte
+
+    def test_carte_de_contact(self):
+        """En haut de la fiche : Appeler, Texto (déjà écrit), Itinéraire ; Courriel quand le client en a un."""
+        self.client_de("Demain", telephone=TEL)
+        ronds, carte = self.ronds("Demain")
+        self.assertEqual(list(ronds), ["Appeler", "Texto", "Itinéraire"])
+        self.assertEqual(ronds["Appeler"], "tel:" + TEL)
+        self.assertTrue(ronds["Texto"].startswith(f"sms:{TEL}?&body=Bonjour%2C%20ici%20Sylvainculteur."))
+        self.assertTrue(ronds["Itinéraire"].startswith("https://www.google.com/maps/dir/?api=1&destination=2%20Rue%20Demain"))
+        self.assertIn("Message déjà écrit : rappel de la visite.", carte)
+        self.assertNotIn("Message au client", carte)                    # l'ancienne carte séparée n'existe plus
+        self.client_de("Demain", courriel="demain@example.com")
+        ronds, _ = self.ronds("Demain")
+        self.assertEqual(list(ronds), ["Appeler", "Texto", "Courriel", "Itinéraire"])
+        self.assertTrue(ronds["Courriel"].startswith("mailto:demain@example.com?subject=Rappel%20de%20notre%20visite"))
+
+    def test_sans_message_les_boutons_restent(self):
+        """Chantier à planifier : rien à proposer, mais on peut toujours appeler, écrire (texto vide) et s'y rendre."""
+        ronds, carte = self.ronds("Urgent")
+        self.assertEqual(ronds["Texto"], "sms:+14505550100")
+        self.assertNotIn("Message déjà écrit", carte)
 
     def test_textos_refuses_par_le_client(self):
         self.client_de("Demain", telephone=TEL, sms_ok=0)
         c = self.conn()
-        m = messages.message(c, self.ids["Demain"])
-        self.assertFalse(m["texto_ok"])
-        carte = messages.carte(c, self.ids["Demain"])
+        self.assertFalse(messages.message(c, self.ids["Demain"])["texto_ok"])
         c.close()
-        self.assertNotIn("sms:", carte)
-        self.assertIn("Le client a refusé les textos et n'a pas de courriel.", carte)
-        self.client_de("Demain", courriel="demain@example.com")
-        c = self.conn()
-        carte = messages.carte(c, self.ids["Demain"])
-        c.close()
-        self.assertIn("mailto:demain@example.com", carte)
-        self.assertIn("pas de textos (refusés par le client)", carte)
+        ronds, carte = self.ronds("Demain")
+        self.assertEqual(list(ronds), ["Appeler", "Itinéraire"])
+        self.assertIn("Pas de textos : refusés par le client.", carte)
+        self.assertNotIn("Message déjà écrit", carte)
 
     def test_sans_telephone_ni_courriel(self):
-        c = self.conn()
-        carte = messages.carte(c, self.ids["Demain"])
-        c.close()
-        self.assertIn("Ajoute un téléphone ou un courriel", carte)
+        ronds, _ = self.ronds("Demain")
+        self.assertEqual(list(ronds), ["Itinéraire"])
 
-    def test_page_du_chantier(self):
-        self.client_de("Demain", telephone=TEL)
-        statut, page = self.get(f"/chantier/{self.ids['Demain']}")
-        self.assertTrue(statut.startswith("200"))
-        self.assertIn("<h2>Message au client</h2>", page)
-        self.assertIn("Rappel de la visite", page)
-        self.assertIn(f'href="sms:{TEL}?&amp;body=Bonjour%2C%20ici%20Sylvainculteur.', page)
-        _, page = self.get(f"/chantier/{self.ids['Fait']}")              # sans contrôle d'accès : administrateur
-        self.assertIn("Rappel de paiement", page)
+    def test_rappel_de_paiement_sur_la_fiche(self):
+        self.client_de("Fait", telephone=TEL)
+        ronds, carte = self.ronds("Fait")                                # sans contrôle d'accès : administrateur
+        self.assertIn("Message déjà écrit : rappel de paiement.", carte)
+        self.assertIn("solde%20de%20919%2C80", ronds["Texto"])
+
+    def test_la_fiche_se_lit_d_abord(self):
+        """Le formulaire est replié sous « Modifier » ; ouvert seulement s'il manque de quoi accepter une soumission."""
+        _, page = self.get(f"/chantier/{self.ids['Demain']}")
+        self.assertIn('<details class="avance modifier-fiche" id="modifier"><summary>Modifier</summary>', page)
+        self.assertLess(page.index('class="carte contact"'), page.index('class="actions-bloc"'))
+        self.assertLess(page.index('class="actions-bloc"'), page.index('id="modifier"'))
+        _, page = self.get(f"/soumission/{self.ids['Devis']}")           # il manque le téléphone, la durée...
+        self.assertIn('<details class="avance modifier-fiche" id="modifier" open>', page)
 
     def test_bulle_texto_dans_la_journee(self):
         demain = (AUJOURDHUI + datetime.timedelta(days=1)).isoformat()
@@ -163,11 +189,11 @@ class TestDroitsMessages(BaseAuth):
         self.comptes()
         admin = self.ouvrir("Admin", "motdepasse-admin")
         soum = self.ouvrir("Soumission", "motdepasse-soum")
-        self.assertIn("Rappel de paiement", self.req("GET", "/chantier/2", cookie=admin)[2])
+        self.assertIn("Message déjà écrit : rappel de paiement.", self.req("GET", "/chantier/2", cookie=admin)[2])
         statut, _, page = self.req("GET", "/chantier/2", cookie=soum)
         self.assertTrue(statut.startswith("200"))
-        self.assertNotIn("Rappel de paiement", page)
-        self.assertNotIn("Message au client", page)
+        self.assertNotIn("rappel de paiement", page)
+        self.assertNotIn("Message déjà écrit", page)
 
 
 if __name__ == "__main__":

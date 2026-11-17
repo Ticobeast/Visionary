@@ -218,8 +218,16 @@ details.avance{border:1px solid var(--trait-leger);border-radius:18px;box-shadow
 .champ{margin-bottom:16px}
 .pied{background:var(--vert-fonce);color:var(--fond);font-size:.8rem;text-align:center;padding:18px 20px}.pied b{font-weight:700}
 .barre-mobile,.menu-tel,.tel-seul,.filtres-det>summary,.modifier-puce,.filtres-bascule,.resume-min,.info-pop,.lien-dl,.texto-jour,.note-heures,.resume-jour,.total-jour{display:none}
+.carte.contact{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 24px}
+.contact-infos p{margin:0 0 4px}.contact-adresse{font-weight:600}.contact-liens{font-size:.85rem;margin-top:8px!important}.contact-liens a{color:var(--doux)}
+.contact-actions{display:flex;gap:18px}.contact-note{flex-basis:100%;margin:0;font-size:.85rem}
+a.rond{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--texte);text-decoration:none}
+.rond-icone{display:flex;align-items:center;justify-content:center;width:46px;height:46px;border-radius:50%;background:#fff;border:1px solid var(--trait)}
+a.rond:hover .rond-icone{background:var(--vert-doux);border-color:var(--vert-bord)}
+.rond-icone svg{width:22px;height:22px;fill:none;stroke:var(--vert-fonce);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+details.modifier-fiche>summary{font-weight:700}
 .no-fiche{font-weight:700;color:var(--doux);font-size:.9rem}
-.message-client .sorte-message{margin:0 0 6px}.message-client .apercu-message{margin:0 0 12px;padding:10px 14px;background:var(--fond);border:1px solid var(--trait-leger);border-radius:12px;color:var(--doux);white-space:pre-line}
+
 .carte-jour{position:relative}.carte-jour h2{padding-right:48px}
 .info-btn{--loupe:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e341d' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E");position:absolute;top:12px;right:14px;width:36px;height:36px;min-height:0;padding:0;border:1px solid var(--trait);border-radius:50%;box-shadow:none;cursor:pointer}
 .info-btn,.info-btn:hover,.info-btn:focus{background:#fff var(--loupe) center/18px no-repeat}.info-btn:hover{background-color:var(--vert-doux);border-color:var(--vert-bord)}
@@ -319,6 +327,7 @@ _ICONES = {
     "tableau": '<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     "clients": '<circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><circle cx="17" cy="9.5" r="2.4"/><path d="M17.5 14.2c2 .3 3.2 1.8 3.5 4.3"/>',
     "soumissions": '<path d="M7 3.5h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5a1.5 1.5 0 0 1 1-1.5z"/><path d="M14 3.5V8h4M9 13h6M9 16.5h4"/>',
+    "chantiers": '<path d="M12 3l5 7h-3l4 6h-5v5h-2v-5H6l4-6H7z"/>',
     "menu": '<path d="M4 7h16M4 12h16M4 17h16"/>',
 }
 
@@ -328,19 +337,20 @@ def _icone(nom):
 
 
 def _barre_mobile(section):
-    """Téléphone : en bas, des onglets (icône + nom) : Tableau de bord et Clients (administrateur), Soumissions et Clients (compte « soumission »),
-    puis l'icône du menu ; tout le reste est dans la feuille « Menu »."""
+    """Téléphone : en bas, des onglets (icône + nom) : Accueil (le tableau de bord), Soumissions, Chantiers et Clients (administrateur) ;
+    Soumissions, Chantiers et Clients (compte « soumission ») ; puis l'icône du menu : le reste (Journée, Archives, Utilisateurs,
+    déconnexion) est dans la feuille « Menu »."""
     admin = est_admin()
 
     def lien(href, texte, actif, icone):
         return f'<a href="{href}" class="{"actif" if actif else ""}">{_icone(icone)}<span>{texte}</span></a>'
     if admin:
-        principaux = [("/", "Tableau de bord", "tableau"), ("/clients", "Clients", "clients")]
-        reste = [("/chantiers", "Chantiers", "chantiers"), ("/soumissions", "Soumissions", "soumissions"), ("/journee", "Journée", "journee"),
-                 ("/archives", "Archives", "archives")]
+        principaux = [("/", "Accueil", "tableau"), ("/soumissions", "Soumissions", "soumissions"), ("/chantiers", "Chantiers", "chantiers"),
+                      ("/clients", "Clients", "clients")]
+        reste = [("/journee", "Journée", "journee"), ("/archives", "Archives", "archives")]
     else:
-        principaux = [("/soumissions", "Soumissions", "soumissions"), ("/clients", "Clients", "clients")]
-        reste = [("/chantiers", "Chantiers", "chantiers")]
+        principaux = [("/soumissions", "Soumissions", "soumissions"), ("/chantiers", "Chantiers", "chantiers"), ("/clients", "Clients", "clients")]
+        reste = []
     u = utilisateur_courant()
     if u and u["role"] == "admin":
         reste.append(("/utilisateurs", "Utilisateurs", "utilisateurs"))

@@ -469,7 +469,7 @@ class TestModification(BaseInterface):
         formulaire = page[page.index('<form method="post" action="/chantier/3">'):page.index("</form>", page.index('<form method="post" action="/chantier/3">'))]
         for interdit in ("client_nom", "client_prenom", "client_telephone", "client_courriel", "adresse", "ville", "client_secteur", "code_postal", "client_sms_ok"):
             self.assertNotIn(f'name="{interdit}"', formulaire)
-        self.assertIn('class="lecture-seule"', page)
+        self.assertIn('class="carte contact"', page)
         self.assertIn("850 Boulevard du Lac", page)                                   # mais le client est bien affiché
         self.assertIn('href="/client/3/modifier?retour=%2Fchantier%2F3"', page)       # seul point d'entrée : la fiche client (puis retour ici)
 
@@ -484,7 +484,7 @@ class TestModification(BaseInterface):
     def test_le_recap_apres_enregistrement_montre_le_client_verrouille(self):
         self.post("/nouveau", fiche())
         page = self.get("/soumission/4")[1]
-        self.assertIn('class="lecture-seule"', page)
+        self.assertIn('class="carte contact"', page)
         self.assertNotIn('name="client_nom"', page)
         self.assertIn("Sylvie Roy", page)
         self.assertIn("22 Rue des Pins", page)
