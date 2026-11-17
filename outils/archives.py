@@ -413,9 +413,11 @@ def _resultats(lignes, groupes, f, historique_vide=False):
     else:
         total = len(lignes)
         corps = ""
-        for l in lignes[:LIMITE_RESULTATS]:
-            corps += (f'<tr><td class="c-date">{esc(date_lisible(l["date_ref"]))}</td><td class="c-client">{_identite(l["client_nom_complet"], l["telephone"], url_fiche(l["chantier_id"], l["genre"]))}</td>'
-                      f'<td class="c-adresse">{_lieu(l["adresse"], l["secteur"], l["ville"])}</td><td class="c-travaux">{esc(l["travaux_detail"] or "à préciser")}</td>'
+        for l in lignes[:LIMITE_RESULTATS]:      # le nom ouvre la fiche du CLIENT (tous ses chantiers) ; les travaux ouvrent ce chantier-là
+            lien_client = f"/client/{l['client_id']}"
+            corps += (f'<tr><td class="c-date">{esc(date_lisible(l["date_ref"]))}</td><td class="c-client">{_identite(l["client_nom_complet"], l["telephone"], lien_client)}</td>'
+                      f'<td class="c-adresse">{_lieu(l["adresse"], l["secteur"], l["ville"])}</td>'
+                      f'<td class="c-travaux"><a class="lien-discret" href="{url_fiche(l["chantier_id"], l["genre"])}">{esc(l["travaux_detail"] or "à préciser")}</a></td>'
                       f'<td class="c-statut">{badge_statut(l["statut"], l["genre"])}</td><td class="montant c-montant">{_montant_ou_tiret(l["prix_ht"])}</td>{_relancer(l["client_id"])}</tr>')
         tete = ('<th>Date</th><th>Client</th><th>Adresse</th><th>Travaux</th><th>Résultat</th><th class="droite">Prix avant taxes</th><th></th>')
         unite = "fiche" + ("s" if total > 1 else "")

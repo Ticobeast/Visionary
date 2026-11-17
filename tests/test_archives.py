@@ -448,6 +448,16 @@ class TestPresentationTelephone(BaseArchives):
                 self.assertIn(classe, ligne, (chemin, classe))
         self.assertRegex(self.get("/archives?par_client=1&resultat=tout"), r'c-statut">\d+<span class="tel-seul"> chantiers?</span>')
 
+    def test_le_nom_ouvre_la_fiche_du_client_et_les_travaux_le_chantier(self):
+        """Dans les archives, cliquer sur un client ouvre SA fiche (avec tous ses chantiers) ; les travaux ouvrent ce chantier-là."""
+        page = self.get("/archives?resultat=tout")
+        client_id, chantier_id, nom = self.sql("SELECT client_id, chantier_id, client_nom_complet FROM v_chantiers "
+                                               "WHERE statut = 'termine' ORDER BY chantier_id LIMIT 1")[0]
+        self.assertIn(f'<td class="c-client"><a href="/client/{client_id}">{nom}</a>', page)
+        self.assertRegex(page, rf'<td class="c-travaux"><a class="lien-discret" href="/chantier/{chantier_id}">')
+        fiche = self.get(f"/client/{client_id}")
+        self.assertIn(f'href="/chantier/{chantier_id}"', fiche)                  # son chantier est dans l'historique de la fiche
+
     def test_les_numeros_des_listes_lancent_l_appel(self):
         """Dans les listes, le numéro se touche pour appeler ; sur une fiche, il se lit et on appelle par la tuile Appeler."""
         self.sql_exec("UPDATE clients SET telephone = '+18195550106' WHERE nom = 'Hamel'")

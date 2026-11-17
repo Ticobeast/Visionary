@@ -151,6 +151,7 @@ Fais chacun de ces scénarios et coche ce qui fonctionne comme attendu :
 | 107 | Après une mise à jour du programme, ouvrir plusieurs pages sur **téléphone** (réseau cellulaire si possible) et sur **ordinateur** ; ouvrir la page de **connexion** sans être connecté | les pages ont exactement le même aspect qu'avant et s'ouvrent plus vite sur un signal faible (le style n'est téléchargé qu'une fois, puis gardé en mémoire par le téléphone ; chaque page est environ dix fois plus légère) ; après une mise à jour qui change le style, le nouveau style s'applique tout de suite, sans rien vider ; la page de connexion est bien mise en forme avant la connexion |
 | 108 | **Journée** avec au moins trois chantiers, sur **téléphone** : maintenir le doigt sur une tuile, attendre qu'elle se soulève, la déplacer plus haut ou plus bas, relâcher ; faire défiler la page d'un geste rapide ; toucher brièvement le nom d'un client puis **Terminer** ; approcher la tuile soulevée du haut ou du bas de l'écran. Sur **ordinateur** : cliquer sur une ligne, la tirer, relâcher ; appuyer sur **Échap** pendant un déplacement. Même chose dans **Raccourcis** (Chantiers et Soumissions) | la tuile se soulève (contour vert, ombre), suit le doigt ou la souris, les voisines s'écartent en douceur ; au relâchement l'ordre est enregistré et les heures de la journée sont recalculées (message « Ordre de passage mis à jour ») ; une poignée à six points remplace les flèches ; un geste rapide fait défiler sans rien déplacer ; un toucher bref ouvre toujours la fiche ou la fenêtre Terminer ; près du bord de l'écran, la page défile toute seule ; Échap annule ; les raccourcis gardent leur nouvel ordre sur les pages Chantiers et Soumissions |
 | 109 | Sur **téléphone** : dans Chantiers, Soumissions, Clients et l'historique d'une fiche client, toucher une tuile ailleurs que sur le nom ; dans le **tableau de bord**, toucher plusieurs jours du calendrier, dont un jour vide | la tuile touchée prend tout de suite un contour vert et un fond vert pâle, qui restent jusqu'à l'ouverture de la fiche ; en revenant en arrière, le contour a disparu ; la carte de la journée choisie monte en douceur (un tiers de seconde), y compris pour un jour vide ; rien ne bouge à la simple ouverture du tableau de bord |
+| 110 | Dans **Archives** (téléphone et ordinateur), toucher le **nom d'un client**, puis revenir et toucher les **travaux** d'une ligne | le nom ouvre la **fiche du client**, avec tous ses chantiers et soumissions dans « Soumissions et chantiers » ; la flèche « ‹ Archives » ramène aux archives, au même endroit ; les travaux ouvrent le chantier de cette ligne ; le numéro lance l'appel ; « Relancer » ouvre une nouvelle soumission pour ce client |
 
 **Test de lecture par Python** (prépare l'étape 2 : itinéraires). Dans un terminal :
 
@@ -165,7 +166,7 @@ for r in c.execute("SELECT client_nom_complet, adresse_maps, duree_estimee_h, da
 EOF
 ```
 
-**Réussi si** : les 109 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
+**Réussi si** : les 110 scénarios se passent comme prévu et le test de lecture affiche les chantiers planifiés
 avec une adresse complète.
 
 ## Phase 2 : mise en service (1 semaine)

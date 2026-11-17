@@ -257,6 +257,7 @@ button:active,.bouton:active{transform:scale(.97);transition-duration:.1s}
 .rond-icone{transition:transform .1s,background-color .15s,border-color .15s}a.rond:active .rond-icone{transform:scale(.92)}
 .menu-rapide>summary{transition:background-color .15s}
 table.soumissions tbody tr,table.chantiers tbody tr,table.clients tbody tr{transition:background-color .12s}
+a.lien-discret{font-weight:inherit;color:inherit;text-decoration:none}a.lien-discret:hover{text-decoration:underline}
 .poignee{display:none}.glisser-pret .fleches{display:none!important}
 .glisser-pret .poignee{display:inline-block;width:22px;height:22px;vertical-align:middle;opacity:.55;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230e341d'%3E%3Ccircle cx='9' cy='6' r='1.7'/%3E%3Ccircle cx='15' cy='6' r='1.7'/%3E%3Ccircle cx='9' cy='12' r='1.7'/%3E%3Ccircle cx='15' cy='12' r='1.7'/%3E%3Ccircle cx='9' cy='18' r='1.7'/%3E%3Ccircle cx='15' cy='18' r='1.7'/%3E%3C/svg%3E") center/20px no-repeat}
 body.glisse,body.glisse *{overflow-anchor:none}.glisser-pret>[data-id]{cursor:grab;position:relative}.glisser-pret>[data-id].leve{z-index:30;cursor:grabbing;outline:2px solid var(--vert);outline-offset:-1px;box-shadow:0 16px 36px rgba(14,52,29,.28)}
