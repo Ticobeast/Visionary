@@ -416,6 +416,9 @@ def main(argv=None):
         if compte_essai:
             print(f"\nCOMPTE D'ESSAI (cette base de fausses données seulement) : nom « {auth.COMPTE_ESSAI[0]} », mot de passe « {auth.COMPTE_ESSAI[1]} ».\n"
                   "Pour le retirer : python gerer_utilisateurs.py --essai (le désactiver) ; ou supprimer data/test.db (la base d'essai est recréée).")
+        elif a.reseau:
+            print(f"\nLe compte d'essai « {auth.COMPTE_ESSAI[0]} » est DÉSACTIVÉ dans cette base : il ne peut pas servir à se connecter.\n"
+                  "Pour le réactiver ou voir les autres comptes : python gerer_utilisateurs.py --essai")
     if db.name == DB_DEFAUT.name:
         print("Pour t'entraîner sur de fausses données, lance plutôt :  python outils/interface.py --essai")
     nuage = service_nuage(db)

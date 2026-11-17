@@ -1,7 +1,7 @@
 # SylvainCulteur : où en est le programme (contexte pour le Projet Claude)
 
 Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), branche de travail `claude/kind-knuth-824c6c`
-(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 736 tests automatiques, tous verts.
+(pas encore fusionnée dans `main`). Base de données : format v16 (journal des modifications : table journal ; fusion de deux fiches : clients.fusionne_dans ; nouvelle adresse d'un client : clients.remplace_par ; date de la facture figée quand le chantier est terminé ; numéros de fiche jamais réutilisés depuis v12 ; migration automatique v8 à v15 vers v16). 737 tests automatiques, tous verts.
 
 ## 1. Ce que fait le programme
 - **Clients** : une fiche = une personne (ou entreprise) + son adresse ; secteur choisi dans une liste fermée (pas de doublons).
@@ -39,7 +39,7 @@ Mis à jour : novembre 2026. Dépôt GitHub : `ticobeast/visionary` (privé), br
 ## 2. Accès et lancement
 - PC : `lancer_interface.bat` (vraie base), `lancer_essai.bat` (fausses données, data/test.db).
 - Téléphones : `lancer_reseau.bat` ; adresse Tailscale `http://ticotower.tailbb6d3b.ts.net:8765/`.
-- Essai sur téléphone avec les fausses données : `lancer_essai_reseau.bat` ; crée le compte d'essai `essai` / `essai1234`
+- Essai sur téléphone avec les fausses données : `lancer_essai_reseau.bat` ; garantit le compte d'essai `essai` / `essai1234` à chaque lancement (créé s'il manque, mot de passe remis)
   (seulement dans la base d'essai).
 - Comptes réels : `gerer_utilisateurs.bat` (jamais de mot de passe réel écrit dans le dépôt ou une conversation).
 - Le dossier doit être hors OneDrive/Dropbox (ex. C:\SylvainCulteur). Sauvegarde automatique quotidienne dans data/sauvegardes/.

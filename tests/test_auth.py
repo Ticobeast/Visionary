@@ -508,12 +508,28 @@ class TestCompteEssai(BaseAuth):
         finally:
             c.close()
 
-    def test_ne_touche_pas_aux_comptes_existants(self):
+    def test_cree_le_compte_meme_s_il_y_a_d_autres_comptes(self):
+        """Sinon « essai / essai1234 » est refusé sans qu'on sache pourquoi (le compte n'existe simplement pas)."""
         self.creer("Alice", "motdepasse-alice", "admin")
         c = self.conn()
         try:
-            self.assertFalse(auth.preparer_compte_essai(c))
-            self.assertEqual([u["nom"] for u in auth.lister_utilisateurs(c)], ["Alice"])
+            self.assertTrue(auth.preparer_compte_essai(c))
+            self.assertEqual([u["nom"] for u in auth.lister_utilisateurs(c)], ["Alice", "essai"])
+            self.assertEqual(auth.connexion(c, *auth.COMPTE_ESSAI, "100.64.0.9")[0]["nom"], "essai")
+            self.assertEqual(auth.connexion(c, "Alice", "motdepasse-alice", "100.64.0.9")[0]["nom"], "Alice")     # les autres comptes ne changent pas
+        finally:
+            c.close()
+
+    def test_remet_le_mot_de_passe_annonce(self):
+        """Le démarrage annonce « essai1234 » : si le mot de passe du compte d'essai a été changé, il est remis."""
+        c = self.conn()
+        try:
+            auth.preparer_compte_essai(c)
+            self.assertEqual(auth.changer_mot_de_passe(c, "essai", "autre-mot-de-passe"), [])
+            self.assertIsNone(auth.connexion(c, *auth.COMPTE_ESSAI, "100.64.0.9")[0])
+            auth.reinitialiser_blocages()
+            self.assertTrue(auth.preparer_compte_essai(c))
+            self.assertEqual(auth.connexion(c, *auth.COMPTE_ESSAI, "100.64.0.9")[0]["nom"], "essai")
         finally:
             c.close()
 
@@ -524,7 +540,8 @@ class TestCompteEssai(BaseAuth):
             self.creer("Alice", "motdepasse-alice", "admin")
             self.assertEqual(auth.definir_actif(c, "essai", False), [])
             self.assertFalse(auth.compte_essai_actif(c))
-            self.assertFalse(auth.preparer_compte_essai(c))                                             # il y a un autre compte : on n'en refait pas
+            self.assertFalse(auth.preparer_compte_essai(c))                                             # désactivé exprès : on n'y touche pas
+            self.assertEqual([(u["nom"], u["actif"]) for u in auth.lister_utilisateurs(c)], [("Alice", 1), ("essai", 0)])
         finally:
             c.close()
 

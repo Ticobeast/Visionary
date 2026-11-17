@@ -99,10 +99,17 @@ def compte_essai_actif(conn):
 
 
 def preparer_compte_essai(conn):
-    """Base d'essai en mode réseau : s'il n'y a encore aucun compte actif, crée le compte administrateur « essai » (temporaire, mot de passe
-    connu : ne jamais l'utiliser sur la vraie base, qui n'en reçoit jamais). Retourne True si ce compte est utilisable ensuite."""
-    if nombre_actifs(conn) == 0:
+    """Base d'essai en mode réseau : le compte administrateur « essai » (temporaire, mot de passe connu : ne jamais l'utiliser sur la
+    vraie base, qui n'en reçoit jamais) doit TOUJOURS fonctionner avec le mot de passe annoncé au démarrage.
+    - il n'existe pas : on le crée, même si la base d'essai a déjà d'autres comptes (sinon on reste coincé dehors sans le savoir) ;
+    - il existe, actif, mais son mot de passe a été changé : on remet le mot de passe annoncé ;
+    - il a été désactivé exprès : on n'y touche pas (c'est la façon de le retirer).
+    Retourne True si ce compte est utilisable ensuite."""
+    r = conn.execute("SELECT id, mot_de_passe, actif FROM utilisateurs WHERE nom = ?", (COMPTE_ESSAI[0],)).fetchone()
+    if r is None:
         creer_utilisateur(conn, COMPTE_ESSAI[0], COMPTE_ESSAI[1], "admin")
+    elif r[2] == 1 and not verifier(COMPTE_ESSAI[1], r[1]):
+        changer_mot_de_passe(conn, r[0], COMPTE_ESSAI[1])
     return compte_essai_actif(conn)
 
 
